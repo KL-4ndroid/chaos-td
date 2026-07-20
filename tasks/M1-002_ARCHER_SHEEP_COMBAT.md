@@ -2,7 +2,7 @@
 
 ## Status
 
-- [ ] Ready
+- [x] Ready
 - [ ] In Progress
 - [ ] Blocked
 - [ ] Done

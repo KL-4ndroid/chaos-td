@@ -5,7 +5,27 @@
 - [ ] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
+
+## Completion Report
+
+- **Commit 1**: f1c3ddb - feat(core): add movement, lane, and monster state types
+- **Commit 2**: f2bb265 - feat(core): integrate movement and lanes into simulation
+- **Date**: 2026-07-20
+- **Branch**: autonomous/phase1-mvp
+- **Tests**: 111 passed
+- **Verification**: lint, typecheck, build all passed
+
+## Acceptance Criteria
+
+- [x] Sheep 每 Tick 依 Speed 前進。
+- [x] Progress 不減。
+- [x] Segment Transition 正確。
+- [x] 終點造成一次 Leak。
+- [x] Leaked Monster 移除且不重複扣 HP。
+- [x] 相同 State 到達 Tick 一致。
+- [x] p1／p2 鏡像一致。
+- [x] State 無浮點位置。
 
 ## Goal
 
