@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./apps/client" },
+    { "path": "./packages/game-core" },
+    { "path": "./packages/game-data" },
+    { "path": "./packages/shared" },
+    { "path": "./packages/test-fixtures" }
+  ]
+}

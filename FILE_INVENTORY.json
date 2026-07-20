@@ -1,0 +1,202 @@
+{
+  "spec": "Chaos TD Specification v2.0",
+  "generatedAt": "2026-07-20",
+  "fileCountExcludingInventory": 39,
+  "files": [
+    {
+      "path": ".cursor/rules/chaos-td.mdc",
+      "bytes": 1534,
+      "sha256": "b54c3dc1d71ae26ed7229d68304b08564dde9fa0a8e02f4b5b41b9c2c4a3e807"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 1019,
+      "sha256": "f38a2d65b5ab9afc8d0396630966f872e891d62b3e7914dd4de7b03693d3f8bd"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2913,
+      "sha256": "96d8cd243355ea7f3541e4eb0ac1b0f8063c5f9d8f903a2836c582a9f46e8968"
+    },
+    {
+      "path": "SPEC_MANIFEST.json",
+      "bytes": 370,
+      "sha256": "6b101aa9bd09f39dbba921eec085a8f86004d67d9f4ed93dc39bd6426dd3bc78"
+    },
+    {
+      "path": "docs/00_PROJECT_CHARTER.md",
+      "bytes": 2246,
+      "sha256": "0ed56b195815530fe491824448e480d3f374f4dc1460cb7d3975009f8695e89a"
+    },
+    {
+      "path": "docs/01_PRODUCT_SCOPE.md",
+      "bytes": 2404,
+      "sha256": "57798f5a26b0fa899d60db19a1608a6dc61bd41f759ea69529339a23ac81a997"
+    },
+    {
+      "path": "docs/02_CORE_GAME_RULES.md",
+      "bytes": 5780,
+      "sha256": "69f6c2f67e7a07d51dac1476ec8ea68e4a5ada3bd0e24ad8c0bd2b31afc2f83f"
+    },
+    {
+      "path": "docs/03_BALANCE_BASELINE.md",
+      "bytes": 3389,
+      "sha256": "e03ae8248c4295a8dc2202f9629c50a6bf39b0a868c6a498e5b0da6ae3fdb015"
+    },
+    {
+      "path": "docs/04_MAP_AND_PATH_SPEC.md",
+      "bytes": 2618,
+      "sha256": "28ed990271c1b7cc2b05d58dce4b82dda4a082b936e4493159512c25b386cbfe"
+    },
+    {
+      "path": "docs/05_AI_BEHAVIOR_SPEC.md",
+      "bytes": 3095,
+      "sha256": "6a027c48a42c62b6f362a43063ae6c19c7741aefa8cbd6597082f8c0fe7f87a8"
+    },
+    {
+      "path": "docs/06_TECHNICAL_ARCHITECTURE.md",
+      "bytes": 4416,
+      "sha256": "6d985d076647d8c1bb26650404d28ba471e2f583dd44eaed1b0e3516ec6f02a6"
+    },
+    {
+      "path": "docs/07_DATA_CONTRACTS.md",
+      "bytes": 4800,
+      "sha256": "4e3de0cf5dd6db7dbbde1d41fe30b5e1e9c0669cccc7ff7602dec1f5fab4fd0a"
+    },
+    {
+      "path": "docs/08_CLIENT_UX_SPEC.md",
+      "bytes": 2863,
+      "sha256": "b57982c67a0655a04259ad88c10f8c2f6c37b7ce967c18bede933fc51951e059"
+    },
+    {
+      "path": "docs/09_ASSET_PIPELINE.md",
+      "bytes": 2115,
+      "sha256": "0ed0559606917cd8221a7a57027445580247e15df7c67be1fb62f263f172cc5a"
+    },
+    {
+      "path": "docs/10_TEST_STRATEGY.md",
+      "bytes": 2400,
+      "sha256": "68218f485419887171314c929ab94c8b6e298b3ebaa419f5355fa05fa79909fb"
+    },
+    {
+      "path": "docs/11_IMPLEMENTATION_ROADMAP.md",
+      "bytes": 2992,
+      "sha256": "fb6ad63e39e1f15e898237af527d11b5bef88bb125b7c61d4074300c58cf4526"
+    },
+    {
+      "path": "docs/12_CURSOR_EXECUTION_GUIDE.md",
+      "bytes": 2217,
+      "sha256": "1ca641505b376dffb7a9a47adc095fcee5a8fe59d1841967fc80137838ec726d"
+    },
+    {
+      "path": "docs/13_SOURCE_OF_TRUTH.md",
+      "bytes": 1547,
+      "sha256": "3f78c81eced1db6235da67523eb2f78b74994e7867532df64b8216b79f4e036d"
+    },
+    {
+      "path": "docs/14_DECISION_LOG.md",
+      "bytes": 1470,
+      "sha256": "0d6e9b5dd10c636dfcb0d2ad7ec1419cfdda4ec07611908a71c3308ede537765"
+    },
+    {
+      "path": "docs/15_MULTIPLAYER_PHASE_2.md",
+      "bytes": 1977,
+      "sha256": "3c71877f4c963a9752025da71784a4740ccc3a138641e071f01acd1e7307a48e"
+    },
+    {
+      "path": "docs/16_RISK_REGISTER.md",
+      "bytes": 1610,
+      "sha256": "875ce894484d5bfb06cca43eeb927d1cf5572178ff11758262ea46eb451a37c9"
+    },
+    {
+      "path": "docs/17_GLOSSARY.md",
+      "bytes": 976,
+      "sha256": "4d20645ddd8db636a931eb333cd842769a6186c76d3f7d8a3cd2afeb47e37636"
+    },
+    {
+      "path": "docs/18_TECH_BASELINE.md",
+      "bytes": 1387,
+      "sha256": "02283ea9f2a9e5a5488f5331f07767f49e35aa960b07ed9f6a62c565e1c842ba"
+    },
+    {
+      "path": "docs/ADR/ADR-001-DETERMINISTIC-FIXED-STEP.md",
+      "bytes": 525,
+      "sha256": "2a6a1c9e456c2d1095b52753db873f858749505a5fb7de1335adf3188fd0b1a6"
+    },
+    {
+      "path": "docs/ADR/ADR-002-DATA-ORIENTED-ENTITIES.md",
+      "bytes": 470,
+      "sha256": "235f88774d5ec05405ec8b84b9f533fcef966bab58e7f3f2e316218726a5b233"
+    },
+    {
+      "path": "docs/ADR/ADR-003-HITSCAN-MVP-COMBAT.md",
+      "bytes": 437,
+      "sha256": "d6fd397e30b9df771c8eb6d191f9e12583432cbd9a699361bede8150c116bbc5"
+    },
+    {
+      "path": "docs/ADR/ADR-004-NPM-WORKSPACES.md",
+      "bytes": 283,
+      "sha256": "f50386926e0633f46c3401450328c7f08e27956bf45cba1004b62bd236d6e9c7"
+    },
+    {
+      "path": "docs/ADR/ADR-005-PHASER-4-BASELINE.md",
+      "bytes": 417,
+      "sha256": "d59ce58491a41b387305002766f3ffe29b0138c281c1805ece5d885c921ad052"
+    },
+    {
+      "path": "docs/ADR/ADR-006-SERVER-AUTHORITY.md",
+      "bytes": 442,
+      "sha256": "38695b0b83af13dbb3bae702aac426c96d12a1856111f460ca5b25ecb826cb26"
+    },
+    {
+      "path": "docs/ADR/README.md",
+      "bytes": 136,
+      "sha256": "30aa0e463c3291b10de804fe5ba0b1420ee04574107686dc2cb3eb68a870680f"
+    },
+    {
+      "path": "legacy/MIGRATION_MAP.md",
+      "bytes": 763,
+      "sha256": "2c4fe068e95d614da7ae202f7b0855cfba08e9770a83842960393eeecb405834"
+    },
+    {
+      "path": "tasks/M0-001_REPOSITORY_BOOTSTRAP.md",
+      "bytes": 1453,
+      "sha256": "3e2cd150f868482220071958f5f9cb83a07892791d800f2d213395dc76731c79"
+    },
+    {
+      "path": "tasks/M0-002_FIXED_STEP_SIMULATION_CLOCK.md",
+      "bytes": 1348,
+      "sha256": "49227018b46e0831935595972631fcd9c8c695216c4972babccb372d67431ff1"
+    },
+    {
+      "path": "tasks/M0-003_DATA_SCHEMA_AND_VALIDATION.md",
+      "bytes": 1264,
+      "sha256": "38553286a998088763b75671cddcfc765d80619349b68b5c1740a804542c6d43"
+    },
+    {
+      "path": "tasks/M1-001_MAP_AND_MOVEMENT.md",
+      "bytes": 951,
+      "sha256": "69ccc7d2b0ebcb914c446b3e28cc3fb8c21543c34efe88e762263cbdd00f5785"
+    },
+    {
+      "path": "tasks/M1-002_ARCHER_SHEEP_COMBAT.md",
+      "bytes": 966,
+      "sha256": "0f6adf1dedf18b7927dc840f15065c2a978fc9ccbf12c99b7d1eae15ab4ebbc7"
+    },
+    {
+      "path": "tasks/M1-003_PHASER_RENDER_ADAPTER.md",
+      "bytes": 1018,
+      "sha256": "c18c6d0b11f8381f61d0475533e02e33e1ad04e1123fd124240010953e69957b"
+    },
+    {
+      "path": "tasks/README.md",
+      "bytes": 335,
+      "sha256": "7dfc4567ae382982feff0551f51bb30eeacd1e220e0ecbb65eeae1a65c112e4e"
+    },
+    {
+      "path": "tasks/TASK_TEMPLATE.md",
+      "bytes": 679,
+      "sha256": "edaa83462558f7465d10bf9cef7d5392ca75e42641443dee667b7281718d082f"
+    }
+  ]
+}

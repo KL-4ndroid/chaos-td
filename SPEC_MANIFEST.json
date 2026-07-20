@@ -1,0 +1,12 @@
+{
+  "specName": "Chaos TD Specification",
+  "version": "2.0.0",
+  "date": "2026-07-20",
+  "language": "zh-TW",
+  "status": "mvp-baseline",
+  "entrypoint": "README.md",
+  "currentPhase": "Phase 1 - Offline MVP",
+  "authoritativeRules": "docs/02_CORE_GAME_RULES.md",
+  "authoritativeContracts": "docs/07_DATA_CONTRACTS.md",
+  "cursorRules": ".cursor/rules/chaos-td.mdc"
+}

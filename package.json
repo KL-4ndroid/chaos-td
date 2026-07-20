@@ -1,0 +1,35 @@
+{
+  "name": "chaos-td",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Chaos TD - Dual-lane competitive tower defense",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/client",
+    "build": "npm run build --workspace=apps/client",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.64.0",
+    "@typescript-eslint/parser": "^8.64.0",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
+    "prettier": "^3.4.0",
+    "typescript": "^6.0.0",
+    "typescript-eslint": "^8.64.0",
+    "vitest": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "npm@11.0.0",
+  "lockfile": 3
+}

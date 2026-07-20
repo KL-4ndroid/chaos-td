@@ -1,0 +1,26 @@
+{
+  "name": "@chaos-td/shared",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared types across packages",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.0"
+  },
+  "peerDependencies": {},
+  "dependencies": {}
+}

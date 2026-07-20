@@ -1,0 +1,27 @@
+---
+description: Chaos TD v2.0 project-wide implementation rules
+alwaysApply: true
+---
+
+# Chaos TD Rules
+
+1. Read the active task and only its Required Reading.
+2. Do not implement deferred features.
+3. `packages/game-core` must not import Phaser, DOM, Canvas, WebSocket, LocalStorage or audio.
+4. Never use `Math.random()`, `Date.now()`, timers or render delta as game-rule input.
+5. Use integer ticks and integer fixed-point values for rule state.
+6. The client submits commands; it must not directly mutate authoritative simulation state.
+7. Do not duplicate game-data values in UI or scenes.
+8. Prefer data-oriented serializable state over per-content inheritance classes.
+9. Add or update tests before implementing new behavior.
+10. Do not delete or weaken tests to make CI pass.
+11. Do not use broad `any`, `as unknown as`, empty stubs or TODOs to claim completion.
+12. Do not add frameworks or major dependencies unless the task or accepted ADR permits it.
+13. Do not change an accepted ADR silently.
+14. Do not modify unrelated files without explaining why.
+15. Run the exact verification commands required by the task.
+16. A task is not done unless lint, typecheck, required tests and build pass.
+17. If specs conflict, follow `docs/13_SOURCE_OF_TRUTH.md`.
+18. If ambiguity remains, report `SPEC_BLOCKER` with at most two minimal options; complete all unblocked work.
+19. Keep changes reviewable; do not prebuild future empty directory trees.
+20. Update documentation when public contracts or authoritative behavior changes.
