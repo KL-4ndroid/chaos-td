@@ -231,37 +231,37 @@ export function hashStateToString(state: CanonicalState): string {
  * - Emoji / Surrogate Pairs (4 bytes)
  */
 function utf8Encode(str: string): Uint8Array {
-  const result = new Uint8Array(str.length * 4);
-  let pos = 0;
+  const result: number[] = [];
 
   for (let i = 0; i < str.length; i++) {
     const code = str.charCodeAt(i);
 
-    if (code < 0x80) {
+    // Check for high surrogate first (must be combined with low surrogate)
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const high = code;
+      const low = str.charCodeAt(++i);
+      const codepoint = 0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00);
+      // 4-byte: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+      result.push(0xF0 | (codepoint >> 18));
+      result.push(0x80 | ((codepoint >> 12) & 0x3F));
+      result.push(0x80 | ((codepoint >> 6) & 0x3F));
+      result.push(0x80 | (codepoint & 0x3F));
+    } else if (code < 0x80) {
       // ASCII: 0xxxxxxx
-      result[pos++] = code;
+      result.push(code);
     } else if (code < 0x800) {
       // 2-byte: 110xxxxx 10xxxxxx
-      result[pos++] = 0xc0 | (code >> 6);
-      result[pos++] = 0x80 | (code & 0x3f);
-    } else if (code < 0x10000) {
-      // 3-byte: 1110xxxx 10xxxxxx 10xxxxxx
-      result[pos++] = 0xe0 | (code >> 12);
-      result[pos++] = 0x80 | ((code >> 6) & 0x3f);
-      result[pos++] = 0x80 | (code & 0x3f);
+      result.push(0xC0 | (code >> 6));
+      result.push(0x80 | (code & 0x3F));
     } else {
-      // Surrogate pair (4-byte): 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-      const high = code - 0xd800;
-      const low = str.charCodeAt(++i) - 0xdc00;
-      const codepoint = (high << 10) + low + 0x10000;
-      result[pos++] = 0xf0 | (codepoint >> 18);
-      result[pos++] = 0x80 | ((codepoint >> 12) & 0x3f);
-      result[pos++] = 0x80 | ((codepoint >> 6) & 0x3f);
-      result[pos++] = 0x80 | (codepoint & 0x3f);
+      // 3-byte: 1110xxxx 10xxxxxx 10xxxxxx
+      result.push(0xE0 | (code >> 12));
+      result.push(0x80 | ((code >> 6) & 0x3F));
+      result.push(0x80 | (code & 0x3F));
     }
   }
 
-  return result.slice(0, pos);
+  return new Uint8Array(result);
 }
 
 /**

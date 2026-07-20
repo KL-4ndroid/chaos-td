@@ -503,7 +503,7 @@ describe('Canonical Hash - Determinism and Edge Cases', () => {
     expect(() => hashStateToString(badState as unknown as CanonicalState)).toThrow();
   });
 
-  it('should match ASCII test vector', () => {
+  it('should match ASCII full state test vector', () => {
     const p1: PlayerSlotState = { playerId: 'p1' };
     const p2: PlayerSlotState = { playerId: 'p2' };
 
@@ -523,10 +523,53 @@ describe('Canonical Hash - Determinism and Edge Cases', () => {
     expect(hash).toBe('8ef8adbc744cd21f');
   });
 
-  it('should handle non-ASCII characters (UTF-8 encoding)', () => {
+  it('should match isolated string test vectors (canonical JSON quoted)', () => {
+    // These test vectors verify UTF-8 encoding in the hash function
+    // The canonical text is JSON.stringify(value) which includes quotes
+
     const p1: PlayerSlotState = { playerId: 'p1' };
     const p2: PlayerSlotState = { playerId: 'p2' };
 
+    // test → "test" → FNV-1a 64 = 3751450a2013b125
+    const state1: CanonicalState = {
+      schemaVersion: 1,
+      configVersion: '1.0.0',
+      seed: 'test',
+      phase: 'ready',
+      tick: 0,
+      players: { p1, p2 },
+      towers: [],
+      monsters: [],
+      result: null,
+    };
+    expect(hashStateToString(state1)).toBe('8ef8adbc744cd21f');
+  });
+
+  it('should match UTF-8 test vector for Chinese seed', () => {
+    const p1: PlayerSlotState = { playerId: 'p1' };
+    const p2: PlayerSlotState = { playerId: 'p2' };
+
+    // 混沌攻防 seed → full state hash = eb7d3bf0ffb5cd63
+    const state: CanonicalState = {
+      schemaVersion: 1,
+      configVersion: '1.0.0',
+      seed: '混沌攻防',
+      phase: 'ready',
+      tick: 0,
+      players: { p1, p2 },
+      towers: [],
+      monsters: [],
+      result: null,
+    };
+
+    expect(hashStateToString(state)).toBe('eb7d3bf0ffb5cd63');
+  });
+
+  it('should match UTF-8 test vector for mixed Chinese seed', () => {
+    const p1: PlayerSlotState = { playerId: 'p1' };
+    const p2: PlayerSlotState = { playerId: 'p2' };
+
+    // 測試-seed-中文 seed → full state hash = e64ef410a5fb0427
     const state: CanonicalState = {
       schemaVersion: 1,
       configVersion: '1.0.0',
@@ -539,57 +582,19 @@ describe('Canonical Hash - Determinism and Edge Cases', () => {
       result: null,
     };
 
-    const hash = hashStateToString(state);
-    expect(hash).toMatch(/^[0-9a-f]{16}$/);
-
-    // Different non-ASCII seeds should produce different hashes
-    const state2: CanonicalState = {
-      ...state,
-      seed: '測試-seed-日文',
-    };
-    expect(hashStateToString(state)).not.toBe(hashStateToString(state2));
+    expect(hashStateToString(state)).toBe('e64ef410a5fb0427');
   });
 
-  it('should handle Chinese characters correctly', () => {
+  it('should match UTF-8 test vector for emoji seed (surrogate pair)', () => {
     const p1: PlayerSlotState = { playerId: 'p1' };
     const p2: PlayerSlotState = { playerId: 'p2' };
 
-    const state1: CanonicalState = {
-      schemaVersion: 1,
-      configVersion: '1.0.0',
-      seed: '混沌攻防',
-      phase: 'ready',
-      tick: 0,
-      players: { p1, p2 },
-      towers: [],
-      monsters: [],
-      result: null,
-    };
-
-    const state2: CanonicalState = {
-      schemaVersion: 1,
-      configVersion: '1.0.0',
-      seed: 'test',
-      phase: 'ready',
-      tick: 0,
-      players: { p1, p2 },
-      towers: [],
-      monsters: [],
-      result: null,
-    };
-
-    expect(hashStateToString(state1)).not.toBe(hashStateToString(state2));
-    expect(hashStateToString(state1)).toMatch(/^[0-9a-f]{16}$/);
-  });
-
-  it('should handle emoji / surrogate pairs correctly', () => {
-    const p1: PlayerSlotState = { playerId: 'p1' };
-    const p2: PlayerSlotState = { playerId: 'p2' };
-
+    // 🐑 seed → full state hash = 1dd57eab3a7efe29
+    // Verifies correct UTF-8 encoding of surrogate pair (4 bytes: F0 9F 90 91)
     const state: CanonicalState = {
       schemaVersion: 1,
       configVersion: '1.0.0',
-      seed: 'sheep',
+      seed: '🐑',
       phase: 'ready',
       tick: 0,
       players: { p1, p2 },
@@ -598,13 +603,12 @@ describe('Canonical Hash - Determinism and Edge Cases', () => {
       result: null,
     };
 
-    const hash1 = hashStateToString(state);
-    expect(hash1).toMatch(/^[0-9a-f]{16}$/);
+    expect(hashStateToString(state)).toBe('1dd57eab3a7efe29');
 
-    // Different seeds should produce different hashes
+    // Different emoji should produce different hashes
     const state2: CanonicalState = {
       ...state,
-      seed: 'wolf',
+      seed: '🐺',
     };
     expect(hashStateToString(state)).not.toBe(hashStateToString(state2));
   });
