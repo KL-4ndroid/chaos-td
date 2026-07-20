@@ -176,7 +176,7 @@ describe('Monster Definition Validation', () => {
   it('should reject monster with zero speed', () => {
     const result = validateMonsterDefinition(INVALID_MONSTER_SPEED_ZERO);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.code === 'MONSTER_SPEEDMILLITILESPERTICK_INVALID')).toBe(true);
+    expect(result.errors.some(e => e.code === 'MONSTER_SPEED_INVALID')).toBe(true);
   });
 
   it('should reject monster with armor out of bounds', () => {
@@ -194,7 +194,7 @@ describe('Monster Definition Validation', () => {
   it('should reject monster with zero spawn gap', () => {
     const result = validateMonsterDefinition(INVALID_MONSTER_SPAWN_GAP_ZERO);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.code === 'MONSTER_SPAWNGAPTICKS_INVALID')).toBe(true);
+    expect(result.errors.some(e => e.code === 'MONSTER_SPAWN_GAP_INVALID')).toBe(true);
   });
 
   it('should reject monster with missing id', () => {

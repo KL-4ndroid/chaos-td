@@ -21,6 +21,8 @@
     "typescript": "^6.0.0",
     "vitest": "^4.1.0"
   },
-  "peerDependencies": {},
+  "peerDependencies": {
+    "@chaos-td/game-data": "workspace:*"
+  },
   "dependencies": {}
 }
