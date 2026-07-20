@@ -19,8 +19,8 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Lockfile - we commit this but ignore temp copies
-package-lock.json
+# Lockfile
+# package-lock.json
 
 # Logs
 *.log
