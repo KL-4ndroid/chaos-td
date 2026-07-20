@@ -1,0 +1,9 @@
+feat(core): add deterministic simulation foundation
+
+- Core Simulation with phase state machine (READY/COUNTDOWN/RUNNING/RESOLVING/RESULT)
+- Mulberry32 PRNG with explicit versioning and test vectors
+- FNV-1a 64-bit canonical state hash with UTF-8 encoding
+- Canonical serializer with explicit type restrictions (plain objects only)
+- Per-tick event lifecycle (no accumulation)
+- 59 tests covering PRNG, hash, phase boundaries, edge cases
+- ADR-007 (PRNG) and ADR-008 (Canonical Hash) documented

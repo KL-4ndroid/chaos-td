@@ -45,6 +45,22 @@
 - Status：Accepted
 - Decision：建立後為正式數值唯一來源。
 
+## DEC-009｜PRNG 選擇
+
+- Status：Accepted
+- Date：2026-07-20
+- Decision：Mulberry32 Algorithm，版本化 SeededRng。
+- Reason：小、跨 JS Runtime 穩定、passes TestU01/SmallCrush、易版本化。
+- Reference：ADR-007-SEEDED-PRNG
+
+## DEC-010｜Canonical Hash 選擇
+
+- Status：Accepted
+- Date：2026-07-20
+- Decision：Canonical JSON + djb2 hash。
+- Reason：零依賴、確定性、debug-friendly、不需密碼安全。
+- Reference：ADR-008-CANONICAL-HASH
+
 ## Open
 
 ### OPEN-001｜上下或左右 Lane
@@ -56,10 +72,12 @@
 
 ### OPEN-002｜PRNG
 
-- Owner：M0-002
-- Requirement：小、跨 JS Runtime 穩定、版本化。
+- Status：Resolved by DEC-009
+- Decision：Mulberry32 Algorithm。
+- Reference：ADR-007-SEEDED-PRNG
 
 ### OPEN-003｜State Hash
 
-- Owner：M0-002
-- Requirement：穩定、簡單，不需密碼安全。
+- Status：Resolved by DEC-010
+- Decision：Canonical JSON + djb2 hash。
+- Reference：ADR-008-CANONICAL-HASH

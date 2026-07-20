@@ -6,4 +6,70 @@
  * Must NOT use: Math.random(), Date.now(), timers, render delta
  */
 
-export {};
+// Constants
+export {
+  TICK_DURATION_MS,
+  TICKS_PER_SECOND,
+  PHASE_TICKS,
+  PHASE_DURATIONS_MS,
+} from './constants';
+
+// PRNG
+export {
+  PRNG_VERSION,
+  type SeededRng,
+  parseSeed,
+  create,
+  createFromString,
+  next,
+  nextInt,
+  fork,
+} from './prng';
+
+// Canonical State
+export {
+  type PlayerSlot,
+  type Phase,
+  type PlayerSlotState,
+  type TowerState,
+  type MonsterState,
+  type MatchResult,
+  type CanonicalState,
+  type StateHash,
+  STATE_HASH_ALGORITHM,
+  STATE_HASH_VERSION,
+  canonicalize,
+  hashState,
+  hashStateToString,
+} from './canonical';
+
+// Events
+export {
+  type DomainEvent,
+  type CommandAcceptedEvent,
+  type CommandRejectedEvent,
+  type PhaseChangedEvent,
+  type IncomePaidEvent,
+  type MatchEndedEvent,
+  type TowerBuiltEvent,
+  type TowerUpgradedEvent,
+  type TowerSoldEvent,
+  type MonsterQueuedEvent,
+  type MonsterSpawnedEvent,
+  type MonsterDiedEvent,
+  type MonsterLeakedEvent,
+  type AttackFiredEvent,
+  type DamageAppliedEvent,
+  type ShieldBrokenEvent,
+  type SlowAppliedEvent,
+} from './events';
+
+// Simulation
+export {
+  type MatchConfig,
+  type SimulationState,
+  type Simulation,
+  type StepResult,
+  createSimulation,
+  createWithRng,
+} from './simulation';
