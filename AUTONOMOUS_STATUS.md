@@ -6,8 +6,8 @@
 - **Milestone**: M1 Minimal Vertical Slice
 - **Task**: M1-002 Done, M1-003 Next
 - **Status**: Ready for M1-003
-- **Last commit**: pending
-- **Last push**: pending
+- **Last commit**: d148892 feat(core): add archer sheep combat
+- **Last push**: 2026-07-20, origin/autonomous/phase1-mvp
 - **Test status**: 120 passed; lint, typecheck, build, balance docs passed
 
 ## Completed Tasks
@@ -18,7 +18,7 @@
 | M0-002 | 6484ba9 | Passed | Yes |
 | M0-003 | 19f283e | Passed | Yes |
 | M1-001 | f1c3ddb, f2bb265 | 111 passed | Yes |
-| M1-002 | pending | 120 passed | pending |
+| M1-002 | d148892 | 120 passed | Yes |
 
 ## Current Gate
 
