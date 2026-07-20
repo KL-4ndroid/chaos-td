@@ -44,7 +44,7 @@ export function createFromString(seedStr: string): SeededRng {
 }
 
 export function next(rng: SeededRng): { value: number; rng: SeededRng } {
-  let s = rng.state[0];
+  let s = rng.state[0] ?? 0;
   s = (s + 0x6D2B79F5) >>> 0;
   let t = Math.imul(s ^ (s >>> 15), 1 | s);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
@@ -67,5 +67,5 @@ export function nextInt(rng: SeededRng, min: number, max: number): { value: numb
 
 export function fork(rng: SeededRng): SeededRng {
   const { value, rng: after } = next(rng);
-  return create(value * 4294967296 + after.state[0]);
+  return create(value * 4294967296 + (after.state[0] ?? 0));
 }

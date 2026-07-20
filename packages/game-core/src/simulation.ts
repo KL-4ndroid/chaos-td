@@ -16,9 +16,18 @@ import { PHASE_TICKS } from './constants';
 import { type SeededRng, createFromString } from './prng';
 import type { Phase, PlayerSlot, CanonicalState, MonsterState } from './canonical';
 import { hashStateToString } from './canonical';
-import type { DomainEvent, PhaseChangedEvent, MonsterSpawnedEvent, MonsterLeakedEvent } from './events';
-import type { LaneId, FixedPointPosition } from '@chaos-td/game-data';
-import { hasReachedEnd, type PathSegment } from './movement';
+import type {
+  AttackFiredEvent,
+  DamageAppliedEvent,
+  DomainEvent,
+  MonsterDiedEvent,
+  PhaseChangedEvent,
+  MonsterSpawnedEvent,
+  MonsterLeakedEvent,
+} from './events';
+import { TOWER_BY_ID, type LaneId, type FixedPointPosition } from '@chaos-td/game-data';
+import { hasReachedEnd, type PathSegment, calculatePosition } from './movement';
+import { compareTargetPriority, type TowerRuntimeState } from './tower';
 
 export interface MatchConfig {
   seed: string;
@@ -81,6 +90,7 @@ export interface SimulationState {
   resolvingStartedAtTick: number | null;
   players: Record<PlayerSlot, PlayerBattleState>;
   lanes: Record<LaneId, LaneRuntimeState>;
+  towers: TowerRuntimeState[];
   nextEntityId: number;
   stateHash: string;
 }
@@ -121,7 +131,13 @@ function computeStateHash(state: SimulationState): string {
     phase: state.phase,
     tick: state.tick,
     players: state.players,
-    towers: [],
+    towers: state.towers.map((tower) => ({
+      id: tower.entityId,
+      ownerId: tower.ownerId,
+      level: tower.level,
+      cellX: tower.cellX,
+      cellY: tower.cellY,
+    })),
     monsters,
     result: null,
   };
@@ -135,7 +151,11 @@ function createInitialPlayers(): Record<PlayerSlot, PlayerBattleState> {
   };
 }
 
-function createSimulationState(config: MatchConfig, lanes: Record<LaneId, LaneRuntimeState>): SimulationState {
+function createSimulationState(
+  config: MatchConfig,
+  lanes: Record<LaneId, LaneRuntimeState>,
+  towers: TowerRuntimeState[],
+): SimulationState {
   const state: SimulationState = {
     schemaVersion: 1,
     config,
@@ -145,6 +165,7 @@ function createSimulationState(config: MatchConfig, lanes: Record<LaneId, LaneRu
     resolvingStartedAtTick: null,
     players: createInitialPlayers(),
     lanes,
+    towers,
     nextEntityId: 1,
     stateHash: '',
   };
@@ -194,7 +215,10 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
 
     // Spawn monsters from queue
     if (newLane.spawnCooldownTicks === 0 && newLane.spawnQueue.length > 0) {
-      const spawn = newLane.spawnQueue.shift()!;
+      const spawn = newLane.spawnQueue.shift();
+      if (!spawn) {
+        continue;
+      }
 
       const monster: MonsterRuntimeState = {
         entityId: spawn.entityId,
@@ -235,14 +259,15 @@ function processMovement(state: SimulationState): { state: SimulationState; even
   const newState: SimulationState = { ...state, players: { ...state.players } };
 
   for (const [laneId, lane] of Object.entries(state.lanes)) {
-    const newLane: LaneRuntimeState = { ...lane, monsters: [...lane.monsters] };
+    const newLane: LaneRuntimeState = {
+      ...lane,
+      monsters: lane.monsters.map((monster) => ({ ...monster })),
+    };
     let defenderHp = newState.players[lane.defenderId].hp;
 
     for (let i = 0; i < newLane.monsters.length; i++) {
       const monster = newLane.monsters[i];
-
-      // Skip dead monsters
-      if (monster.hp <= 0) continue;
+      if (!monster || monster.hp <= 0) continue;
 
       // Calculate movement
       const speed = monster.speedMilliTilesPerTick;
@@ -251,7 +276,10 @@ function processMovement(state: SimulationState): { state: SimulationState; even
 
       // Update segment if needed
       while (monster.segmentIndex < newLane.segments.length - 1) {
-        const currentSegment = newLane.segments[monster.segmentIndex]!;
+        const currentSegment = newLane.segments[monster.segmentIndex];
+        if (!currentSegment) {
+          break;
+        }
         if (monster.distanceOnSegmentMilliTiles >= currentSegment.lengthMilliTiles) {
           monster.distanceOnSegmentMilliTiles -= currentSegment.lengthMilliTiles;
           monster.segmentIndex++;
@@ -294,6 +322,90 @@ function processMovement(state: SimulationState): { state: SimulationState; even
   return { state: newState, events };
 }
 
+function processCombat(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
+  const events: DomainEvent[] = [];
+  const newState: SimulationState = {
+    ...state,
+    lanes: { ...state.lanes },
+    towers: state.towers.map((tower) => ({ ...tower })),
+  };
+
+  for (const lane of Object.values(state.lanes)) {
+    newState.lanes[lane.laneId] = {
+      ...lane,
+      monsters: lane.monsters.map((monster) => ({ ...monster })),
+    };
+  }
+
+  const orderedTowers = [...newState.towers].sort((a, b) => a.entityId - b.entityId);
+  for (const tower of orderedTowers) {
+    tower.cooldownTicks = Math.max(0, tower.cooldownTicks - 1);
+    tower.targetId = null;
+    if (tower.cooldownTicks > 0 || tower.towerTypeId !== 'archer') {
+      continue;
+    }
+
+    const definition = TOWER_BY_ID.get(tower.towerTypeId);
+    const level = definition?.levels[tower.level - 1];
+    const lane = newState.lanes[tower.ownerId === 'p1' ? 'lane_p1' : 'lane_p2'];
+    if (!definition || !level) {
+      continue;
+    }
+
+    const towerX = tower.cellX * 1000 + 500;
+    const towerY = tower.cellY * 1000 + 500;
+    const rangeSquared = level.rangeMilliTiles * level.rangeMilliTiles;
+    const candidates = lane.monsters.filter((monster) => {
+      if (monster.hp <= 0) {
+        return false;
+      }
+      const position = calculatePosition(lane.waypoints, lane.segments, monster.pathProgressMilliTiles);
+      const dx = position.x - towerX;
+      const dy = position.y - towerY;
+      return dx * dx + dy * dy <= rangeSquared;
+    });
+    candidates.sort((a, b) => compareTargetPriority(a, b, definition.targeting));
+
+    const target = candidates[0];
+    if (!target) {
+      continue;
+    }
+
+    tower.targetId = target.entityId;
+    target.hp = Math.max(0, target.hp - level.damage);
+    tower.cooldownTicks = level.cooldownTicks;
+
+    const attackEvent: AttackFiredEvent = {
+      type: 'attack_fired',
+      tick: state.tick,
+      towerEntityId: tower.entityId,
+      targetMonsterId: target.entityId,
+    };
+    const damageEvent: DamageAppliedEvent = {
+      type: 'damage_applied',
+      tick: state.tick,
+      monsterEntityId: target.entityId,
+      damage: level.damage,
+      newHp: target.hp,
+    };
+    events.push(attackEvent, damageEvent);
+
+    if (target.hp === 0) {
+      const deathEvent: MonsterDiedEvent = {
+        type: 'monster_died',
+        tick: state.tick,
+        playerId: target.ownerId,
+        monsterEntityId: target.entityId,
+        killerPlayerId: tower.ownerId,
+      };
+      events.push(deathEvent);
+    }
+  }
+
+  newState.towers.sort((a, b) => a.entityId - b.entityId);
+  return { state: newState, events };
+}
+
 function stepSimulation(state: SimulationState): { state: SimulationState; events: readonly DomainEvent[] } {
   const allEvents: DomainEvent[] = [];
 
@@ -321,10 +433,14 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
       currentState = afterSpawn;
       allEvents.push(...spawnEvents);
 
-      // Process movement
+      // Process movement and leaks before target acquisition.
       const { state: afterMovement, events: moveEvents } = processMovement(currentState);
       currentState = afterMovement;
       allEvents.push(...moveEvents);
+
+      const { state: afterCombat, events: combatEvents } = processCombat(currentState);
+      currentState = afterCombat;
+      allEvents.push(...combatEvents);
 
       const tickInRunning = currentState.tick - (currentState.runningStartedAtTick ?? 0);
       const shouldResolve = tickInRunning >= PHASE_TICKS.RUNNING_MAX;
@@ -422,7 +538,13 @@ class SimulationImpl implements Simulation {
       phase: this._state.phase,
       tick: this._state.tick,
       players: this._state.players,
-      towers: [],
+      towers: this._state.towers.map((tower) => ({
+        id: tower.entityId,
+        ownerId: tower.ownerId,
+        level: tower.level,
+        cellX: tower.cellX,
+        cellY: tower.cellY,
+      })),
       monsters,
       result: null,
     };
@@ -465,9 +587,17 @@ class SimulationImpl implements Simulation {
 
 export function createSimulation(
   config: MatchConfig,
-  lanes?: Record<LaneId, LaneRuntimeState>
+  lanes?: Record<LaneId, LaneRuntimeState>,
+  towers: TowerRuntimeState[] = [],
 ): Simulation {
-  const state = createSimulationState(config, lanes ?? { lane_p1: createEmptyLane('lane_p1', 'p1', 'p2'), lane_p2: createEmptyLane('lane_p2', 'p2', 'p1') });
+  const state = createSimulationState(
+    config,
+    lanes ?? {
+      lane_p1: createEmptyLane('lane_p1', 'p1', 'p2'),
+      lane_p2: createEmptyLane('lane_p2', 'p2', 'p1'),
+    },
+    towers,
+  );
   const rng = createFromString(config.seed);
   return new SimulationImpl(state, rng);
 }

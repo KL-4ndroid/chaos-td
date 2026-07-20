@@ -3,50 +3,40 @@
 ## Current
 
 - **Branch**: autonomous/phase1-mvp
-- **Milestone**: M0 Repository Foundation
-- **Task**: M0-003 Done, M1-001 Next
-- **Status**: Ready for M1-001
-- **Last commit**: c91c0dd
-- **Test status**: Passing
+- **Milestone**: M1 Minimal Vertical Slice
+- **Task**: M1-002 Done, M1-003 Next
+- **Status**: Ready for M1-003
+- **Last commit**: pending
+- **Last push**: pending
+- **Test status**: 120 passed; lint, typecheck, build, balance docs passed
 
 ## Completed Tasks
 
 | Task | Commit | Tests | Push |
 |------|--------|-------|------|
-| M0-001 | a306741 | N/A | ✅ |
-| M0-002 | 6484ba9 | ✅ | ✅ |
-| M0-003 | 19f283e | ✅ | ✅ |
-| Task Status Update | c91c0dd | N/A | ✅ |
+| M0-001 | a306741 | N/A | Yes |
+| M0-002 | 6484ba9 | Passed | Yes |
+| M0-003 | 19f283e | Passed | Yes |
+| M1-001 | f1c3ddb, f2bb265 | 111 passed | Yes |
+| M1-002 | pending | 120 passed | pending |
 
 ## Current Gate
 
-- **Criteria**: M0-001, M0-002, M0-003 all Done
-- **Result**: ✅ Gate Passed
-
-## Milestone Progress
-
-### M0 Repository Foundation
-- [x] M0-001 Repository Bootstrap
-- [x] M0-002 Fixed-Step Simulation Clock
-- [x] M0-003 Data Schema and Validation
-
-### M1 Minimal Vertical Slice
-- [ ] M1-001 Map and Monster Movement
-- [ ] M1-002 Archer Sheep Combat
-- [ ] M1-003 Phaser Render Adapter
+- **Criteria**: M1-001 and M1-002 complete; M1-003 pending
+- **Result**: In progress
 
 ## Pending Placeholders
 
-- Assets: None required for MVP core
-- Copy: N/A for headless core
-- Manual verification: None at this stage
+- **Assets**: M1-003 may use specification-approved placeholder rendering.
+- **Copy**: None.
+- **Manual verification**: Client rendering will require automated screenshot verification where available.
 
 ## Known Non-blocking Risks
 
-- game-core has 1 existing timeout test (pre-existing, not blocking)
+- Client production bundle is 1,376.95 kB and triggers Vite's chunk-size warning.
+- Package-local Vitest scripts inherit root-relative include paths; repository-level `npm run test` is the verified test entrypoint.
 
 ## Next Task
 
-- **M1-001**: Map and Monster Movement
-- **Dependencies**: M0-002, M0-003 Done ✅
-- **Files**: game-core/src/movement.ts, game-core/src/monster.ts, etc.
+- **M1-003**: Phaser Render Adapter
+- **Dependencies**: M1-001 and M1-002 Done

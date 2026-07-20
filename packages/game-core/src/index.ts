@@ -87,3 +87,11 @@ export {
   hasReachedEnd,
   type PathSegment,
 } from './movement';
+
+// Tower combat helpers
+export {
+  createTowerState,
+  compareTargetPriority,
+  type TowerLevel,
+  type TowerRuntimeState,
+} from './tower';

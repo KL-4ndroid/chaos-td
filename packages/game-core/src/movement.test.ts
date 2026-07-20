@@ -34,16 +34,20 @@ describe('Movement', () => {
       expect(segments.length).toBe(2);
 
       // First segment: horizontal
-      expect(segments[0]!.startIndex).toBe(0);
-      expect(segments[0]!.lengthMilliTiles).toBe(3000);
-      expect(segments[0]!.dirX).toBe(1);
-      expect(segments[0]!.dirY).toBe(0);
+      expect(segments[0]).toMatchObject({
+        startIndex: 0,
+        lengthMilliTiles: 3000,
+        dirX: 1,
+        dirY: 0,
+      });
 
       // Second segment: vertical
-      expect(segments[1]!.startIndex).toBe(1);
-      expect(segments[1]!.lengthMilliTiles).toBe(5000);
-      expect(segments[1]!.dirX).toBe(0);
-      expect(segments[1]!.dirY).toBe(1);
+      expect(segments[1]).toMatchObject({
+        startIndex: 1,
+        lengthMilliTiles: 5000,
+        dirX: 0,
+        dirY: 1,
+      });
     });
 
     it('should return empty array for less than 2 waypoints', () => {
@@ -63,9 +67,11 @@ describe('Movement', () => {
 
       const segments = createPathSegments(waypoints);
 
-      expect(segments[0]!.lengthMilliTiles).toBe(3000);
-      expect(segments[0]!.dirX).toBe(-1);
-      expect(segments[0]!.dirY).toBe(0);
+      expect(segments[0]).toMatchObject({
+        lengthMilliTiles: 3000,
+        dirX: -1,
+        dirY: 0,
+      });
     });
   });
 

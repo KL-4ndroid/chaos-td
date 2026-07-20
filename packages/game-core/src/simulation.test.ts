@@ -35,11 +35,11 @@ describe('PRNG - Mulberry32 Determinism', () => {
     for (let i = 0; i < 1000; i++) {
       const r1 = next(rng1);
       values1.push(r1.value);
-      rng1.state[0] = r1.rng.state[0];
+      rng1.state[0] = r1.rng.state[0] ?? 0;
 
       const r2 = next(rng2);
       values2.push(r2.value);
-      rng2.state[0] = r2.rng.state[0];
+      rng2.state[0] = r2.rng.state[0] ?? 0;
     }
 
     expect(values1).toEqual(values2);

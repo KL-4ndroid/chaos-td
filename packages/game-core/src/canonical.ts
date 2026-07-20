@@ -277,7 +277,7 @@ function fnv1a64HashUtf8(str: string): string {
 
   let hash = FNV_OFFSET_BASIS;
   for (let i = 0; i < bytes.length; i++) {
-    hash = hash ^ BigInt(bytes[i]);
+    hash = hash ^ BigInt(bytes[i] ?? 0);
     hash = hash * FNV_PRIME;
   }
 

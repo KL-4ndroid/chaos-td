@@ -41,6 +41,9 @@ export function createPathSegments(waypoints: readonly FixedPointPosition[]): re
   for (let i = 0; i < waypoints.length - 1; i++) {
     const start = waypoints[i];
     const end = waypoints[i + 1];
+    if (!start || !end) {
+      continue;
+    }
 
     const dx = end.xMilliTiles - start.xMilliTiles;
     const dy = end.yMilliTiles - start.yMilliTiles;
@@ -88,6 +91,9 @@ export function calculatePosition(
 
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
+    if (!segment) {
+      continue;
+    }
 
     if (remaining <= segment.lengthMilliTiles) {
       // Position is within this segment
@@ -106,6 +112,9 @@ export function calculatePosition(
 
   // Past the end - return end position
   const lastSegment = segments[segments.length - 1];
+  if (!lastSegment) {
+    return { segmentIndex: 0, distanceOnSegment: 0, x: 0, y: 0 };
+  }
   return {
     segmentIndex: segments.length - 1,
     distanceOnSegment: lastSegment.lengthMilliTiles,
@@ -124,8 +133,13 @@ export function calculatePathLength(waypoints: readonly FixedPointPosition[]): n
 
   let total = 0;
   for (let i = 0; i < waypoints.length - 1; i++) {
-    const dx = Math.abs(waypoints[i + 1].xMilliTiles - waypoints[i].xMilliTiles);
-    const dy = Math.abs(waypoints[i + 1].yMilliTiles - waypoints[i].yMilliTiles);
+    const start = waypoints[i];
+    const end = waypoints[i + 1];
+    if (!start || !end) {
+      continue;
+    }
+    const dx = Math.abs(end.xMilliTiles - start.xMilliTiles);
+    const dy = Math.abs(end.yMilliTiles - start.yMilliTiles);
     total += dx + dy;
   }
 

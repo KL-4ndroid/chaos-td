@@ -94,7 +94,10 @@ export function processSpawns(lane: LaneState): MonsterRuntimeState[] {
 
   // Spawn next monster from queue
   if (lane.spawnQueue.length > 0) {
-    const params = lane.spawnQueue.shift()!;
+    const params = lane.spawnQueue.shift();
+    if (!params) {
+      return spawned;
+    }
 
     const monster: MonsterRuntimeState = {
       entityId: params.entityId,
