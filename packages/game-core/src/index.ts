@@ -70,6 +70,20 @@ export {
   type SimulationState,
   type Simulation,
   type StepResult,
+  type PlayerBattleState,
+  type LaneRuntimeState,
+  type MonsterSpawnParams,
+  type MonsterRuntimeState,
   createSimulation,
   createWithRng,
 } from './simulation';
+
+// Movement
+export {
+  MILLI_TILES_PER_TILE,
+  createPathSegments,
+  calculatePosition,
+  calculatePathLength,
+  hasReachedEnd,
+  type PathSegment,
+} from './movement';
