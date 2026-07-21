@@ -3,10 +3,10 @@
 ## Current
 
 - **Branch**: autonomous/phase1-mvp
-- **Milestone**: M2 Economy and Player Commands
-- **Task**: M2-003 Done, M2 Gate Next
-- **Status**: M2 Gate evaluation
-- **Last commit**: pending
+- **Milestone**: M3 Full MVP Content
+- **Task**: M3 tasks defined
+- **Status**: M2 Gate Passed, starting M3
+- **Last commit**: f33a02b
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
 - **Test status**: 152 passed; lint, typecheck, build passed
 
@@ -23,25 +23,10 @@
 | M1 Gate | 7aed67e | 127 passed | Yes |
 | M2-001 | c42e0e3 | 142 passed | Yes |
 | M2-002 | 1ad2233 | 147 passed | Yes |
-| M2-003 | pending | 152 passed | Pending |
+| M2-003 | f33a02b | 152 passed | Yes |
+| M2 Gate | f33a02b | 152 passed | Yes |
 
-## M1 Gate Results
-
-| Criteria | Result |
-|-----------|--------|
-| Headless and visual results consistent | PASS |
-| Sheep complete path walking | PASS |
-| Archer can lock/target/kill | PASS |
-| Leak deducts HP | PASS (via simulation) |
-| 10 minutes no crash | PASS (stress test) |
-| Replay fixture reproducibility | PASS (determinism tests) |
-
-## Current Gate
-
-- **Criteria**: M2-001, M2-002, M2-003 all Done
-- **Result**: In progress
-
-## M2 Gate Criteria
+## M2 Gate Results
 
 | Criteria | Status |
 |-----------|--------|
@@ -65,5 +50,5 @@
 
 ## Next Task
 
-- **M2 Gate**: Evaluate M2 completion
-- **Dependencies**: M2-001, M2-002, M2-003 Done
+- **M3-001**: Additional Tower Types (Mage, Frost, Sniper)
+- **Dependencies**: M2 Gate passed
