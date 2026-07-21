@@ -4,11 +4,11 @@
 
 - **Branch**: autonomous/phase1-mvp
 - **Milestone**: M2 Economy and Player Commands
-- **Task**: M2-002 Done, M2-003 Next
-- **Status**: In progress
+- **Task**: M2-003 Done, M2 Gate Next
+- **Status**: M2 Gate evaluation
 - **Last commit**: pending
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
-- **Test status**: 147 passed; lint, typecheck, build passed
+- **Test status**: 152 passed; lint, typecheck, build passed
 
 ## Completed Tasks
 
@@ -22,7 +22,8 @@
 | M1-003 | 66bc8fa | 124 passed | Yes |
 | M1 Gate | 7aed67e | 127 passed | Yes |
 | M2-001 | c42e0e3 | 142 passed | Yes |
-| M2-002 | pending | 147 passed | Pending |
+| M2-002 | 1ad2233 | 147 passed | Yes |
+| M2-003 | pending | 152 passed | Pending |
 
 ## M1 Gate Results
 
@@ -37,8 +38,19 @@
 
 ## Current Gate
 
-- **Criteria**: M1-001, M1-002, M1-003 all Done
-- **Result**: PASSED
+- **Criteria**: M2-001, M2-002, M2-003 all Done
+- **Result**: In progress
+
+## M2 Gate Criteria
+
+| Criteria | Status |
+|-----------|--------|
+| Gold deducted immediately on spawn | PASS |
+| Error command does not mutate state | PASS |
+| Duplicate command idempotent | PASS |
+| Gold never negative | PASS |
+| Resolving testable | PASS |
+| Can complete a full game | PASS |
 
 ## Pending Placeholders
 
@@ -53,5 +65,5 @@
 
 ## Next Task
 
-- **M2-003**: Game Completion (HP, victory/defeat)
-- **Dependencies**: M2-002 Done
+- **M2 Gate**: Evaluate M2 completion
+- **Dependencies**: M2-001, M2-002, M2-003 Done

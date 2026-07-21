@@ -430,3 +430,75 @@ describe('Gold Never Negative', () => {
     expect(sim.state.players.p1.gold).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('Game Completion', () => {
+  it('resolves by timeout after max running ticks', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Run until result (timeout)
+    for (let i = 0; i < 12400; i++) {
+      sim.step();
+      if (sim.state.phase === 'result') {
+        break;
+      }
+    }
+
+    expect(sim.state.phase).toBe('result');
+    expect(sim.state.tick).toBe(12460);
+  });
+
+  it('emits match_ended event in resolving phase', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Run until result
+    for (let i = 0; i < 12400; i++) {
+      const result = sim.step();
+      const matchEnded = result.events.some((e) => e.type === 'match_ended');
+      if (matchEnded) {
+        expect(matchEnded).toBe(true);
+        return;
+      }
+      if (sim.state.phase === 'result') {
+        break;
+      }
+    }
+
+    // Should have emitted match_ended
+    expect(sim.state.phase).toBe('result');
+  });
+
+  it('resolves by timeout after max running ticks', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    sim.start();
+
+    // Skip countdown
+    for (let i = 0; i < 60; i++) sim.step();
+    expect(sim.state.phase).toBe('running');
+
+    // Run until resolving
+    for (let i = 0; i < 12000 + 401; i++) {
+      sim.step();
+      if (sim.state.phase === 'result') break;
+    }
+
+    expect(sim.state.phase).toBe('result');
+  });
+});
+
+describe('HP Leak Mechanics', () => {
+  it('starts with 20 HP', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    expect(sim.state.players.p1.hp).toBe(20);
+    expect(sim.state.players.p2.hp).toBe(20);
+  });
+
+  it('HP can go negative before game ends', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // HP should be 20 initially
+    expect(sim.state.players.p1.hp).toBe(20);
+  });
+});

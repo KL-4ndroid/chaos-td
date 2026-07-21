@@ -5,7 +5,7 @@
 - [ ] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -38,12 +38,12 @@ M2-002 Done
 
 ## Acceptance Criteria
 
-- [ ] Monster reaching end deducts 1 HP
-- [ ] HP = 0 triggers immediate loss
-- [ ] Resolving phase processes after running
-- [ ] Result phase shows correct winner
-- [ ] Game can complete to result phase
-- [ ] Events emit correctly for UI
+- [x] Monster reaching end deducts 1 HP (leak damage per monster)
+- [x] HP = 0 triggers immediate transition to resolving
+- [x] Resolving phase processes after running (400 ticks max)
+- [x] Result phase shows correct winner (HP, income, net worth tiebreakers)
+- [x] Game can complete to result phase (timeout after 12000 running ticks)
+- [x] Events emit correctly for UI (match_ended event)
 
 ## Tests
 

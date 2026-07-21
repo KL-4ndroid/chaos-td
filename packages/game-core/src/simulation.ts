@@ -37,6 +37,7 @@ import type {
   CommandAcceptedEvent,
   CommandRejectedEvent,
   IncomePaidEvent,
+  MatchEndedEvent,
 } from './events';
 import {
   TOWER_BY_ID,
@@ -437,6 +438,14 @@ function processCombat(state: SimulationState): { state: SimulationState; events
   return { state: newState, events };
 }
 
+function calculateNetWorth(state: SimulationState, playerId: 'p1' | 'p2'): number {
+  const player = state.players[playerId];
+  const playerTowers = state.towers.filter((t) => t.ownerId === playerId);
+  const towerNetWorth = playerTowers.reduce((sum, tower) => sum + tower.totalInvested, 0);
+
+  return player.gold + Math.floor(towerNetWorth * SELL_REFUND_PERMILLE / 1000);
+}
+
 function processCommands(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
   const events: DomainEvent[] = [];
   const newState: SimulationState = {
@@ -834,7 +843,10 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
       allEvents.push(...combatEvents);
 
       const tickInRunning = currentState.tick - (currentState.runningStartedAtTick ?? 0);
-      const shouldResolve = tickInRunning >= PHASE_TICKS.RUNNING_MAX;
+      const shouldResolve =
+        tickInRunning >= PHASE_TICKS.RUNNING_MAX ||
+        currentState.players.p1.hp <= 0 ||
+        currentState.players.p2.hp <= 0;
 
       if (shouldResolve) {
         const { state: newState, event } = transitionPhase(currentState, 'resolving');
@@ -853,6 +865,61 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
         const { state: newState, event } = transitionPhase(currentState, 'result');
         currentState = newState;
         if (event) allEvents.push(event);
+
+        // Determine winner
+        const p1Hp = currentState.players.p1.hp;
+        const p2Hp = currentState.players.p2.hp;
+
+        let winnerId: 'p1' | 'p2' | null = null;
+        let outcome: 'win' | 'draw' = 'draw';
+        let reason = 'timeout';
+
+        if (p1Hp !== p2Hp) {
+          if (p1Hp > p2Hp) {
+            winnerId = 'p1';
+            outcome = 'win';
+            reason = 'hp_advantage';
+          } else {
+            winnerId = 'p2';
+            outcome = 'win';
+            reason = 'hp_advantage';
+          }
+        } else {
+          // Tie-breaker: income
+          const p1Income = currentState.players.p1.income;
+          const p2Income = currentState.players.p2.income;
+          if (p1Income !== p2Income) {
+            if (p1Income > p2Income) {
+              winnerId = 'p1';
+              reason = 'income_advantage';
+            } else {
+              winnerId = 'p2';
+              reason = 'income_advantage';
+            }
+          } else {
+            // Final tie-breaker: net worth
+            const p1NetWorth = calculateNetWorth(currentState, 'p1');
+            const p2NetWorth = calculateNetWorth(currentState, 'p2');
+            if (p1NetWorth !== p2NetWorth) {
+              if (p1NetWorth > p2NetWorth) {
+                winnerId = 'p1';
+                reason = 'networth_advantage';
+              } else {
+                winnerId = 'p2';
+                reason = 'networth_advantage';
+              }
+            }
+          }
+        }
+
+        const matchEndEvent: MatchEndedEvent = {
+          type: 'match_ended',
+          tick: currentState.tick,
+          winnerId,
+          outcome,
+          reason,
+        };
+        allEvents.push(matchEndEvent);
       }
       break;
     }
