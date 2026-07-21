@@ -4,11 +4,11 @@
 
 - **Branch**: autonomous/phase1-mvp
 - **Milestone**: M3 Full MVP Content
-- **Task**: M3-001 Additional Tower Types - Completed
-- **Status**: M3-001 Done; proceeding to M3-002
+- **Task**: M3-002 Additional Monster Types - Completed
+- **Status**: M3-002 Done; proceeding to M3-003
 - **Last commit**: (pending)
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
-- **Test status**: 152 passed; lint, typecheck, build passed
+- **Test status**: 162 passed; lint, typecheck, build passed
 
 ## Completed Tasks
 
@@ -25,25 +25,15 @@
 | M2-002 | 1ad2233 | 147 passed | Yes |
 | M2-003 | f33a02b | 152 passed | Yes |
 | M2 Gate | f33a02b | 152 passed | Yes |
-| M3-001 | (pending) | 152 passed | Pending |
+| M3-001 | 86f6ef7 | 152 passed | Yes |
+| M3-002 | (pending) | 162 passed | Pending |
 
-## M2 Gate Results
+## M3-002 Completion
 
-| Criteria | Status |
-|-----------|--------|
-| Gold deducted immediately on spawn | PASS |
-| Error command does not mutate state | PASS |
-| Duplicate command idempotent | PASS |
-| Gold never negative | PASS |
-| Resolving testable | PASS |
-| Can complete a full game | PASS |
-
-## M3-001 Completion
-
-- Mage tower: splash damage with armor/shield reduction
-- Frost tower: slow effect with refresh and reset logic
-- Sniper tower: uses STRONG targeting (prioritizes highest HP)
-- All tower types integrated into `processCombat`
+- All monster types defined (sheep, wolf, treant, ghost) in game-data
+- Added monster availability timer enforcement (30s wolf, 90s treant, 150s ghost)
+- Added `monster_locked` rejection reason for unavailable monsters
+- Added comprehensive tests for monster unlock timing
 
 ## Pending Placeholders
 

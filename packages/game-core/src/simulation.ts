@@ -790,6 +790,20 @@ function processCommands(state: SimulationState): { state: SimulationState; even
           continue;
         }
 
+        // Check if monster is available at current running tick
+        const runningTick = state.runningStartedAtTick !== null ? state.tick - state.runningStartedAtTick : 0;
+        if (monsterDef.availableAtRunningTick > runningTick) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'monster_locked',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
         if (command.quantity < 1 || command.quantity > 5) {
           const rejectEvent: CommandRejectedEvent = {
             type: 'command_rejected',

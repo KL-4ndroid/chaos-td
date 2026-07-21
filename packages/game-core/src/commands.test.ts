@@ -502,3 +502,176 @@ describe('HP Leak Mechanics', () => {
     expect(sim.state.players.p1.hp).toBe(20);
   });
 });
+
+describe('M3-002 Monster Types', () => {
+  function advanceToRunning(sim: ReturnType<typeof createSimulation>): void {
+    sim.start();
+    for (let i = 0; i < 60; i += 1) {
+      sim.step();
+    }
+  }
+
+  function makeQueueMonster(playerId: 'p1' | 'p2', monsterType: string, quantity: number, seq: number): QueueMonsterCommand {
+    return {
+      type: 'queue_monster',
+      commandId: { playerId, tick: 61, sequence: seq },
+      playerId,
+      monsterTypeId: monsterType,
+      quantity,
+    };
+  }
+
+  it('rejects wolf before 30 seconds', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Wolf is available at tick 600 (30 seconds)
+    // Try to queue at tick 61
+    sim.submitCommand(makeQueueMonster('p1', 'wolf', 1, 0));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_rejected')).toBe(true);
+  });
+
+  it('accepts wolf after 30 seconds', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Advance to tick 720 (runningStartedAtTick=60, runningTick=660 >= 600 for wolf)
+    for (let i = 0; i < 600; i += 1) {
+      sim.step();
+    }
+
+    // Now at tick 720, wolf should be available
+    sim.submitCommand(makeQueueMonster('p1', 'wolf', 1, 0));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_accepted')).toBe(true);
+  });
+
+  it('rejects treant before 90 seconds', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Treant is available at tick 1800 (90 seconds)
+    sim.submitCommand(makeQueueMonster('p1', 'treant', 1, 0));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_rejected')).toBe(true);
+  });
+
+  it('accepts treant after 90 seconds', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Advance to tick 1860 (past 1800 = 90 seconds)
+    for (let i = 0; i < 1799; i += 1) {
+      sim.step();
+    }
+
+    sim.submitCommand(makeQueueMonster('p1', 'treant', 1, 0));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_accepted')).toBe(true);
+  });
+
+  it('rejects ghost before 150 seconds', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Ghost is available at tick 3000 (150 seconds)
+    sim.submitCommand(makeQueueMonster('p1', 'ghost', 1, 0));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_rejected')).toBe(true);
+  });
+
+  it('accepts ghost after 150 seconds', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Advance to tick 3060 (past 3000 = 150 seconds)
+    for (let i = 0; i < 2999; i += 1) {
+      sim.step();
+    }
+
+    sim.submitCommand(makeQueueMonster('p1', 'ghost', 1, 0));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_accepted')).toBe(true);
+  });
+
+  it('wolf costs correct gold and grants correct income', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Advance to runningTick >= 600 (30 seconds) for wolf unlock
+    for (let i = 0; i < 600; i += 1) {
+      sim.step();
+    }
+
+    // Record gold before sending wolf
+    const goldBefore = sim.state.players.p1.gold;
+    const incomeBefore = sim.state.players.p1.income;
+
+    // Wolf: cost 105, income gain 10
+    sim.submitCommand(makeQueueMonster('p1', 'wolf', 1, 0));
+    sim.step();
+
+    expect(sim.state.players.p1.gold).toBe(goldBefore - 105);
+    expect(sim.state.players.p1.income).toBe(incomeBefore + 10);
+  });
+
+  it('treant has correct stats (armor)', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Advance to runningTick >= 1800 (90 seconds) for treant unlock
+    for (let i = 0; i < 1800; i += 1) {
+      sim.step();
+    }
+
+    // Record gold before sending treant
+    const goldBefore = sim.state.players.p1.gold;
+    const incomeBefore = sim.state.players.p1.income;
+
+    // Treant: cost 185, income gain 16
+    sim.submitCommand(makeQueueMonster('p1', 'treant', 1, 0));
+    sim.step();
+
+    expect(sim.state.players.p1.gold).toBe(goldBefore - 185);
+    expect(sim.state.players.p1.income).toBe(incomeBefore + 16);
+  });
+
+  it('ghost has shield property', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Advance to runningTick >= 3000 (150 seconds) for ghost unlock
+    for (let i = 0; i < 3000; i += 1) {
+      sim.step();
+    }
+
+    // Record gold before sending ghost
+    const goldBefore = sim.state.players.p1.gold;
+    const incomeBefore = sim.state.players.p1.income;
+
+    // Ghost: cost 240, income gain 20
+    sim.submitCommand(makeQueueMonster('p1', 'ghost', 1, 0));
+    sim.step();
+
+    expect(sim.state.players.p1.gold).toBe(goldBefore - 240);
+    expect(sim.state.players.p1.income).toBe(incomeBefore + 20);
+  });
+
+  it('accepts sheep at start (tick 0)', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Sheep is available at tick 0
+    sim.submitCommand(makeQueueMonster('p1', 'sheep', 1, 0));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_accepted')).toBe(true);
+  });
+});
