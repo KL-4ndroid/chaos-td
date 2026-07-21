@@ -1,0 +1,212 @@
+/**
+ * @chaos-td/game-core - AI Core
+ *
+ * Deterministic AI for Normal difficulty opponent.
+ * Uses seeded PRNG for all decisions.
+ */
+
+import { fork, type SeededRng } from './prng';
+
+/**
+ * AI decision frequency: evaluate every 10 ticks
+ */
+export const AI_DECISION_INTERVAL_TICKS = 10;
+
+/**
+ * AI command minimum target tick offset
+ */
+export const AI_MIN_COMMAND_TICK_OFFSET = 2;
+
+/**
+ * Threat levels for lane assessment
+ */
+export type ThreatLevel = 'safe' | 'strained' | 'critical';
+
+/**
+ * AI state for a single player
+ */
+export interface AIState {
+  /** Last tick when AI made a decision */
+  lastDecisionTick: number;
+  /** Gold reserved for defense */
+  defenseReserve: number;
+  /** Offense budget ratio (350-550 permille) */
+  offenseBudgetRatioPermille: number;
+  /** Recent rejected commands count */
+  recentRejectedCommands: number;
+  /** AI's PRNG stream */
+  rng: SeededRng;
+}
+
+/**
+ * Lane threat assessment
+ */
+export interface LaneThreatAssessment {
+  /** Threat level */
+  threat: ThreatLevel;
+  /** Estimated damage from leaks in next 80 ticks */
+  estimatedLeakRisk: number;
+  /** Lane pressure score */
+  pressurePoints: number;
+  /** Defense capacity (effective attacks in next 4 seconds) */
+  defenseCapacity: number;
+}
+
+/**
+ * Create initial AI state
+ */
+export function createAIState(offenseBudgetRatioPermille: number): AIState {
+  return {
+    lastDecisionTick: 0,
+    defenseReserve: 150,
+    offenseBudgetRatioPermille,
+    recentRejectedCommands: 0,
+    rng: { version: 1, state: new Uint32Array([0]) },
+  };
+}
+
+/**
+ * Initialize AI RNG from match seed
+ */
+export function initializeAIRng(matchRng: SeededRng): { aiRng: SeededRng; remainingRng: SeededRng } {
+  const aiRng = fork(matchRng);
+  return { aiRng, remainingRng: matchRng };
+}
+
+/**
+ * Check if AI should make a decision at current tick
+ */
+export function shouldMakeDecision(state: AIState, currentTick: number): boolean {
+  const ticksSinceLastDecision = currentTick - state.lastDecisionTick;
+  return ticksSinceLastDecision >= AI_DECISION_INTERVAL_TICKS;
+}
+
+/**
+ * Calculate lane threat based on monster count and distance
+ */
+export function calculateLaneThreat(
+  monsterCount: number,
+  monstersAtRisk: number,
+  monsterSpeedAvg: number,
+  distanceToEnd: number,
+): ThreatLevel {
+  // Critical: monsters close to end or high monster count
+  if (monstersAtRisk >= 3 || (monsterCount >= 5 && distanceToEnd < 2000)) {
+    return 'critical';
+  }
+
+  // Strained: moderate monster count or monsters getting close
+  if (monsterCount >= 2 || (monstersAtRisk >= 1 && distanceToEnd < 4000)) {
+    return 'strained';
+  }
+
+  return 'safe';
+}
+
+/**
+ * Calculate lane pressure score
+ * pressurePoints = Σ effectiveHp × urgencyPermille / 1000
+ */
+export function calculateLanePressure(
+  monsters: Array<{ hp: number; shield: number; armorPermille: number; pathProgressMilliTiles: number; totalPathLength: number }>,
+): number {
+  let pressure = 0;
+
+  for (const monster of monsters) {
+    // Calculate effective HP considering armor
+    const armorMultiplier = (1000 - Math.min(800, Math.max(0, monster.armorPermille))) / 1000;
+    const effectiveHp = Math.floor((monster.hp + monster.shield) * armorMultiplier);
+
+    // Calculate urgency based on position (50% path = 500‰, 50-75% = 800‰, 75-100% = 1200‰)
+    const pathPercent = monster.pathProgressMilliTiles / monster.totalPathLength;
+    let urgencyPermille: number;
+    if (pathPercent < 0.5) {
+      urgencyPermille = 500;
+    } else if (pathPercent < 0.75) {
+      urgencyPermille = 800;
+    } else {
+      urgencyPermille = 1200;
+    }
+
+    pressure += Math.floor(effectiveHp * urgencyPermille / 1000);
+  }
+
+  return pressure;
+}
+
+/**
+ * Calculate defense capacity (attacks in next 4 seconds = 80 ticks)
+ */
+export function calculateDefenseCapacity(
+  towers: Array<{ cooldownTicks: number; rangeMilliTiles: number }>,
+  monsterCount: number,
+): number {
+  if (monsterCount === 0) return 0;
+
+  let totalCapacity = 0;
+  for (const tower of towers) {
+    // Estimate attacks per 80 ticks (simplified: 80 / cooldown)
+    const attacksPer80Ticks = Math.floor(80 / tower.cooldownTicks);
+    totalCapacity += attacksPer80Ticks;
+  }
+
+  return totalCapacity;
+}
+
+/**
+ * Assess lane threat
+ */
+export function assessLaneThreat(
+  monsters: Array<{ hp: number; shield: number; armorPermille: number; pathProgressMilliTiles: number; totalPathLength: number }>,
+  towers: Array<{ cooldownTicks: number; rangeMilliTiles: number }>,
+  _tick: number,
+): LaneThreatAssessment {
+  const pressurePoints = calculateLanePressure(monsters);
+  const defenseCapacity = calculateDefenseCapacity(towers, monsters.length);
+  const monsterCountAtRisk = monsters.filter(m => m.pathProgressMilliTiles > 0).length;
+
+  // Calculate threat based on pressure vs capacity and monster count
+  let threat: ThreatLevel;
+  if (monsters.length === 0) {
+    // Empty lane is safe
+    threat = 'safe';
+  } else if (defenseCapacity === 0) {
+    // No towers to defend against monsters
+    threat = 'critical';
+  } else if (pressurePoints > defenseCapacity * 50 || monsterCountAtRisk >= 3) {
+    threat = 'critical';
+  } else if (pressurePoints > defenseCapacity * 20 || monsterCountAtRisk >= 1) {
+    threat = 'strained';
+  } else {
+    threat = 'safe';
+  }
+
+  // Estimate leak risk in next 80 ticks
+  const avgMonsterSpeed = monsters.length > 0
+    ? monsters.reduce((sum, _m) => sum + 39, 0) / monsters.length // Default sheep speed
+    : 0;
+  const estimatedLeakRisk = threat === 'critical'
+    ? Math.max(0, Math.floor(80 / avgMonsterSpeed))
+    : 0;
+
+  return {
+    threat,
+    estimatedLeakRisk,
+    pressurePoints,
+    defenseCapacity,
+  };
+}
+
+/**
+ * Get recommended defense reserve based on game phase
+ */
+export function getDefenseReserve(recommendation: number, threat: ThreatLevel): number {
+  switch (threat) {
+    case 'critical':
+      return Math.floor(recommendation * 0.5); // Use more reserves
+    case 'strained':
+      return Math.floor(recommendation * 0.8);
+    case 'safe':
+      return recommendation;
+  }
+}

@@ -2,10 +2,10 @@
 
 ## Status
 
-- [ ] Ready
+- [x] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -37,11 +37,11 @@ M3 Gate Passed
 
 ## Acceptance Criteria
 
-- [ ] AIState interface defined
-- [ ] AI evaluates decisions every 10 ticks
-- [ ] AI uses deterministic PRNG stream
-- [ ] Threat levels correctly determined
-- [ ] AI commands have correct target tick (current + 2)
+- [x] AIState interface defined
+- [x] AI evaluates decisions every 10 ticks
+- [x] AI uses deterministic PRNG stream
+- [x] Threat levels correctly determined
+- [x] AI commands have correct target tick (current + 2)
 
 ## Verification
 
@@ -50,3 +50,15 @@ npm run test
 npm run typecheck
 npm run lint
 ```
+
+## Completion Report
+
+- **Commit**: `feat(core): add AI core architecture with threat assessment`
+- **Date**: 2026-07-22
+- **Branch**: `autonomous/phase1-mvp`
+- **Test Results**: 191 tests passed
+- **Changes**:
+  - Created `ai-core.ts` with AI state and threat assessment logic
+  - Implemented `calculateLanePressure`, `calculateDefenseCapacity`, `assessLaneThreat`
+  - Added `shouldMakeDecision` for decision frequency control
+  - Created comprehensive tests for AI core module
