@@ -2,10 +2,10 @@
 
 ## Status
 
-- [ ] Ready
+- [x] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -35,10 +35,10 @@ M4 Gate Passed
 
 ## Acceptance Criteria
 
-- [ ] Replay captures all game events
-- [ ] Replay can be exported to JSON
-- [ ] Replay can be imported and replayed exactly
-- [ ] Hash checkpoints verified
+- [x] Replay captures all game events
+- [x] Replay can be exported to JSON
+- [x] Replay can be imported and replayed exactly
+- [x] Hash checkpoints verified
 
 ## Verification
 
@@ -47,3 +47,15 @@ npm run test
 npm run typecheck
 npm run lint
 ```
+
+## Completion Report
+
+- **Commit**: `feat(core): add replay system with serialization and checkpoints`
+- **Date**: 2026-07-22
+- **Branch**: `autonomous/phase1-mvp`
+- **Test Results**: 228 tests passed
+- **Changes**:
+  - Created `replay.ts` with replay data structures
+  - Implemented replay serialization/deserialization
+  - Added checkpoint system for integrity verification
+  - Created comprehensive tests for replay module
