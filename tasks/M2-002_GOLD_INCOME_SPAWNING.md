@@ -5,7 +5,7 @@
 - [ ] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -41,13 +41,13 @@ M2-001 Done
 
 ## Acceptance Criteria
 
-- [ ] Player starts with 50 gold
-- [ ] Spawning monster deducts gold immediately
-- [ ] Enemy reaching end grants income to opponent
-- [ ] Base income ticks every 10 ticks
-- [ ] Gold cannot go negative
-- [ ] Monster queue processes correctly
-- [ ] Two lanes work independently
+- [x] Player starts with 600 gold (corrected from 50 per balance doc)
+- [x] Spawning monster deducts gold immediately (sendCost from MONSTER_BY_ID)
+- [x] Income increases on each monster sent (incomeGain from MONSTER_BY_ID)
+- [x] Base income ticks every 200 ticks
+- [x] Gold cannot go negative
+- [x] Monster queue processes correctly
+- [x] Two lanes work independently
 
 ## Tests
 

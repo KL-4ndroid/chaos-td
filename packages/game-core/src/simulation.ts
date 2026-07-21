@@ -40,6 +40,7 @@ import type {
 } from './events';
 import {
   TOWER_BY_ID,
+  MONSTER_BY_ID,
   type LaneId,
   type FixedPointPosition,
 } from '@chaos-td/game-data';
@@ -666,16 +667,10 @@ function processCommands(state: SimulationState): { state: SimulationState; even
       case 'queue_monster': {
         const laneId: LaneId = command.playerId === 'p1' ? 'lane_p2' : 'lane_p1';
         const lane = newState.lanes[laneId];
+        const player = newState.players[command.playerId];
 
-        const monsterStats: Record<string, { hp: number; shield: number; speed: number; leak: number; gap: number }> = {
-          sheep: { hp: 85, shield: 0, speed: 39, leak: 1, gap: 9 },
-          wolf: { hp: 125, shield: 0, speed: 59, leak: 1, gap: 10 },
-          treant: { hp: 390, shield: 0, speed: 28, leak: 2, gap: 14 },
-          ghost: { hp: 215, shield: 95, speed: 44, leak: 2, gap: 13 },
-        };
-
-        const stats = monsterStats[command.monsterTypeId];
-        if (!stats) {
+        const monsterDef = MONSTER_BY_ID.get(command.monsterTypeId);
+        if (!monsterDef) {
           const rejectEvent: CommandRejectedEvent = {
             type: 'command_rejected',
             tick: state.tick,
@@ -711,16 +706,35 @@ function processCommands(state: SimulationState): { state: SimulationState; even
           continue;
         }
 
+        // Deduct send cost and grant income for each monster
+        const totalSendCost = monsterDef.sendCost * command.quantity;
+        const totalIncomeGain = monsterDef.incomeGain * command.quantity;
+
+        if (player.gold < totalSendCost) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'insufficient_gold',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        player.gold -= totalSendCost;
+        player.income += totalIncomeGain;
+
         for (let i = 0; i < command.quantity; i++) {
           const spawn: MonsterSpawnParams = {
             entityId: newState.nextEntityId++,
             ownerId: command.playerId,
             monsterTypeId: command.monsterTypeId,
-            hp: stats.hp,
-            shield: stats.shield,
-            speedMilliTilesPerTick: stats.speed,
-            leakDamage: stats.leak,
-            spawnGapTicks: stats.gap,
+            hp: monsterDef.hp,
+            shield: monsterDef.shield,
+            speedMilliTilesPerTick: monsterDef.speedMilliTilesPerTick,
+            leakDamage: monsterDef.leakDamage,
+            spawnGapTicks: monsterDef.spawnGapTicks,
           };
           lane.spawnQueue.push(spawn);
         }

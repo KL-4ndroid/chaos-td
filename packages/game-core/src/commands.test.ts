@@ -304,6 +304,90 @@ describe('Queue Monster Command', () => {
 
     expect(result.events.some(e => e.type === 'command_rejected')).toBe(true);
   });
+
+  it('deducts gold and adds income when queueing monsters', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    const initialGold = sim.state.players.p1.gold;
+    const initialIncome = sim.state.players.p1.income;
+
+    // Send 1 sheep: cost 60, income gain 6
+    sim.submitCommand(makeQueueMonster('p1', 'sheep', 1, 0));
+    sim.step();
+
+    expect(sim.state.players.p1.gold).toBe(initialGold - 60);
+    expect(sim.state.players.p1.income).toBe(initialIncome + 6);
+  });
+
+  it('grants income on each monster sent', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    const initialGold = sim.state.players.p1.gold;
+    const initialIncome = sim.state.players.p1.income;
+
+    // Send 3 sheep: cost 180, income gain 18
+    sim.submitCommand(makeQueueMonster('p1', 'sheep', 3, 0));
+    sim.step();
+
+    expect(sim.state.players.p1.gold).toBe(initialGold - 180);
+    expect(sim.state.players.p1.income).toBe(initialIncome + 18);
+  });
+
+  it('rejects insufficient gold for monster send', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // Spend most gold on towers (5 archer = 600 gold exactly)
+    for (let i = 0; i < 5; i++) {
+      sim.submitCommand(makeBuildTower('p1', 'archer', 3 + i, 4, i));
+    }
+    sim.step();
+
+    // After 5 archer towers: 600 - (5 * 120) = 0 gold
+    expect(sim.state.players.p1.gold).toBe(0);
+
+    // Try to send a sheep (costs 60)
+    sim.submitCommand(makeQueueMonster('p1', 'sheep', 1, 10));
+    const result = sim.step();
+
+    expect(result.events.some(e => e.type === 'command_rejected')).toBe(true);
+  });
+});
+
+describe('Income System', () => {
+  it('grants income every 200 ticks', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    // At tick 61 after advanceToRunning
+    // Skip to tick 261 (200 ticks into running, since tick 60 = running start)
+    for (let i = 0; i < 199; i++) {
+      sim.step();
+    }
+    // Now at tick 260, income will be paid next tick (tick 261)
+
+    const goldAt200 = sim.state.players.p1.gold;
+    sim.step(); // tick 261, income should be paid
+    const goldAt201 = sim.state.players.p1.gold;
+
+    expect(goldAt201).toBe(goldAt200 + 100); // Initial income is 100
+  });
+
+  it('accumulates income over multiple intervals', () => {
+    const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    advanceToRunning(sim);
+
+    const initialGold = sim.state.players.p1.gold;
+
+    // Skip 400 ticks (2 income intervals)
+    for (let i = 0; i < 400; i++) {
+      sim.step();
+    }
+
+    expect(sim.state.players.p1.gold).toBe(initialGold + 200);
+  });
 });
 
 describe('Command Determinism', () => {

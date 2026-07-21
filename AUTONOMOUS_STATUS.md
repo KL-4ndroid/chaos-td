@@ -4,11 +4,11 @@
 
 - **Branch**: autonomous/phase1-mvp
 - **Milestone**: M2 Economy and Player Commands
-- **Task**: M2-001 Done, M2-002 Next
+- **Task**: M2-002 Done, M2-003 Next
 - **Status**: In progress
 - **Last commit**: pending
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
-- **Test status**: 142 passed; lint, typecheck, build passed
+- **Test status**: 147 passed; lint, typecheck, build passed
 
 ## Completed Tasks
 
@@ -21,7 +21,8 @@
 | M1-002 | d148892 | 120 passed | Yes |
 | M1-003 | 66bc8fa | 124 passed | Yes |
 | M1 Gate | 7aed67e | 127 passed | Yes |
-| M2-001 | pending | 142 passed | Pending |
+| M2-001 | c42e0e3 | 142 passed | Yes |
+| M2-002 | pending | 147 passed | Pending |
 
 ## M1 Gate Results
 
@@ -52,5 +53,5 @@
 
 ## Next Task
 
-- **M2-002**: Gold, Income, and Monster Spawning
-- **Dependencies**: M2-001 Done
+- **M2-003**: Game Completion (HP, victory/defeat)
+- **Dependencies**: M2-002 Done
