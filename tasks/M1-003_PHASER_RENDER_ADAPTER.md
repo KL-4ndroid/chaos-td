@@ -5,7 +5,7 @@
 - [ ] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -33,11 +33,17 @@ Fixed-Step Adapter、Placeholder、Entity→GameObject、Interpolation、Attack 
 
 ## Acceptance Criteria
 
-- [ ] Client 只呼叫 Core API。
-- [ ] Render 數量與 Core 同步。
-- [ ] 視覺 Projectile 不影響 Damage。
-- [ ] 30／60 FPS 同 Replay Hash 相同。
-- [ ] Hidden 自動 Pause。
-- [ ] Backlog 不丟。
-- [ ] Placeholder 可辨識。
-- [ ] 無 Console Error。
+- [x] Client 只呼叫 Core API。
+- [x] Render 數量與 Core 同步。
+- [x] 視覺 Projectile 不影響 Damage。
+- [x] 30／60 FPS 同 Replay Hash 相同。
+- [x] Hidden 自動 Pause。
+- [x] Backlog 不丟。
+- [x] Placeholder 可辨識。
+- [x] 無 Console Error。
+
+## Completion Report
+
+- Commit:
+- Duration:
+- Notes:

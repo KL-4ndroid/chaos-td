@@ -323,6 +323,10 @@ function processMovement(state: SimulationState): { state: SimulationState; even
 }
 
 function processCombat(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
+  if (state.towers.length === 0) {
+    return { state, events: [] };
+  }
+
   const events: DomainEvent[] = [];
   const newState: SimulationState = {
     ...state,

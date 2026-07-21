@@ -269,17 +269,24 @@ function utf8Encode(str: string): Uint8Array {
  * Processes string as UTF-8 bytes.
  */
 function fnv1a64HashUtf8(str: string): string {
-  const FNV_OFFSET_BASIS = 14695981039346656037n;
-  const FNV_PRIME = 1099511628211n;
+  const FNV_OFFSET_LOW = 0x84222325;
+  const FNV_OFFSET_HIGH = 0xcbf29ce4;
+  const FNV_PRIME_LOW = 0x1b3;
+  const FNV_PRIME_HIGH = 0x100;
 
-  // Encode UTF-16 string to UTF-8 bytes
   const bytes = utf8Encode(str);
+  let low = FNV_OFFSET_LOW;
+  let high = FNV_OFFSET_HIGH;
 
-  let hash = FNV_OFFSET_BASIS;
   for (let i = 0; i < bytes.length; i++) {
-    hash = hash ^ BigInt(bytes[i] ?? 0);
-    hash = hash * FNV_PRIME;
+    low = (low ^ (bytes[i] ?? 0)) >>> 0;
+    const lowProduct = low * FNV_PRIME_LOW;
+    const carry = Math.floor(lowProduct / 0x100000000);
+    const nextLow = lowProduct >>> 0;
+    const nextHigh = high * FNV_PRIME_LOW + low * FNV_PRIME_HIGH + carry;
+    low = nextLow;
+    high = nextHigh >>> 0;
   }
 
-  return (hash & 0xFFFFFFFFFFFFFFFFn).toString(16).padStart(16, '0');
+  return (high >>> 0).toString(16).padStart(8, '0') + (low >>> 0).toString(16).padStart(8, '0');
 }
