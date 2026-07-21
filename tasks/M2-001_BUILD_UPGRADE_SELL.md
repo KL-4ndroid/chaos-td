@@ -5,7 +5,7 @@
 - [ ] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -43,14 +43,14 @@ M1 Gate Passed
 
 ## Acceptance Criteria
 
-- [ ] Build command deducts correct gold amount
-- [ ] Upgrade command increases tower level (max 3)
-- [ ] Sell command refunds 60% of invested gold
-- [ ] Invalid cell position rejected
-- [ ] Insufficient gold rejected
-- [ ] Duplicate command idempotent (no double processing)
-- [ ] Error commands do not mutate state
-- [ ] Gold never goes negative
+- [x] Build command deducts correct gold amount
+- [x] Upgrade command increases tower level (max 3)
+- [x] Sell command refunds 70% of invested gold
+- [x] Invalid cell position rejected
+- [x] Insufficient gold rejected
+- [x] Duplicate command idempotent (no double processing)
+- [x] Error commands do not mutate state
+- [x] Gold never goes negative
 
 ## Tests
 

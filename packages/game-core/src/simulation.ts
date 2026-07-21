@@ -12,7 +12,14 @@
  * - RESULT: Final state. No more step() changes.
  */
 
-import { PHASE_TICKS } from './constants';
+import {
+  PHASE_TICKS,
+  INITIAL_GOLD,
+  INITIAL_HP,
+  INITIAL_INCOME,
+  INCOME_INTERVAL_TICKS,
+  SELL_REFUND_PERMILLE,
+} from './constants';
 import { type SeededRng, createFromString } from './prng';
 import type { Phase, PlayerSlot, CanonicalState, MonsterState } from './canonical';
 import { hashStateToString } from './canonical';
@@ -24,10 +31,21 @@ import type {
   PhaseChangedEvent,
   MonsterSpawnedEvent,
   MonsterLeakedEvent,
+  TowerBuiltEvent,
+  TowerUpgradedEvent,
+  TowerSoldEvent,
+  CommandAcceptedEvent,
+  CommandRejectedEvent,
+  IncomePaidEvent,
 } from './events';
-import { TOWER_BY_ID, type LaneId, type FixedPointPosition } from '@chaos-td/game-data';
+import {
+  TOWER_BY_ID,
+  type LaneId,
+  type FixedPointPosition,
+} from '@chaos-td/game-data';
 import { hasReachedEnd, type PathSegment, calculatePosition } from './movement';
 import { compareTargetPriority, type TowerRuntimeState } from './tower';
+import type { GameCommand, CommandId } from './commands';
 
 export interface MatchConfig {
   seed: string;
@@ -40,6 +58,9 @@ export interface PlayerSlotState {
 
 export interface PlayerBattleState extends PlayerSlotState {
   hp: number;
+  gold: number;
+  income: number;
+  totalInvested: number;
 }
 
 export interface LaneRuntimeState {
@@ -92,6 +113,8 @@ export interface SimulationState {
   lanes: Record<LaneId, LaneRuntimeState>;
   towers: TowerRuntimeState[];
   nextEntityId: number;
+  nextCommandIdSequence: number;
+  pendingCommands: GameCommand[];
   stateHash: string;
 }
 
@@ -106,7 +129,8 @@ export interface Simulation {
   start(): Simulation;
   step(): StepResult;
   getCanonicalState(): CanonicalState;
-  queueMonster(playerId: PlayerSlot, monsterTypeId: string, quantity: number): void;
+  submitCommand(command: GameCommand): void;
+  getNextCommandId(playerId: PlayerSlot): CommandId;
 }
 
 function computeStateHash(state: SimulationState): string {
@@ -146,8 +170,8 @@ function computeStateHash(state: SimulationState): string {
 
 function createInitialPlayers(): Record<PlayerSlot, PlayerBattleState> {
   return {
-    p1: { playerId: 'p1', hp: 20 },
-    p2: { playerId: 'p2', hp: 20 },
+    p1: { playerId: 'p1', hp: INITIAL_HP, gold: INITIAL_GOLD, income: INITIAL_INCOME, totalInvested: 0 },
+    p2: { playerId: 'p2', hp: INITIAL_HP, gold: INITIAL_GOLD, income: INITIAL_INCOME, totalInvested: 0 },
   };
 }
 
@@ -167,6 +191,8 @@ function createSimulationState(
     lanes,
     towers,
     nextEntityId: 1,
+    nextCommandIdSequence: 0,
+    pendingCommands: [],
     stateHash: '',
   };
   state.stateHash = computeStateHash(state);
@@ -410,6 +436,343 @@ function processCombat(state: SimulationState): { state: SimulationState; events
   return { state: newState, events };
 }
 
+function processCommands(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
+  const events: DomainEvent[] = [];
+  const newState: SimulationState = {
+    ...state,
+    players: {
+      p1: { ...state.players.p1 },
+      p2: { ...state.players.p2 },
+    },
+    towers: state.towers.map((tower) => ({ ...tower })),
+    pendingCommands: [...state.pendingCommands],
+    lanes: {
+      lane_p1: state.lanes.lane_p1 ? { ...state.lanes.lane_p1, spawnQueue: [...state.lanes.lane_p1.spawnQueue] } : state.lanes.lane_p1,
+      lane_p2: state.lanes.lane_p2 ? { ...state.lanes.lane_p2, spawnQueue: [...state.lanes.lane_p2.spawnQueue] } : state.lanes.lane_p2,
+    },
+  };
+
+  // Sort commands by player ID then sequence for deterministic processing
+  const sortedCommands = [...newState.pendingCommands].sort((a, b) => {
+    if (a.commandId.playerId !== b.commandId.playerId) {
+      return a.commandId.playerId.localeCompare(b.commandId.playerId);
+    }
+    return a.commandId.sequence - b.commandId.sequence;
+  });
+
+  for (const command of sortedCommands) {
+    const player = newState.players[command.playerId];
+
+    switch (command.type) {
+      case 'build_tower': {
+        const towerDef = TOWER_BY_ID.get(command.towerTypeId);
+        if (!towerDef || !towerDef.levels[0]) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'invalid_tower_type',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        const buildCost = towerDef.levels[0].cost;
+        if (player.gold < buildCost) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'insufficient_gold',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        // Check if cell is already occupied
+        const occupied = newState.towers.some(
+          (t) => t.cellX === command.cellX && t.cellY === command.cellY && t.ownerId === command.playerId,
+        );
+        if (occupied) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'cell_occupied',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        // Build the tower
+        const newTower: TowerRuntimeState = {
+          entityId: newState.nextEntityId++,
+          ownerId: command.playerId,
+          towerTypeId: command.towerTypeId,
+          level: 1,
+          cellX: command.cellX,
+          cellY: command.cellY,
+          cooldownTicks: 0,
+          targetId: null,
+          totalInvested: buildCost,
+        };
+
+        newState.towers.push(newTower);
+        player.gold -= buildCost;
+        player.totalInvested += buildCost;
+
+        const acceptEvent: CommandAcceptedEvent = {
+          type: 'command_accepted',
+          tick: state.tick,
+          playerId: command.playerId,
+          commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+        };
+        const buildEvent: TowerBuiltEvent = {
+          type: 'tower_built',
+          tick: state.tick,
+          playerId: command.playerId,
+          towerEntityId: newTower.entityId,
+          towerType: command.towerTypeId,
+          cellX: command.cellX,
+          cellY: command.cellY,
+        };
+        events.push(acceptEvent, buildEvent);
+        break;
+      }
+
+      case 'upgrade_tower': {
+        const tower = newState.towers.find((t) => t.entityId === command.towerEntityId && t.ownerId === command.playerId);
+        if (!tower) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'tower_not_found',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        if (tower.level >= 3) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'max_level',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        const towerDef = TOWER_BY_ID.get(tower.towerTypeId);
+        if (!towerDef) continue;
+
+        const nextLevel = tower.level + 1;
+        const levelDef = towerDef.levels[nextLevel - 1];
+        if (!levelDef) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'max_level',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        const upgradeCost = levelDef.cost;
+        if (player.gold < upgradeCost) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'insufficient_gold',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        tower.level = nextLevel as 1 | 2 | 3;
+        tower.totalInvested += upgradeCost;
+        player.gold -= upgradeCost;
+        player.totalInvested += upgradeCost;
+
+        const acceptEvent: CommandAcceptedEvent = {
+          type: 'command_accepted',
+          tick: state.tick,
+          playerId: command.playerId,
+          commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+        };
+        const upgradeEvent: TowerUpgradedEvent = {
+          type: 'tower_upgraded',
+          tick: state.tick,
+          playerId: command.playerId,
+          towerEntityId: tower.entityId,
+          newLevel: tower.level,
+        };
+        events.push(acceptEvent, upgradeEvent);
+        break;
+      }
+
+      case 'sell_tower': {
+        const towerIndex = newState.towers.findIndex(
+          (t) => t.entityId === command.towerEntityId && t.ownerId === command.playerId,
+        );
+        if (towerIndex === -1) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'tower_not_found',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        const tower = newState.towers[towerIndex];
+        if (!tower) {
+          continue;
+        }
+        const refund = Math.floor((tower.totalInvested * SELL_REFUND_PERMILLE) / 1000);
+
+        newState.towers.splice(towerIndex, 1);
+        player.gold += refund;
+
+        const acceptEvent: CommandAcceptedEvent = {
+          type: 'command_accepted',
+          tick: state.tick,
+          playerId: command.playerId,
+          commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+        };
+        const sellEvent: TowerSoldEvent = {
+          type: 'tower_sold',
+          tick: state.tick,
+          playerId: command.playerId,
+          towerEntityId: tower.entityId,
+          refund,
+        };
+        events.push(acceptEvent, sellEvent);
+        break;
+      }
+
+      case 'queue_monster': {
+        const laneId: LaneId = command.playerId === 'p1' ? 'lane_p2' : 'lane_p1';
+        const lane = newState.lanes[laneId];
+
+        const monsterStats: Record<string, { hp: number; shield: number; speed: number; leak: number; gap: number }> = {
+          sheep: { hp: 85, shield: 0, speed: 39, leak: 1, gap: 9 },
+          wolf: { hp: 125, shield: 0, speed: 59, leak: 1, gap: 10 },
+          treant: { hp: 390, shield: 0, speed: 28, leak: 2, gap: 14 },
+          ghost: { hp: 215, shield: 95, speed: 44, leak: 2, gap: 13 },
+        };
+
+        const stats = monsterStats[command.monsterTypeId];
+        if (!stats) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'invalid_monster_type',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        if (command.quantity < 1 || command.quantity > 5) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'invalid_quantity',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        if (lane.spawnQueue.length + command.quantity > 30) {
+          const rejectEvent: CommandRejectedEvent = {
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'queue_full',
+          };
+          events.push(rejectEvent);
+          continue;
+        }
+
+        for (let i = 0; i < command.quantity; i++) {
+          const spawn: MonsterSpawnParams = {
+            entityId: newState.nextEntityId++,
+            ownerId: command.playerId,
+            monsterTypeId: command.monsterTypeId,
+            hp: stats.hp,
+            shield: stats.shield,
+            speedMilliTilesPerTick: stats.speed,
+            leakDamage: stats.leak,
+            spawnGapTicks: stats.gap,
+          };
+          lane.spawnQueue.push(spawn);
+        }
+
+        const acceptEvent: CommandAcceptedEvent = {
+          type: 'command_accepted',
+          tick: state.tick,
+          playerId: command.playerId,
+          commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+        };
+        events.push(acceptEvent);
+        break;
+      }
+    }
+
+    // Clear pending commands after processing
+    newState.pendingCommands = [];
+  }
+
+  return { state: newState, events };
+}
+
+function processIncome(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
+  const events: DomainEvent[] = [];
+  const newState: SimulationState = {
+    ...state,
+    players: {
+      p1: { ...state.players.p1 },
+      p2: { ...state.players.p2 },
+    },
+  };
+
+  for (const playerId of ['p1', 'p2'] as const) {
+    const player = newState.players[playerId];
+    const tickInRunning = state.tick - (state.runningStartedAtTick ?? 0);
+
+    if (tickInRunning > 0 && tickInRunning % INCOME_INTERVAL_TICKS === 0) {
+      player.gold += player.income;
+      const incomeEvent: IncomePaidEvent = {
+        type: 'income_paid',
+        tick: state.tick,
+        playerId,
+        amount: player.income,
+        newGold: player.gold,
+      };
+      events.push(incomeEvent);
+    }
+  }
+
+  return { state: newState, events };
+}
+
 function stepSimulation(state: SimulationState): { state: SimulationState; events: readonly DomainEvent[] } {
   const allEvents: DomainEvent[] = [];
 
@@ -431,6 +794,16 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
 
     case 'running': {
       currentState = { ...currentState, tick: currentState.tick + 1 };
+
+      // Process commands first
+      const { state: afterCommands, events: commandEvents } = processCommands(currentState);
+      currentState = afterCommands;
+      allEvents.push(...commandEvents);
+
+      // Process income
+      const { state: afterIncome, events: incomeEvents } = processIncome(currentState);
+      currentState = afterIncome;
+      allEvents.push(...incomeEvents);
 
       // Process spawns
       const { state: afterSpawn, events: spawnEvents } = processSpawns(currentState);
@@ -554,38 +927,19 @@ class SimulationImpl implements Simulation {
     };
   }
 
-  queueMonster(playerId: PlayerSlot, monsterTypeId: string, quantity: number): void {
+  submitCommand(command: GameCommand): void {
     if (this._state.phase !== 'running') {
-      return; // Only queue in running phase
+      return;
     }
+    this._state.pendingCommands.push(command);
+  }
 
-    const laneId: LaneId = playerId === 'p1' ? 'lane_p2' : 'lane_p1';
-    const lane = this._state.lanes[laneId];
-
-    // Get monster stats from game-data (simplified for now)
-    const monsterStats: Record<string, { hp: number; shield: number; speed: number; leak: number; gap: number }> = {
-      sheep: { hp: 85, shield: 0, speed: 39, leak: 1, gap: 9 },
-      wolf: { hp: 125, shield: 0, speed: 59, leak: 1, gap: 10 },
-      treant: { hp: 390, shield: 0, speed: 28, leak: 2, gap: 14 },
-      ghost: { hp: 215, shield: 95, speed: 44, leak: 2, gap: 13 },
+  getNextCommandId(playerId: PlayerSlot): CommandId {
+    return {
+      playerId,
+      tick: this._state.tick,
+      sequence: this._state.nextCommandIdSequence++,
     };
-
-    const stats = monsterStats[monsterTypeId];
-    if (!stats) return;
-
-    for (let i = 0; i < quantity; i++) {
-      const spawn: MonsterSpawnParams = {
-        entityId: this._state.nextEntityId++,
-        ownerId: playerId,
-        monsterTypeId,
-        hp: stats.hp,
-        shield: stats.shield,
-        speedMilliTilesPerTick: stats.speed,
-        leakDamage: stats.leak,
-        spawnGapTicks: stats.gap,
-      };
-      lane.spawnQueue.push(spawn);
-    }
   }
 }
 

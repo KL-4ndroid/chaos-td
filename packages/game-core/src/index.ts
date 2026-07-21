@@ -12,6 +12,11 @@ export {
   TICKS_PER_SECOND,
   PHASE_TICKS,
   PHASE_DURATIONS_MS,
+  INITIAL_GOLD,
+  INITIAL_HP,
+  INITIAL_INCOME,
+  INCOME_INTERVAL_TICKS,
+  SELL_REFUND_PERMILLE,
 } from './constants';
 
 // PRNG
@@ -95,3 +100,14 @@ export {
   type TowerLevel,
   type TowerRuntimeState,
 } from './tower';
+
+// Commands
+export {
+  type GameCommand,
+  type CommandId,
+  type BuildTowerCommand,
+  type UpgradeTowerCommand,
+  type SellTowerCommand,
+  type QueueMonsterCommand,
+  createCommandId,
+} from './commands';

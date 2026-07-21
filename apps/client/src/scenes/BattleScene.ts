@@ -106,8 +106,20 @@ export class BattleScene extends Phaser.Scene {
   private stepSimulation(): void {
     const result = this.simulation.step();
     if (result.state.phase === 'running' && !this.demoQueued) {
-      this.simulation.queueMonster('p1', 'sheep', 5);
-      this.simulation.queueMonster('p2', 'sheep', 5);
+      this.simulation.submitCommand({
+        type: 'queue_monster',
+        commandId: this.simulation.getNextCommandId('p1'),
+        playerId: 'p1',
+        monsterTypeId: 'sheep',
+        quantity: 5,
+      });
+      this.simulation.submitCommand({
+        type: 'queue_monster',
+        commandId: this.simulation.getNextCommandId('p2'),
+        playerId: 'p2',
+        monsterTypeId: 'sheep',
+        quantity: 5,
+      });
       this.demoQueued = true;
     }
     this.captureMonsterPositions(result.state);

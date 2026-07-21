@@ -4,11 +4,11 @@
 
 - **Branch**: autonomous/phase1-mvp
 - **Milestone**: M2 Economy and Player Commands
-- **Task**: Defining M2 tasks
-- **Status**: M1 Gate Passed, starting M2
+- **Task**: M2-001 Done, M2-002 Next
+- **Status**: In progress
 - **Last commit**: pending
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
-- **Test status**: 127 passed; lint, typecheck, build passed
+- **Test status**: 142 passed; lint, typecheck, build passed
 
 ## Completed Tasks
 
@@ -20,7 +20,8 @@
 | M1-001 | f1c3ddb, f2bb265 | 111 passed | Yes |
 | M1-002 | d148892 | 120 passed | Yes |
 | M1-003 | 66bc8fa | 124 passed | Yes |
-| M1 Gate | pending | 127 passed | Pending |
+| M1 Gate | 7aed67e | 127 passed | Yes |
+| M2-001 | pending | 142 passed | Pending |
 
 ## M1 Gate Results
 
@@ -46,10 +47,10 @@
 
 ## Known Non-blocking Risks
 
-- Client production bundle is 1,399 kB and triggers Vite's chunk-size warning.
+- Client production bundle is 1,405 kB and triggers Vite's chunk-size warning.
 - Package-local Vitest scripts inherit root-relative include paths; repository-level `npm run test` is the verified test entrypoint.
 
 ## Next Task
 
-- **M2-001**: Build/Upgrade/Sell Commands
-- **Dependencies**: M1 Gate passed
+- **M2-002**: Gold, Income, and Monster Spawning
+- **Dependencies**: M2-001 Done

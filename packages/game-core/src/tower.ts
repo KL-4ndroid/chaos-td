@@ -17,7 +17,7 @@ export interface TowerRuntimeState {
   /** Tower type ID */
   readonly towerTypeId: TowerId;
   /** Current level */
-  level: TowerLevel;
+  level: 1 | 2 | 3;
   /** Cell position X */
   cellX: number;
   /** Cell position Y */
@@ -26,6 +26,8 @@ export interface TowerRuntimeState {
   cooldownTicks: number;
   /** Target monster entity ID or null */
   targetId: number | null;
+  /** Total gold invested in this tower (for sell refund) */
+  totalInvested: number;
 }
 
 /**
@@ -37,6 +39,7 @@ export function createTowerState(
   towerTypeId: TowerId,
   cellX: number,
   cellY: number,
+  totalInvested: number = 0,
 ): TowerRuntimeState {
   return {
     entityId,
@@ -47,6 +50,7 @@ export function createTowerState(
     cellY,
     cooldownTicks: 0,
     targetId: null,
+    totalInvested,
   };
 }
 

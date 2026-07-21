@@ -11,8 +11,6 @@ describe('M1 Gate - Stress Test', () => {
   it('runs 10 minutes (12000 ticks) without crash', () => {
     const sim = createSimulation(
       { seed: 'gate-stress-test', configVersion: CONFIG_VERSION },
-      {},
-      [],
     );
 
     sim.start();
@@ -29,8 +27,6 @@ describe('M1 Gate - Stress Test', () => {
   it('produces deterministic hash at tick 1000', () => {
     const sim = createSimulation(
       { seed: 'determinism-check', configVersion: CONFIG_VERSION },
-      {},
-      [],
     );
 
     sim.start();
@@ -46,12 +42,12 @@ describe('M1 Gate - Stress Test', () => {
     const seed = 'consistency-test';
     const config = { seed, configVersion: CONFIG_VERSION };
 
-    const run1 = createSimulation(config, {}, []);
+    const run1 = createSimulation(config);
     run1.start();
     for (let i = 0; i < 500; i++) run1.step();
     const hash1 = run1.state.stateHash;
 
-    const run2 = createSimulation(config, {}, []);
+    const run2 = createSimulation(config);
     run2.start();
     for (let i = 0; i < 500; i++) run2.step();
     const hash2 = run2.state.stateHash;
