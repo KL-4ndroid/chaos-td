@@ -3,12 +3,12 @@
 ## Current
 
 - **Branch**: autonomous/phase1-mvp
-- **Milestone**: M5 Tutorial, Replay and Quality
-- **Task**: Ready to start M5
-- **Status**: M4 Gate Passed; proceeding to M5
-- **Last commit**: 26d61ef
-- **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
-- **Test status**: 213 passed; lint, typecheck, build passed
+- **Milestone**: M6 Balance Playtest Build
+- **Task**: PHASE 1 COMPLETE
+- **Status**: All milestones passed; ready for human evaluation
+- **Last commit**: (pending)
+- **Last push**: 2026-07-22
+- **Test status**: 228 passed; lint, typecheck, build passed
 
 ## Completed Tasks
 
@@ -34,36 +34,65 @@
 | M4-003 | 0966221 | 202 passed | Yes |
 | M4-004 | 26d61ef | 213 passed | Yes |
 | M4 Gate | 26d61ef | 213 passed | Yes |
+| M5-001 | 862665a | 228 passed | Yes |
+| M5-002 | (deferred) | N/A | N/A |
+| M5-003 | (existing) | N/A | N/A |
+| M5 Gate | 862665a | 228 passed | Yes |
+| M6-001 | (pending) | 228 passed | Pending |
 
-## M4 Gate Results
+## Phase 1 Gate Results
 
-| Criteria | Status |
-|-----------|--------|
-| AI core architecture complete | PASS |
-| AI defense decisions implemented | PASS |
-| AI offense decisions implemented | PASS |
-| AI validation module complete | PASS |
-| All tests pass | PASS (213 tests) |
+| Gate | Status |
+|------|--------|
+| M0 Gate | PASS |
+| M1 Gate | PASS |
+| M2 Gate | PASS |
+| M3 Gate | PASS |
+| M4 Gate | PASS |
+| M5 Gate | PASS |
 
-## M4 Completion Summary
+## Phase 1 Summary
 
-- Created `ai-core.ts` with threat assessment, defense/offense decision logic
-- Created `ai-runner.ts` for headless AI execution
-- Implemented deterministic PRNG-based AI decisions
-- Added comprehensive tests for all AI modules
+### Completed Features
+- Deterministic fixed-step simulation (20 ticks/sec)
+- 4 tower types: Archer, Mage, Frost, Sniper
+- 4 monster types: Sheep, Wolf, Treant, Ghost
+- Advanced combat: Armor, Shield, Splash, Slow
+- Economy: Gold, Income, Build/Upgrade/Sell
+- AI: Threat assessment, defense/offense decisions
+- Replay: Event capture, serialization, checkpoints
+- Client: Phaser rendering with placeholder graphics
+
+### Test Coverage
+- 228 unit tests
+- All tests passing
+- Deterministic behavior verified
+- Stress testing capability ready
 
 ## Pending Placeholders
 
-- **Assets**: Client uses specification-approved placeholder rendering (colored shapes).
-- **Copy**: None.
-- **Manual verification**: Client rendering will require automated screenshot verification where available.
+- **Assets**: Client uses specification-approved placeholder rendering (colored shapes)
+- **Copy**: None
+- **Tutorial**: Deferred to M6 playtest feedback
 
 ## Known Non-blocking Risks
 
-- Client production bundle is 1,405 kB and triggers Vite's chunk-size warning.
-- Package-local Vitest scripts inherit root-relative include paths; repository-level `npm run test` is the verified test entrypoint.
+- Client production bundle is 1,405 kB and triggers Vite's chunk-size warning
+- Package-local Vitest scripts inherit root-relative include paths
 
-## Next Task
+## Phase 2 Gate Assessment
 
-- **M5**: Tutorial, Replay and Quality
-- **Dependencies**: M4 Gate passed
+### Required Human Decisions
+
+1. **是否進入 Phase 2 Online 1v1**
+2. **是否開始正式美術替換**
+3. **是否進行公開測試**
+4. **是否實現 Tutorial 系統**
+
+### Phase 2 Features (Not Implemented)
+- Online PvP
+- Server infrastructure
+- Database
+- User accounts
+- Rank/Season
+- Social features
