@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { SeededRng } from './prng';
 import {
   AI_DECISION_INTERVAL_TICKS,
   AI_BUILD_PRIORITY_CELLS,
@@ -14,6 +15,8 @@ import {
   assessLaneThreat,
   decideDefense,
   calculateBuildScore,
+  calculateOffenseBudget,
+  decideOffense,
   type AIState,
 } from './ai-core';
 
@@ -234,6 +237,44 @@ describe('AI Core', () => {
       const scoreLowGold = calculateBuildScore('archer', 120, 13, 18, 2, 150);
 
       expect(scoreLowGold).toBeLessThan(scoreNormal);
+    });
+  });
+
+  describe('calculateOffenseBudget', () => {
+    it('returns 0 when gold is below reserve', () => {
+      const budget = calculateOffenseBudget(100, 150, 400);
+      expect(budget).toBe(0);
+    });
+
+    it('calculates budget correctly', () => {
+      const budget = calculateOffenseBudget(600, 150, 400);
+      // (600 - 150) * 400 / 1000 = 450 * 0.4 = 180
+      expect(budget).toBe(180);
+    });
+  });
+
+  describe('decideOffense', () => {
+    it('does not send when lane is not safe', () => {
+      const decision = decideOffense('critical', 200, 0, 30, 60, ['sheep'], { version: 1, state: new Uint32Array([42]) } as SeededRng);
+      expect(decision.type).toBe('no_action');
+    });
+
+    it('does not send when budget is insufficient', () => {
+      const decision = decideOffense('safe', 50, 0, 30, 60, ['sheep'], { version: 1, state: new Uint32Array([42]) } as SeededRng);
+      expect(decision.type).toBe('no_action');
+    });
+
+    it('does not send when queue is nearly full', () => {
+      const decision = decideOffense('safe', 200, 28, 30, 60, ['sheep'], { version: 1, state: new Uint32Array([42]) } as SeededRng);
+      expect(decision.type).toBe('no_action');
+    });
+
+    it('sends monster when conditions are met', () => {
+      const decision = decideOffense('safe', 200, 0, 30, 60, ['sheep'], { version: 1, state: new Uint32Array([42]) } as SeededRng);
+      expect(decision.type).toBe('send_monster');
+      if (decision.type === 'send_monster') {
+        expect(decision.quantity).toBeGreaterThan(0);
+      }
     });
   });
 });

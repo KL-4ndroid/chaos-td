@@ -87,7 +87,7 @@ export function shouldMakeDecision(state: AIState, currentTick: number): boolean
 export function calculateLaneThreat(
   monsterCount: number,
   monstersAtRisk: number,
-  monsterSpeedAvg: number,
+  _monsterSpeedAvg: number,
   distanceToEnd: number,
 ): ThreatLevel {
   // Critical: monsters close to end or high monster count
@@ -138,7 +138,7 @@ export function calculateLanePressure(
  * Calculate defense capacity (attacks in next 4 seconds = 80 ticks)
  */
 export function calculateDefenseCapacity(
-  towers: Array<{ cooldownTicks: number; rangeMilliTiles: number }>,
+  towers: Array<{ cooldownTicks: number }>,
   monsterCount: number,
 ): number {
   if (monsterCount === 0) return 0;
@@ -158,7 +158,7 @@ export function calculateDefenseCapacity(
  */
 export function assessLaneThreat(
   monsters: Array<{ hp: number; shield: number; armorPermille: number; pathProgressMilliTiles: number; totalPathLength: number }>,
-  towers: Array<{ cooldownTicks: number; rangeMilliTiles: number }>,
+  towers: Array<{ cooldownTicks: number }>,
   _tick: number,
 ): LaneThreatAssessment {
   const pressurePoints = calculateLanePressure(monsters);
@@ -287,7 +287,7 @@ export function decideDefense(
   defenseReserve: number,
   availableGold: number,
   existingTowerTypes: string[],
-  monstersInRange: number,
+  _monstersInRange: number,
   preferredTower: string = 'archer',
 ): DefenseAction {
   // Don't spend if gold is below reserve
@@ -338,7 +338,7 @@ export function decideDefense(
     }
 
     case 'safe':
-    default:
+    default: {
       // Don't build unless we have lots of extra gold
       if (availableGold > defenseReserve + gold * 0.5) {
         const affordableTowers = AI_BUILD_PRIORITY_CELLS.filter(
@@ -357,5 +357,111 @@ export function decideDefense(
         }
       }
       return { type: 'no_action', reason: 'lane_safe' };
+    }
   }
+}
+
+// ============================================================================
+// Offense Decision Logic
+// ============================================================================
+
+/**
+ * Offense action types
+ */
+export type OffenseAction =
+  | { type: 'send_monster'; monsterType: string; quantity: number; score: number }
+  | { type: 'no_action'; reason: string };
+
+/**
+ * Monster type selection weights based on lane state
+ */
+export const MONSTER_PREFERENCES: Readonly<Record<string, {
+  baseWeight: number;
+  vsLowFirepower: number;
+  vsHighFirepower: number;
+  vsSplash: number;
+  vsSlow: number;
+}>> = Object.freeze({
+  sheep: { baseWeight: 100, vsLowFirepower: 120, vsHighFirepower: 60, vsSplash: 80, vsSlow: 70 },
+  wolf: { baseWeight: 80, vsLowFirepower: 100, vsHighFirepower: 70, vsSplash: 60, vsSlow: 90 },
+  treant: { baseWeight: 50, vsLowFirepower: 80, vsHighFirepower: 40, vsSplash: 20, vsSlow: 50 },
+  ghost: { baseWeight: 40, vsLowFirepower: 60, vsHighFirepower: 100, vsSplash: 50, vsSlow: 30 },
+});
+
+/**
+ * Calculate offense budget based on gold and reserve
+ */
+export function calculateOffenseBudget(
+  gold: number,
+  defenseReserve: number,
+  offenseBudgetRatioPermille: number,
+): number {
+  const available = gold - defenseReserve;
+  if (available <= 0) return 0;
+  return Math.floor(available * offenseBudgetRatioPermille / 1000);
+}
+
+/**
+ * Select monster type based on lane state
+ */
+export function selectMonsterType(
+  laneThreat: ThreatLevel,
+  preferredTypes: readonly string[],
+  rng: SeededRng,
+): string {
+  // Default to sheep for safe lanes
+  if (laneThreat === 'safe') {
+    // Use PRNG to pick between sheep and wolf
+    const useWolf = rng.state[0]! % 2 === 0;
+    return useWolf && preferredTypes.includes('wolf') ? 'wolf' : 'sheep';
+  }
+
+  // For strained/critical, prefer tankier monsters
+  if (laneThreat === 'strained' && preferredTypes.includes('wolf')) {
+    return 'wolf';
+  }
+
+  return 'sheep';
+}
+
+/**
+ * Decide on offense action based on lane state and budget
+ */
+export function decideOffense(
+  laneThreat: ThreatLevel,
+  offenseBudget: number,
+  queueLength: number,
+  maxQueueSize: number,
+  monsterCost: number,
+  preferredTypes: readonly string[],
+  rng: SeededRng,
+): OffenseAction {
+  // Only send when lane is safe
+  if (laneThreat !== 'safe') {
+    return { type: 'no_action', reason: 'lane_not_safe' };
+  }
+
+  // Don't flood queue
+  if (queueLength >= maxQueueSize - 2) {
+    return { type: 'no_action', reason: 'queue_nearly_full' };
+  }
+
+  // Check budget
+  if (offenseBudget < monsterCost) {
+    return { type: 'no_action', reason: 'insufficient_budget' };
+  }
+
+  // Select monster type
+  const monsterType = selectMonsterType(laneThreat, preferredTypes, rng);
+
+  // Calculate quantity (max 5, based on budget)
+  const maxAffordable = Math.floor(offenseBudget / monsterCost);
+  const quantity = Math.min(5, Math.max(1, maxAffordable));
+
+  return {
+    type: 'send_monster',
+    monsterType,
+    quantity,
+    score: 50, // Base score
+  };
 }

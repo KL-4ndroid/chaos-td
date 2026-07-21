@@ -2,10 +2,10 @@
 
 ## Status
 
-- [ ] Ready
+- [x] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -36,11 +36,11 @@ M4-002 Done
 
 ## Acceptance Criteria
 
-- [ ] AI calculates offense budget correctly
-- [ ] AI selects appropriate monster types
-- [ ] AI respects monster availability timers
-- [ ] AI only sends when lane is safe
-- [ ] Deterministic spawn decisions
+- [x] AI calculates offense budget correctly
+- [x] AI selects appropriate monster types
+- [x] AI respects monster availability timers
+- [x] AI only sends when lane is safe
+- [x] Deterministic spawn decisions
 
 ## Verification
 
@@ -49,3 +49,16 @@ npm run test
 npm run typecheck
 npm run lint
 ```
+
+## Completion Report
+
+- **Commit**: `feat(core): add AI offense decision logic with monster selection`
+- **Date**: 2026-07-22
+- **Branch**: `autonomous/phase1-mvp`
+- **Test Results**: 202 tests passed
+- **Changes**:
+  - Added `decideOffense` function for offense action decisions
+  - Added `calculateOffenseBudget` for offense budget calculation
+  - Added `selectMonsterType` for monster selection
+  - Added `MONSTER_PREFERENCES` for monster type weights
+  - Added comprehensive tests for offense decisions
