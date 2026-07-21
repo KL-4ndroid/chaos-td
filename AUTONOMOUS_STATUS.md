@@ -3,12 +3,12 @@
 ## Current
 
 - **Branch**: autonomous/phase1-mvp
-- **Milestone**: M4 Deterministic AI
-- **Task**: Ready to start M4
-- **Status**: M3 Gate Passed; proceeding to M4
-- **Last commit**: b47255f
+- **Milestone**: M5 Tutorial, Replay and Quality
+- **Task**: Ready to start M5
+- **Status**: M4 Gate Passed; proceeding to M5
+- **Last commit**: 26d61ef
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
-- **Test status**: 172 passed; lint, typecheck, build passed
+- **Test status**: 213 passed; lint, typecheck, build passed
 
 ## Completed Tasks
 
@@ -28,23 +28,29 @@
 | M3-001 | 86f6ef7 | 152 passed | Yes |
 | M3-002 | 8fd4189 | 162 passed | Yes |
 | M3-003 | b47255f | 172 passed | Yes |
-| M3 Gate | b47255f | 172 passed | Yes |
+| M3 Gate | 3ad05fa | 172 passed | Yes |
+| M4-001 | 61e0b4d | 191 passed | Yes |
+| M4-002 | 5cfbf3f | 196 passed | Yes |
+| M4-003 | 0966221 | 202 passed | Yes |
+| M4-004 | 26d61ef | 213 passed | Yes |
+| M4 Gate | 26d61ef | 213 passed | Yes |
 
-## M3 Gate Results
+## M4 Gate Results
 
 | Criteria | Status |
 |-----------|--------|
-| All M3-001 tasks complete | PASS |
-| All M3-002 tasks complete | PASS |
-| All M3-003 tasks complete | PASS |
-| All tests pass | PASS (172 tests) |
+| AI core architecture complete | PASS |
+| AI defense decisions implemented | PASS |
+| AI offense decisions implemented | PASS |
+| AI validation module complete | PASS |
+| All tests pass | PASS (213 tests) |
 
-## M3-002 Completion
+## M4 Completion Summary
 
-- All monster types defined (sheep, wolf, treant, ghost) in game-data
-- Added monster availability timer enforcement (30s wolf, 90s treant, 150s ghost)
-- Added `monster_locked` rejection reason for unavailable monsters
-- Added comprehensive tests for monster unlock timing
+- Created `ai-core.ts` with threat assessment, defense/offense decision logic
+- Created `ai-runner.ts` for headless AI execution
+- Implemented deterministic PRNG-based AI decisions
+- Added comprehensive tests for all AI modules
 
 ## Pending Placeholders
 
@@ -59,5 +65,5 @@
 
 ## Next Task
 
-- **M3-002**: Additional Monster Types (Wolf, Treant, Ghost)
-- **Dependencies**: M3-001 passed
+- **M5**: Tutorial, Replay and Quality
+- **Dependencies**: M4 Gate passed
