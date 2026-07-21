@@ -652,8 +652,8 @@ describe('Simulation - READY Phase', () => {
 
   it('should have minimal player state', () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
-    expect(sim.state.players.p1).toEqual({ playerId: 'p1', hp: 20 });
-    expect(sim.state.players.p2).toEqual({ playerId: 'p2', hp: 20 });
+    expect(sim.state.players.p1).toEqual({ playerId: 'p1', hp: 20, gold: 600, income: 100, totalInvested: 0 });
+    expect(sim.state.players.p2).toEqual({ playerId: 'p2', hp: 20, gold: 600, income: 100, totalInvested: 0 });
   });
 
   it('should not accept step() in READY', () => {
@@ -913,12 +913,12 @@ describe('Simulation - Player Slots', () => {
     expect(sim.state.players.p2.playerId).toBe('p2');
   });
 
-  it('should not have game state in player slots yet', () => {
+  it('should have correct player state fields', () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     const keys1 = Object.keys(sim.state.players.p1);
     const keys2 = Object.keys(sim.state.players.p2);
-    expect(keys1).toEqual(['playerId', 'hp']);
-    expect(keys2).toEqual(['playerId', 'hp']);
+    expect(keys1).toEqual(['playerId', 'hp', 'gold', 'income', 'totalInvested']);
+    expect(keys2).toEqual(['playerId', 'hp', 'gold', 'income', 'totalInvested']);
   });
 });
 

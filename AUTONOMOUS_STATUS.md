@@ -4,9 +4,9 @@
 
 - **Branch**: autonomous/phase1-mvp
 - **Milestone**: M3 Full MVP Content
-- **Task**: M3 tasks defined
-- **Status**: M2 Gate Passed, starting M3
-- **Last commit**: f33a02b
+- **Task**: M3-001 Additional Tower Types - Completed
+- **Status**: M3-001 Done; proceeding to M3-002
+- **Last commit**: (pending)
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
 - **Test status**: 152 passed; lint, typecheck, build passed
 
@@ -25,6 +25,7 @@
 | M2-002 | 1ad2233 | 147 passed | Yes |
 | M2-003 | f33a02b | 152 passed | Yes |
 | M2 Gate | f33a02b | 152 passed | Yes |
+| M3-001 | (pending) | 152 passed | Pending |
 
 ## M2 Gate Results
 
@@ -36,6 +37,13 @@
 | Gold never negative | PASS |
 | Resolving testable | PASS |
 | Can complete a full game | PASS |
+
+## M3-001 Completion
+
+- Mage tower: splash damage with armor/shield reduction
+- Frost tower: slow effect with refresh and reset logic
+- Sniper tower: uses STRONG targeting (prioritizes highest HP)
+- All tower types integrated into `processCombat`
 
 ## Pending Placeholders
 
@@ -50,5 +58,5 @@
 
 ## Next Task
 
-- **M3-001**: Additional Tower Types (Mage, Frost, Sniper)
-- **Dependencies**: M2 Gate passed
+- **M3-002**: Additional Monster Types (Wolf, Treant, Ghost)
+- **Dependencies**: M3-001 passed

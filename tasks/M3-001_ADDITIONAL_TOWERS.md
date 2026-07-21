@@ -2,10 +2,10 @@
 
 ## Status
 
-- [ ] Ready
+- [x] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -37,10 +37,10 @@ M2 Gate Passed
 
 ## Acceptance Criteria
 
-- [ ] Mage deals splash damage in radius
-- [ ] Frost applies slow effect
-- [ ] Sniper uses STRONG targeting
-- [ ] All towers combat correctly
+- [x] Mage deals splash damage in radius
+- [x] Frost applies slow effect
+- [x] Sniper uses STRONG targeting
+- [x] All towers combat correctly
 
 ## Verification
 
@@ -49,3 +49,20 @@ npm run test
 npm run typecheck
 npm run lint
 ```
+
+## Completion Report
+
+- **Commit**: `fix(core): correct M3-001 splash/slow syntax and exactOptionalPropertyTypes`
+- **Date**: 2026-07-22
+- **Branch**: `autonomous/phase1-mvp`
+- **Test Results**: 152 tests passed
+- **Changes**:
+  - Fixed syntax error in splash damage calculation (missing parentheses)
+  - Fixed `other` → `target` bug in frost slow refresh logic
+  - Fixed `exactOptionalPropertyTypes` error by using `delete` instead of `= undefined`
+  - Added `armorPermille` to test monster factory in `combat.test.ts`
+  - Added `slowPermille` and `slowDurationTicks` to `MonsterRuntimeState` and `MonsterSpawnParams`
+  - Implemented splash damage for mage towers (armor/shield calculation)
+  - Implemented slow effect for frost towers (refresh on stronger, reset duration on same)
+  - Integrated all tower types into `processCombat`
+

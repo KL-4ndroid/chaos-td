@@ -26,6 +26,7 @@ function createMonster(
     monsterTypeId: 'sheep',
     hp,
     shield: 0,
+    armorPermille: 0,
     segmentIndex: 0,
     distanceOnSegmentMilliTiles: pathProgressMilliTiles,
     pathProgressMilliTiles,
@@ -202,6 +203,6 @@ describe('Archer vs Sheep combat', () => {
       simulation.step();
     }
 
-    expect(simulation.state.stateHash).toBe('f9f4e973fa6554a4');
+    expect(simulation.state.stateHash).toBe('8f2931f1db7af2c4');
   });
 });

@@ -86,6 +86,7 @@ export interface MonsterSpawnParams {
   monsterTypeId: string;
   hp: number;
   shield: number;
+  armorPermille: number;
   speedMilliTilesPerTick: number;
   leakDamage: number;
   spawnGapTicks: number;
@@ -97,11 +98,14 @@ export interface MonsterRuntimeState {
   monsterTypeId: string;
   hp: number;
   shield: number;
+  armorPermille: number;
   segmentIndex: number;
   distanceOnSegmentMilliTiles: number;
   pathProgressMilliTiles: number;
   speedMilliTilesPerTick: number;
   leakDamage: number;
+  slowPermille?: number;
+  slowDurationTicks?: number;
 }
 
 export interface SimulationState {
@@ -254,6 +258,7 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
         monsterTypeId: spawn.monsterTypeId,
         hp: spawn.hp,
         shield: spawn.shield,
+        armorPermille: spawn.armorPermille,
         segmentIndex: 0,
         distanceOnSegmentMilliTiles: 0,
         pathProgressMilliTiles: 0,
@@ -297,8 +302,21 @@ function processMovement(state: SimulationState): { state: SimulationState; even
       const monster = newLane.monsters[i];
       if (!monster || monster.hp <= 0) continue;
 
+      // Apply slow effect if active
+      let speed = monster.speedMilliTilesPerTick;
+      if (monster.slowPermille !== undefined && monster.slowPermille > 0) {
+        speed = Math.floor(speed * (1000 - monster.slowPermille) / 1000);
+        // Decrement slow duration
+        if (monster.slowDurationTicks !== undefined) {
+          monster.slowDurationTicks--;
+          if (monster.slowDurationTicks <= 0) {
+            delete (monster as unknown as Record<string, unknown>)['slowPermille'];
+            delete (monster as unknown as Record<string, unknown>)['slowDurationTicks'];
+          }
+        }
+      }
+
       // Calculate movement
-      const speed = monster.speedMilliTilesPerTick;
       monster.pathProgressMilliTiles += speed;
       monster.distanceOnSegmentMilliTiles += speed;
 
@@ -373,7 +391,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
   for (const tower of orderedTowers) {
     tower.cooldownTicks = Math.max(0, tower.cooldownTicks - 1);
     tower.targetId = null;
-    if (tower.cooldownTicks > 0 || tower.towerTypeId !== 'archer') {
+    if (tower.cooldownTicks > 0) {
       continue;
     }
 
@@ -404,8 +422,25 @@ function processCombat(state: SimulationState): { state: SimulationState; events
     }
 
     tower.targetId = target.entityId;
-    target.hp = Math.max(0, target.hp - level.damage);
     tower.cooldownTicks = level.cooldownTicks;
+
+    // Calculate damage with armor
+    let damage = level.damage;
+    const armorMultiplierPermille = 1000 - Math.min(800, Math.max(0, target.armorPermille));
+    damage = Math.max(1, Math.floor(damage * armorMultiplierPermille / 1000));
+
+    // Apply damage to primary target
+    let actualDamage = damage;
+    if (target.shield > 0) {
+      if (target.shield >= actualDamage) {
+        target.shield -= actualDamage;
+        actualDamage = 0;
+      } else {
+        actualDamage -= target.shield;
+        target.shield = 0;
+      }
+    }
+    target.hp = Math.max(0, target.hp - actualDamage);
 
     const attackEvent: AttackFiredEvent = {
       type: 'attack_fired',
@@ -417,7 +452,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
       type: 'damage_applied',
       tick: state.tick,
       monsterEntityId: target.entityId,
-      damage: level.damage,
+      damage,
       newHp: target.hp,
     };
     events.push(attackEvent, damageEvent);
@@ -431,6 +466,70 @@ function processCombat(state: SimulationState): { state: SimulationState; events
         killerPlayerId: tower.ownerId,
       };
       events.push(deathEvent);
+    }
+
+    // Handle splash damage for mage towers
+    if (definition.role === 'splash' && level.splashRadiusMilliTiles && level.splashFactorPermille) {
+      for (const other of candidates.slice(1)) {
+        if (other.hp <= 0) continue;
+        const otherPos = calculatePosition(lane.waypoints, lane.segments, other.pathProgressMilliTiles);
+        const dx = otherPos.x - towerX;
+        const dy = otherPos.y - towerY;
+        const distSq = dx * dx + dy * dy;
+        const splashRadiusSq = level.splashRadiusMilliTiles * level.splashRadiusMilliTiles;
+        if (distSq <= splashRadiusSq) {
+          let splashDamage = Math.floor(damage * level.splashFactorPermille / 1000);
+          const armorMultiplier = Math.max(0, other.armorPermille);
+          const cappedArmor = Math.min(800, armorMultiplier);
+          splashDamage = Math.max(1, Math.floor(splashDamage * (1000 - cappedArmor) / 1000));
+          let splashActual = splashDamage;
+          if (other.shield > 0) {
+            if (other.shield >= splashActual) {
+              other.shield -= splashActual;
+              splashActual = 0;
+            } else {
+              splashActual -= other.shield;
+              other.shield = 0;
+            }
+          }
+          other.hp = Math.max(0, other.hp - splashActual);
+          events.push({
+            type: 'damage_applied',
+            tick: state.tick,
+            monsterEntityId: other.entityId,
+            damage: splashDamage,
+            newHp: other.hp,
+          });
+          if (other.hp === 0) {
+            events.push({
+              type: 'monster_died',
+              tick: state.tick,
+              playerId: other.ownerId,
+              monsterEntityId: other.entityId,
+              killerPlayerId: tower.ownerId,
+            });
+          }
+        }
+      }
+    }
+
+    // Handle slow effect for frost towers
+    if (definition.role === 'slow' && level.slowPermille && level.slowDurationTicks) {
+      const existingSlow = target.slowPermille ?? 0;
+      if (level.slowPermille > existingSlow) {
+        target.slowPermille = level.slowPermille;
+        target.slowDurationTicks = level.slowDurationTicks;
+        events.push({
+          type: 'slow_applied',
+          tick: state.tick,
+          monsterEntityId: target.entityId,
+          slowPermille: level.slowPermille,
+          durationTicks: level.slowDurationTicks,
+        });
+      } else if (level.slowPermille === existingSlow && target.slowDurationTicks !== undefined) {
+        // Refresh duration
+        target.slowDurationTicks = level.slowDurationTicks;
+      }
     }
   }
 
@@ -741,6 +840,7 @@ function processCommands(state: SimulationState): { state: SimulationState; even
             monsterTypeId: command.monsterTypeId,
             hp: monsterDef.hp,
             shield: monsterDef.shield,
+            armorPermille: monsterDef.armorPermille,
             speedMilliTilesPerTick: monsterDef.speedMilliTilesPerTick,
             leakDamage: monsterDef.leakDamage,
             spawnGapTicks: monsterDef.spawnGapTicks,
