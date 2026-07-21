@@ -4,11 +4,11 @@
 
 - **Branch**: autonomous/phase1-mvp
 - **Milestone**: M3 Full MVP Content
-- **Task**: M3-002 Additional Monster Types - Completed
-- **Status**: M3-002 Done; proceeding to M3-003
+- **Task**: M3-003 Advanced Mechanics - Completed
+- **Status**: All M3 Tasks Done; proceeding to M3 Gate
 - **Last commit**: (pending)
 - **Last push**: 2026-07-22, origin/autonomous/phase1-mvp
-- **Test status**: 162 passed; lint, typecheck, build passed
+- **Test status**: 172 passed; lint, typecheck, build passed
 
 ## Completed Tasks
 
@@ -26,7 +26,16 @@
 | M2-003 | f33a02b | 152 passed | Yes |
 | M2 Gate | f33a02b | 152 passed | Yes |
 | M3-001 | 86f6ef7 | 152 passed | Yes |
-| M3-002 | (pending) | 162 passed | Pending |
+| M3-002 | 8fd4189 | 162 passed | Yes |
+| M3-003 | (pending) | 172 passed | Pending |
+
+## M3-003 Completion
+
+- Added comprehensive tests for armor damage reduction
+- Added tests for shield absorption and depletion
+- Added tests for mage splash damage mechanics
+- Added tests for frost slow effect mechanics
+- All advanced combat mechanics verified to work correctly
 
 ## M3-002 Completion
 

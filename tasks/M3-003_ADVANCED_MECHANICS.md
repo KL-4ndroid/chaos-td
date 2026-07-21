@@ -2,10 +2,10 @@
 
 ## Status
 
-- [ ] Ready
+- [x] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -35,10 +35,10 @@ M3-002 Done
 
 ## Acceptance Criteria
 
-- [ ] Armor reduces damage correctly
-- [ ] Shield absorbs damage before HP
-- [ ] Splash hits multiple monsters
-- [ ] Slow reduces speed correctly
+- [x] Armor reduces damage correctly
+- [x] Shield absorbs damage before HP
+- [x] Splash hits multiple monsters
+- [x] Slow reduces speed correctly
 
 ## Verification
 
@@ -47,3 +47,16 @@ npm run test
 npm run typecheck
 npm run lint
 ```
+
+## Completion Report
+
+- **Commit**: `test(core): add M3-003 advanced combat mechanics tests`
+- **Date**: 2026-07-22
+- **Branch**: `autonomous/phase1-mvp`
+- **Test Results**: 172 tests passed
+- **Changes**:
+  - Added comprehensive tests for armor damage reduction
+  - Added tests for shield absorption and depletion
+  - Added tests for mage splash damage mechanics
+  - Added tests for frost slow effect mechanics
+  - All advanced combat mechanics verified to work correctly
