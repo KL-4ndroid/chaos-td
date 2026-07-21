@@ -5,12 +5,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   AI_DECISION_INTERVAL_TICKS,
+  AI_BUILD_PRIORITY_CELLS,
   createAIState,
   shouldMakeDecision,
   calculateLaneThreat,
   calculateLanePressure,
   calculateDefenseCapacity,
   assessLaneThreat,
+  decideDefense,
+  calculateBuildScore,
   type AIState,
 } from './ai-core';
 
@@ -190,6 +193,47 @@ describe('AI Core', () => {
       const assessment = assessLaneThreat(monsters, towers, 100);
       // Even with monsterCountAtRisk=1, pressure should be low enough
       expect(['safe', 'strained']).toContain(assessment.threat);
+    });
+  });
+
+  describe('decideDefense', () => {
+    it('does not build when gold is below reserve', () => {
+      const decision = decideDefense('safe', 100, 100, 50, [], 0, 'archer');
+      expect(decision.type).toBe('no_action');
+    });
+
+    it('builds tower when threat is critical', () => {
+      const decision = decideDefense('critical', 500, 100, 400, [], 1, 'archer');
+      expect(decision.type).toBe('build_tower');
+      if (decision.type === 'build_tower') {
+        expect(decision.towerType).toBe('archer');
+        expect(decision.score).toBeGreaterThan(0);
+      }
+    });
+
+    it('does not build when no cells available', () => {
+      // All cells occupied
+      const allCells = AI_BUILD_PRIORITY_CELLS.map(c => `${c.cellX},${c.cellY}`);
+      const decision = decideDefense('critical', 500, 100, 400, allCells, 1, 'archer');
+      expect(decision.type).toBe('no_action');
+    });
+  });
+
+  describe('calculateBuildScore', () => {
+    it('returns higher score for more effective towers', () => {
+      const archerScore = calculateBuildScore('archer', 120, 13, 18, 2, 500);
+      const mageScore = calculateBuildScore('mage', 180, 28, 26, 2, 500);
+
+      // Mage does splash but has higher cooldown, archer should be better for single target
+      expect(archerScore).toBeGreaterThan(0);
+      expect(mageScore).toBeGreaterThan(0);
+    });
+
+    it('applies penalty for expensive towers when gold is low', () => {
+      const scoreNormal = calculateBuildScore('archer', 120, 13, 18, 2, 500);
+      const scoreLowGold = calculateBuildScore('archer', 120, 13, 18, 2, 150);
+
+      expect(scoreLowGold).toBeLessThan(scoreNormal);
     });
   });
 });

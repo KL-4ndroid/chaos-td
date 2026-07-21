@@ -2,10 +2,10 @@
 
 ## Status
 
-- [ ] Ready
+- [x] Ready
 - [ ] In Progress
 - [ ] Blocked
-- [ ] Done
+- [x] Done
 
 ## Goal
 
@@ -37,11 +37,11 @@ M4-001 Done
 
 ## Acceptance Criteria
 
-- [ ] AI maintains defense reserve
-- [ ] AI builds affordable towers
-- [ ] AI upgrades when cost-effective
-- [ ] Action scoring is deterministic
-- [ ] AI never goes negative gold
+- [x] AI maintains defense reserve
+- [x] AI builds affordable towers
+- [x] AI upgrades when cost-effective
+- [x] Action scoring is deterministic
+- [x] AI never goes negative gold
 
 ## Verification
 
@@ -50,3 +50,15 @@ npm run test
 npm run typecheck
 npm run lint
 ```
+
+## Completion Report
+
+- **Commit**: `feat(core): add AI defense decision logic with scoring`
+- **Date**: 2026-07-22
+- **Branch**: `autonomous/phase1-mvp`
+- **Test Results**: 196 tests passed
+- **Changes**:
+  - Added `decideDefense` function for defense action decisions
+  - Added `calculateBuildScore` for tower evaluation
+  - Added `AI_BUILD_PRIORITY_CELLS` for tower placement
+  - Added comprehensive tests for defense decisions

@@ -210,3 +210,152 @@ export function getDefenseReserve(recommendation: number, threat: ThreatLevel): 
       return recommendation;
   }
 }
+
+// ============================================================================
+// Defense Decision Logic
+// ============================================================================
+
+/**
+ * Defense action types
+ */
+export type DefenseAction =
+  | { type: 'build_tower'; towerType: string; cellX: number; cellY: number; score: number }
+  | { type: 'upgrade_tower'; towerEntityId: number; score: number }
+  | { type: 'no_action'; reason: string };
+
+/**
+ * Tower build priority cell (center lane positions)
+ */
+export const AI_BUILD_PRIORITY_CELLS: readonly { cellX: number; cellY: number }[] = Object.freeze([
+  { cellX: 3, cellY: 3 },
+  { cellX: 4, cellY: 3 },
+  { cellX: 5, cellY: 3 },
+  { cellX: 6, cellY: 3 },
+  { cellX: 3, cellY: 4 },
+  { cellX: 4, cellY: 4 },
+  { cellX: 5, cellY: 4 },
+  { cellX: 6, cellY: 4 },
+  { cellX: 3, cellY: 5 },
+  { cellX: 4, cellY: 5 },
+  { cellX: 5, cellY: 5 },
+  { cellX: 6, cellY: 5 },
+]);
+
+/**
+ * Calculate expected damage reduction from a tower
+ */
+export function calculateExpectedDamageReduction(
+  towerType: string,
+  cooldownTicks: number,
+  damage: number,
+  monstersInRange: number,
+): number {
+  // Simplified: estimate attacks per 80 ticks * damage * monster count
+  const attacksPer80Ticks = Math.floor(80 / cooldownTicks);
+  return attacksPer80Ticks * damage * Math.min(monstersInRange, 3);
+}
+
+/**
+ * Calculate action score for a tower build
+ */
+export function calculateBuildScore(
+  towerType: string,
+  cost: number,
+  cooldownTicks: number,
+  damage: number,
+  monstersInRange: number,
+  gold: number,
+): number {
+  const expectedDamage = calculateExpectedDamageReduction(towerType, cooldownTicks, damage, monstersInRange);
+
+  // Normalize by cost (higher is better - more damage per gold)
+  const costEfficiency = expectedDamage / Math.max(cost, 1);
+
+  // Penalty for expensive towers when gold is low
+  const goldRatio = gold / Math.max(cost, 1);
+  const costPenalty = goldRatio < 1.5 ? 0.5 : 1.0;
+
+  return Math.floor(expectedDamage * costEfficiency * costPenalty);
+}
+
+/**
+ * Decide on defense action based on threat and resources
+ */
+export function decideDefense(
+  threat: ThreatLevel,
+  gold: number,
+  defenseReserve: number,
+  availableGold: number,
+  existingTowerTypes: string[],
+  monstersInRange: number,
+  preferredTower: string = 'archer',
+): DefenseAction {
+  // Don't spend if gold is below reserve
+  if (availableGold <= defenseReserve) {
+    return { type: 'no_action', reason: 'gold_below_reserve' };
+  }
+
+  switch (threat) {
+    case 'critical': {
+      // Must build/upgrade - find affordable action
+      const affordableTowers = AI_BUILD_PRIORITY_CELLS.filter(
+        (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
+      );
+
+      if (affordableTowers.length > 0) {
+        const cell = affordableTowers[0]!;
+        return {
+          type: 'build_tower',
+          towerType: preferredTower,
+          cellX: cell.cellX,
+          cellY: cell.cellY,
+          score: 100, // High priority
+        };
+      }
+      return { type: 'no_action', reason: 'no_available_cells' };
+    }
+
+    case 'strained': {
+      // Build if we have extra gold
+      const extraGold = availableGold - defenseReserve;
+      if (extraGold > gold * 0.3) {
+        const affordableTowers = AI_BUILD_PRIORITY_CELLS.filter(
+          (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
+        );
+
+        if (affordableTowers.length > 0) {
+          const cell = affordableTowers[0]!;
+          return {
+            type: 'build_tower',
+            towerType: preferredTower,
+            cellX: cell.cellX,
+            cellY: cell.cellY,
+            score: 50,
+          };
+        }
+      }
+      return { type: 'no_action', reason: 'insufficient_extra_gold' };
+    }
+
+    case 'safe':
+    default:
+      // Don't build unless we have lots of extra gold
+      if (availableGold > defenseReserve + gold * 0.5) {
+        const affordableTowers = AI_BUILD_PRIORITY_CELLS.filter(
+          (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
+        );
+
+        if (affordableTowers.length > 0) {
+          const cell = affordableTowers[0]!;
+          return {
+            type: 'build_tower',
+            towerType: preferredTower,
+            cellX: cell.cellX,
+            cellY: cell.cellY,
+            score: 10,
+          };
+        }
+      }
+      return { type: 'no_action', reason: 'lane_safe' };
+  }
+}
