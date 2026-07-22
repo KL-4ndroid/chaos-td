@@ -30,6 +30,10 @@ export class FixedStepLoop {
     return Math.min(1, this.accumulatedMs / this.tickDurationMs);
   }
 
+  get isPaused(): boolean {
+    return this.paused;
+  }
+
   pause(): void {
     this.paused = true;
   }

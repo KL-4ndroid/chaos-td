@@ -101,6 +101,20 @@ export {
   type TowerRuntimeState,
 } from './tower';
 
+// Replay
+export {
+  type Replay,
+  REPLAY_CHECKPOINT_INTERVAL,
+  createReplayData,
+  addCheckpoint,
+  addEvent,
+  finalizeReplay,
+  serializeReplay,
+  deserializeReplay,
+  verifyReplayIntegrity,
+  getReplaySummary,
+} from './replay';
+
 // Commands
 export {
   type GameCommand,

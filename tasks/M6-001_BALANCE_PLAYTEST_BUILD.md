@@ -17,6 +17,8 @@ M5 Gate Passed
 
 ## Completion Report
 
-- **Status**: All milestones complete
-- **Test Results**: 228 tests passed
-- **All Gates**: M0-M5 passed
+- **Status**: Complete
+- **Test Results**: 231 tests passed
+- **Verification**: typecheck passed, lint passed with four pre-existing AI warnings, production build passed
+- **Client MVP**: Player commands, pause/resume, contextual tutorial tips, and replay capture integrated
+- **All Gates**: M0-M6 passed

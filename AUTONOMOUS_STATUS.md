@@ -6,9 +6,9 @@
 - **Milestone**: M6 Balance Playtest Build
 - **Task**: PHASE 1 COMPLETE
 - **Status**: All milestones passed; ready for human evaluation
-- **Last commit**: (pending)
+- **Last commit**: Phase 1 MVP completion commit
 - **Last push**: 2026-07-22
-- **Test status**: 228 passed; lint, typecheck, build passed
+- **Test status**: 231 passed; typecheck passed; lint has four pre-existing AI non-null warnings
 
 ## Completed Tasks
 
@@ -38,7 +38,7 @@
 | M5-002 | (deferred) | N/A | N/A |
 | M5-003 | (existing) | N/A | N/A |
 | M5 Gate | 862665a | 228 passed | Yes |
-| M6-001 | (pending) | 228 passed | Pending |
+| M6-001 | Phase 1 MVP completion commit | 231 passed | Yes |
 
 ## Phase 1 Gate Results
 
@@ -73,7 +73,7 @@
 
 - **Assets**: Client uses specification-approved placeholder rendering (colored shapes)
 - **Copy**: None
-- **Tutorial**: Deferred to M6 playtest feedback
+- **Tutorial**: Four-step contextual tips with skip support
 
 ## Known Non-blocking Risks
 

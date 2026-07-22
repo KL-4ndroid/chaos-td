@@ -5,14 +5,20 @@ import {
   createPathSegments,
   createSimulation,
   createTowerState,
+  addCheckpoint,
+  addEvent,
+  createReplayData,
+  finalizeReplay,
   type DomainEvent,
   type LaneRuntimeState,
   type MonsterRuntimeState,
+  type Replay,
   type Simulation,
   type SimulationState,
 } from '@chaos-td/game-core';
-import { CONFIG_VERSION, MVP_MIRROR_01, type LaneDefinition, type LaneId } from '@chaos-td/game-data';
+import { CONFIG_VERSION, MVP_MIRROR_01, type LaneDefinition, type LaneId, type TowerId } from '@chaos-td/game-data';
 import { FixedStepLoop } from '../simulation-loop';
+import { advanceTutorial, createTutorialState, skipTutorial, type TutorialState } from '../tutorial';
 
 export const BATTLE_SCENE_KEY = 'BattleScene';
 const TILE_PIXELS = 80;
@@ -76,7 +82,11 @@ export class BattleScene extends Phaser.Scene {
   private debugText?: Phaser.GameObjects.Text;
   private hpText?: Phaser.GameObjects.Text;
   private pausedText?: Phaser.GameObjects.Text;
-  private demoQueued = false;
+  private tutorialText?: Phaser.GameObjects.Text;
+  private tutorial: TutorialState = createTutorialState();
+  private selectedTowerType: TowerId = 'archer';
+  private selectedTowerEntityId?: number;
+  private replay: Replay = createReplayData('m1-render-adapter', CONFIG_VERSION, this.simulation.state.stateHash);
 
   constructor() {
     super({ key: BATTLE_SCENE_KEY });
@@ -87,6 +97,7 @@ export class BattleScene extends Phaser.Scene {
     this.drawArena();
     this.createTowerVisuals(this.simulation.state);
     this.createOverlay();
+    this.createInputBindings();
     this.simulation.start();
 
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.handleHidden, this);
@@ -105,22 +116,10 @@ export class BattleScene extends Phaser.Scene {
 
   private stepSimulation(): void {
     const result = this.simulation.step();
-    if (result.state.phase === 'running' && !this.demoQueued) {
-      this.simulation.submitCommand({
-        type: 'queue_monster',
-        commandId: this.simulation.getNextCommandId('p1'),
-        playerId: 'p1',
-        monsterTypeId: 'sheep',
-        quantity: 5,
-      });
-      this.simulation.submitCommand({
-        type: 'queue_monster',
-        commandId: this.simulation.getNextCommandId('p2'),
-        playerId: 'p2',
-        monsterTypeId: 'sheep',
-        quantity: 5,
-      });
-      this.demoQueued = true;
+    this.replay = result.events.reduce((replay, event) => addEvent(replay, event), this.replay);
+    this.replay = addCheckpoint(this.replay, result.state.tick, result.state.stateHash);
+    if (result.state.phase === 'result') {
+      this.replay = finalizeReplay(this.replay, result.state.stateHash, result.state.tick);
     }
     this.captureMonsterPositions(result.state);
     this.renderEvents(result.events);
@@ -289,6 +288,67 @@ export class BattleScene extends Phaser.Scene {
       fontSize: '42px',
       fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(100).setVisible(false);
+    this.tutorialText = this.add.text(24, 650, '', {
+      color: '#f1d38a',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '18px',
+      backgroundColor: '#0b0f14',
+      padding: { left: 10, right: 10, top: 8, bottom: 8 },
+    }).setDepth(51);
+  }
+
+  private createInputBindings(): void {
+    this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.loop.isPaused) this.handleVisible();
+      else this.handleHidden();
+    });
+    this.input.keyboard?.on('keydown-ONE', () => { this.selectedTowerType = 'archer'; });
+    this.input.keyboard?.on('keydown-TWO', () => { this.selectedTowerType = 'mage'; });
+    this.input.keyboard?.on('keydown-THREE', () => { this.selectedTowerType = 'frost'; });
+    this.input.keyboard?.on('keydown-FOUR', () => { this.selectedTowerType = 'sniper'; });
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
+      if (pointer.y < 80 || pointer.y > 640 || this.simulation.state.phase !== 'running') return;
+      const cellX = Math.floor(pointer.x / TILE_PIXELS);
+      const cellY = Math.floor(pointer.y / TILE_PIXELS);
+      const existingTower = this.simulation.state.towers.find(
+        (tower) => tower.ownerId === 'p1' && tower.cellX === cellX && tower.cellY === cellY,
+      );
+      if (existingTower) {
+        this.selectedTowerEntityId = existingTower.entityId;
+        return;
+      }
+      this.submitBuild(cellX, cellY);
+    });
+    this.input.keyboard?.on('keydown-S', () => this.submitMonster('sheep'));
+    this.input.keyboard?.on('keydown-U', () => this.submitUpgrade());
+    this.input.keyboard?.on('keydown-X', () => this.submitSell());
+    this.input.keyboard?.on('keydown-T', () => { this.tutorial = skipTutorial(this.tutorial); });
+  }
+
+  private submitBuild(cellX: number, cellY: number): void {
+    this.simulation.submitCommand({
+      type: 'build_tower', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1',
+      towerTypeId: this.selectedTowerType, cellX, cellY,
+    });
+    this.tutorial = advanceTutorial(this.tutorial, 'build');
+  }
+
+  private submitMonster(monsterTypeId: string): void {
+    this.simulation.submitCommand({
+      type: 'queue_monster', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1', monsterTypeId, quantity: 1,
+    });
+    this.tutorial = advanceTutorial(this.tutorial, 'send');
+  }
+
+  private submitUpgrade(): void {
+    if (this.selectedTowerEntityId === undefined) return;
+    this.simulation.submitCommand({ type: 'upgrade_tower', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1', towerEntityId: this.selectedTowerEntityId });
+    this.tutorial = advanceTutorial(this.tutorial, 'upgrade');
+  }
+
+  private submitSell(): void {
+    if (this.selectedTowerEntityId === undefined) return;
+    this.simulation.submitCommand({ type: 'sell_tower', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1', towerEntityId: this.selectedTowerEntityId });
   }
 
   private updateOverlay(): void {
@@ -297,8 +357,17 @@ export class BattleScene extends Phaser.Scene {
     this.debugText?.setText([
       `${state.phase.toUpperCase()}  TICK ${state.tick}`,
       `HASH ${state.stateHash}`,
+      `P1 GOLD ${state.players.p1.gold} INCOME ${state.players.p1.income}`,
       `ENTITIES ${this.monsterVisuals.size + this.towerVisuals.size}  BACKLOG ${this.loop.backlogTicks}`,
     ]);
+    const tips: Record<TutorialState['step'], string> = {
+      build: 'Click a grid cell to build. 1-4 selects tower type.',
+      send: 'Press S to send a sheep to the opponent.',
+      upgrade: 'Press U after selecting a tower to upgrade it.',
+      result: 'Keep playing until the match result appears.',
+      complete: '',
+    };
+    this.tutorialText?.setText(this.tutorial.skipped ? '' : tips[this.tutorial.step]);
   }
 
   private handleHidden(): void {
