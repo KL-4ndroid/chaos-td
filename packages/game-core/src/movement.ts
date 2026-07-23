@@ -6,9 +6,76 @@
  * No floating-point positions allowed.
  */
 
-import type { FixedPointPosition } from '@chaos-td/game-data';
+import type { FixedPointPosition, GridCell } from '@chaos-td/game-data';
 
 export const MILLI_TILES_PER_TILE = 1000 as const;
+
+const GRID_NEIGHBORS: readonly GridCell[] = [
+  { col: 0, row: -1 },
+  { col: 1, row: 0 },
+  { col: 0, row: 1 },
+  { col: -1, row: 0 },
+];
+
+function cellKey(cell: GridCell): string {
+  return `${cell.col},${cell.row}`;
+}
+
+export function findGridPath(
+  gridColumns: number,
+  gridRows: number,
+  start: GridCell,
+  end: GridCell,
+  occupiedCells: readonly GridCell[],
+  navigationCells?: readonly GridCell[],
+): readonly GridCell[] | null {
+  const occupied = new Set(occupiedCells.map(cellKey));
+  const navigation = navigationCells === undefined ? null : new Set(navigationCells.map(cellKey));
+  const startKey = cellKey(start);
+  const endKey = cellKey(end);
+  occupied.delete(startKey);
+  occupied.delete(endKey);
+
+  const queue: GridCell[] = [start];
+  const parents = new Map<string, string | null>([[startKey, null]]);
+  const cellsByKey = new Map<string, GridCell>([[startKey, start]]);
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (!current) continue;
+    if (cellKey(current) === endKey) break;
+
+    for (const direction of GRID_NEIGHBORS) {
+      const next = { col: current.col + direction.col, row: current.row + direction.row };
+      const key = cellKey(next);
+      const inBounds = next.col >= 0 && next.col < gridColumns && next.row >= 0 && next.row < gridRows;
+      const navigable = navigation === null || navigation.has(key);
+      if (!inBounds || !navigable || occupied.has(key) || parents.has(key)) continue;
+      parents.set(key, cellKey(current));
+      cellsByKey.set(key, next);
+      queue.push(next);
+    }
+  }
+
+  if (!parents.has(endKey)) return null;
+
+  const reversed: GridCell[] = [];
+  let key: string | null = endKey;
+  while (key !== null) {
+    const cell = cellsByKey.get(key);
+    if (!cell) return null;
+    reversed.push(cell);
+    key = parents.get(key) ?? null;
+  }
+  return reversed.reverse();
+}
+
+export function gridPathToWaypoints(path: readonly GridCell[]): readonly FixedPointPosition[] {
+  return path.map((cell) => ({
+    xMilliTiles: cell.col * MILLI_TILES_PER_TILE + MILLI_TILES_PER_TILE / 2,
+    yMilliTiles: cell.row * MILLI_TILES_PER_TILE + MILLI_TILES_PER_TILE / 2,
+  }));
+}
 
 /**
  * A segment of the path between two waypoints.

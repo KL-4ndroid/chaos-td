@@ -9,10 +9,12 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/client",
+    "dev:assets": "npm run dev --workspace=apps/asset-admin",
+    "start:assets": "npm run start --workspace=apps/asset-admin",
     "build": "npm run build --workspace=apps/client",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && npm run test --workspace=apps/asset-admin",
     "test:watch": "vitest",
     "docs:check-balance": "node scripts/check-balance.mjs"
   },

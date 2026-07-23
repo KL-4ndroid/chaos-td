@@ -35,6 +35,7 @@ export interface MonsterState {
   hp: number;
   shield: number;
   pathProgressMilliTiles: number;
+  routeWaypoints?: readonly { xMilliTiles: number; yMilliTiles: number }[];
   alive: boolean;
 }
 

@@ -81,6 +81,7 @@ export {
   type MonsterRuntimeState,
   createSimulation,
   createWithRng,
+  calculateMonsterPosition,
 } from './simulation';
 
 // Movement
@@ -90,6 +91,8 @@ export {
   calculatePosition,
   calculatePathLength,
   hasReachedEnd,
+  findGridPath,
+  gridPathToWaypoints,
   type PathSegment,
 } from './movement';
 

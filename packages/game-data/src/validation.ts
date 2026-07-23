@@ -452,9 +452,21 @@ function validateLane(lane: unknown, laneIndex: number, mapCols: number, mapRows
     errors.push(...validatePosition(end, `maps.lanes[${laneIndex}].endPosition`));
   }
 
+  const navigation = l['navigationCells'];
   const buildable = l['buildableCells'];
   const blocked = l['blockedCells'];
   const aiPriority = l['aiBuildPriorityCells'];
+
+  if (Array.isArray(navigation)) {
+    for (let i = 0; i < navigation.length; i++) {
+      const cell = navigation[i];
+      if (cell !== undefined) {
+        errors.push(...validateGridCell(cell, `maps.lanes[${laneIndex}].navigationCells[${i}]`));
+      }
+    }
+  } else {
+    errors.push(createError('MAP_NAVIGATION_MISSING', 'navigationCells must be an array', `maps.lanes[${laneIndex}].navigationCells`));
+  }
 
   if (Array.isArray(buildable)) {
     for (let i = 0; i < buildable.length; i++) {
@@ -519,7 +531,7 @@ function validateLane(lane: unknown, laneIndex: number, mapCols: number, mapRows
   }
 
   // Check for duplicate cells
-  for (const [name, cells] of [['buildableCells', buildable], ['blockedCells', blocked], ['aiBuildPriorityCells', aiPriority]] as const) {
+  for (const [name, cells] of [['navigationCells', navigation], ['buildableCells', buildable], ['blockedCells', blocked], ['aiBuildPriorityCells', aiPriority]] as const) {
     if (Array.isArray(cells)) {
       const seenCells = new Set<string>();
       for (let i = 0; i < cells.length; i++) {

@@ -11,6 +11,7 @@ import {
   calculatePathLength,
   hasReachedEnd,
   MILLI_TILES_PER_TILE,
+  findGridPath,
 } from './movement';
 import type { FixedPointPosition } from '@chaos-td/game-data';
 
@@ -165,6 +166,42 @@ describe('Movement', () => {
 
     it('should return true past end', () => {
       expect(hasReachedEnd(1500, 1000)).toBe(true);
+    });
+  });
+
+  describe('findGridPath', () => {
+    it('routes around tower-occupied cells with a stable tie-break', () => {
+      const path = findGridPath(
+        5,
+        5,
+        { col: 0, row: 2 },
+        { col: 4, row: 2 },
+        [{ col: 2, row: 2 }],
+      );
+
+      expect(path).toEqual([
+        { col: 0, row: 2 },
+        { col: 0, row: 1 },
+        { col: 1, row: 1 },
+        { col: 2, row: 1 },
+        { col: 3, row: 1 },
+        { col: 4, row: 1 },
+        { col: 4, row: 2 },
+      ]);
+    });
+
+    it('returns null when occupied cells completely seal the route', () => {
+      expect(findGridPath(
+        3,
+        3,
+        { col: 0, row: 1 },
+        { col: 2, row: 1 },
+        [
+          { col: 1, row: 0 },
+          { col: 1, row: 1 },
+          { col: 1, row: 2 },
+        ],
+      )).toBeNull();
     });
   });
 

@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import {
+  SELL_REFUND_PERMILLE,
   TICK_DURATION_MS,
-  calculatePosition,
-  createPathSegments,
-  createSimulation,
-  createTowerState,
   addCheckpoint,
   addEvent,
+  calculateMonsterPosition,
+  createPathSegments,
   createReplayData,
+  createSimulation,
   finalizeReplay,
   type DomainEvent,
   type LaneRuntimeState,
@@ -16,17 +16,36 @@ import {
   type Simulation,
   type SimulationState,
 } from '@chaos-td/game-core';
-import { CONFIG_VERSION, MVP_MIRROR_01, type LaneDefinition, type LaneId, type TowerId } from '@chaos-td/game-data';
+import {
+  CONFIG_VERSION,
+  MONSTER_BY_ID,
+  MVP_MIRROR_01,
+  TOWER_BY_ID,
+  type LaneDefinition,
+  type LaneId,
+  type TowerId,
+} from '@chaos-td/game-data';
 import { FixedStepLoop } from '../simulation-loop';
-import { advanceTutorial, createTutorialState, skipTutorial, type TutorialState } from '../tutorial';
+import { phaserAssetKey } from '../assets';
+import { getTicksUntilNextWave, isDemoWaveTick } from '../wave-schedule';
+import { containsPoint, type ScreenRect } from '../ui-hit-test';
 
 export const BATTLE_SCENE_KEY = 'BattleScene';
-const TILE_PIXELS = 80;
-const BOARD_OFFSET_X = 0;
-const BOARD_OFFSET_Y = 0;
+const VIEW_WIDTH = 480;
+const VIEW_HEIGHT = 960;
+const TILE_PIXELS = 32;
+const BOARD_X = 112;
+const BOARD_WIDTH = MVP_MIRROR_01.gridColumns * TILE_PIXELS;
+const BOARD_HEIGHT = 10 * TILE_PIXELS;
+const TOP_BOARD_Y = 100;
+const BOTTOM_BOARD_Y = 462;
+const LANE_ROWS = 10;
+const LOCAL_LANE_MIN_ROW = 11;
+const LOCAL_LANE = MVP_MIRROR_01.lanes.find((lane) => lane.id === 'lane_p1');
+const OPPONENT_LANE = MVP_MIRROR_01.lanes.find((lane) => lane.id === 'lane_p2');
 
 interface MonsterVisual {
-  body: Phaser.GameObjects.Rectangle;
+  body: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image;
   marker: Phaser.GameObjects.Text;
   previousX: number;
   previousY: number;
@@ -56,21 +75,15 @@ function createDemoSimulation(): Simulation {
   const lanes = Object.fromEntries(
     MVP_MIRROR_01.lanes.map((lane) => [lane.id, createLaneRuntime(lane)]),
   ) as Record<LaneId, LaneRuntimeState>;
-  const towers = [
-    createTowerState(1, 'p1', 'archer', 3, 4),
-    createTowerState(2, 'p2', 'archer', 12, 4),
-  ];
-  return createSimulation(
-    { seed: 'm1-render-adapter', configVersion: CONFIG_VERSION },
-    lanes,
-    towers,
-  );
+  return createSimulation({ seed: 'portrait-maze-demo', configVersion: CONFIG_VERSION }, lanes);
 }
 
-function toPixels(xMilliTiles: number, yMilliTiles: number): { x: number; y: number } {
+function toPixels(laneId: LaneId, xMilliTiles: number, yMilliTiles: number): { x: number; y: number } {
+  const isLocal = laneId === 'lane_p1';
   return {
-    x: BOARD_OFFSET_X + (xMilliTiles / 1000) * TILE_PIXELS,
-    y: BOARD_OFFSET_Y + (yMilliTiles / 1000) * TILE_PIXELS,
+    x: BOARD_X + (xMilliTiles / 1000) * TILE_PIXELS,
+    y: (isLocal ? BOTTOM_BOARD_Y : TOP_BOARD_Y) +
+      (yMilliTiles / 1000 - (isLocal ? LOCAL_LANE_MIN_ROW : 0)) * TILE_PIXELS,
   };
 }
 
@@ -79,25 +92,31 @@ export class BattleScene extends Phaser.Scene {
   private readonly simulation = createDemoSimulation();
   private readonly monsterVisuals = new Map<number, MonsterVisual>();
   private readonly towerVisuals = new Map<number, Phaser.GameObjects.Container>();
-  private debugText?: Phaser.GameObjects.Text;
+  private readonly pathGraphics = new Map<LaneId, Phaser.GameObjects.Graphics>();
   private hpText?: Phaser.GameObjects.Text;
+  private economyText?: Phaser.GameObjects.Text;
+  private phaseText?: Phaser.GameObjects.Text;
+  private waveText?: Phaser.GameObjects.Text;
+  private feedbackText?: Phaser.GameObjects.Text;
   private pausedText?: Phaser.GameObjects.Text;
-  private tutorialText?: Phaser.GameObjects.Text;
-  private tutorial: TutorialState = createTutorialState();
-  private selectedTowerType: TowerId = 'archer';
+  private actionMenu?: Phaser.GameObjects.Container;
+  private actionMenuBounds?: ScreenRect;
+  private selectedCell?: { cellX: number; cellY: number };
+  private opponentDefenseSubmitted = false;
   private selectedTowerEntityId?: number;
-  private replay: Replay = createReplayData('m1-render-adapter', CONFIG_VERSION, this.simulation.state.stateHash);
+  private replay: Replay = createReplayData('portrait-maze-demo', CONFIG_VERSION, this.simulation.state.stateHash);
 
   constructor() {
     super({ key: BATTLE_SCENE_KEY });
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor('#11151b');
+    this.cameras.main.setBackgroundColor('#101418');
     this.drawArena();
-    this.createTowerVisuals(this.simulation.state);
     this.createOverlay();
+    this.createSendControls();
     this.createInputBindings();
+    this.syncTowerVisuals(this.simulation.state);
     this.simulation.start();
 
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.handleHidden, this);
@@ -115,6 +134,29 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private stepSimulation(): void {
+    const state = this.simulation.state;
+    if (state.phase === 'running' && !this.opponentDefenseSubmitted) {
+      const cells = [{ cellX: 4, cellY: 6 }, { cellX: 3, cellY: 4 }, { cellX: 4, cellY: 2 }];
+      cells.forEach((cell, index) => {
+        this.simulation.submitCommand({
+          type: 'build_tower',
+          commandId: this.simulation.getNextCommandId('p2'),
+          playerId: 'p2',
+          towerTypeId: index === 1 ? 'frost' : 'archer',
+          ...cell,
+        });
+      });
+      this.opponentDefenseSubmitted = true;
+    }
+    if (isDemoWaveTick(state.phase, state.tick + 1, state.runningStartedAtTick)) {
+      this.simulation.submitCommand({
+        type: 'queue_monster',
+        commandId: this.simulation.getNextCommandId('p2'),
+        playerId: 'p2',
+        monsterTypeId: 'sheep',
+        quantity: 1,
+      });
+    }
     const result = this.simulation.step();
     this.replay = result.events.reduce((replay, event) => addEvent(replay, event), this.replay);
     this.replay = addCheckpoint(this.replay, result.state.tick, result.state.stateHash);
@@ -124,57 +166,100 @@ export class BattleScene extends Phaser.Scene {
     this.captureMonsterPositions(result.state);
     this.renderEvents(result.events);
     this.removeInactiveMonsterVisuals(result.state);
+    this.syncTowerVisuals(result.state);
   }
 
   private drawArena(): void {
-    const graphics = this.add.graphics();
-    graphics.fillStyle(0x171d25, 1);
-    graphics.fillRect(0, 0, 1280, 720);
+    this.add.rectangle(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH, VIEW_HEIGHT, 0x101418);
+    this.drawBoard('lane_p2', OPPONENT_LANE, TOP_BOARD_Y, 0, 0x453337);
+    this.drawBoard('lane_p1', LOCAL_LANE, BOTTOM_BOARD_Y, LOCAL_LANE_MIN_ROW, 0x27362f);
+  }
 
-    for (let row = 0; row < MVP_MIRROR_01.gridRows; row += 1) {
+  private drawBoard(
+    laneId: LaneId,
+    definition: LaneDefinition | undefined,
+    boardY: number,
+    minRow: number,
+    baseColor: number,
+  ): void {
+    const board = this.add.graphics();
+    const buildable = new Set(definition?.buildableCells.map((cell) => `${cell.col},${cell.row}`) ?? []);
+    for (let localRow = 0; localRow < LANE_ROWS; localRow += 1) {
+      const row = localRow + minRow;
       for (let col = 0; col < MVP_MIRROR_01.gridColumns; col += 1) {
+        const x = BOARD_X + col * TILE_PIXELS;
+        const y = boardY + localRow * TILE_PIXELS;
+        const canBuild = buildable.has(`${col},${row}`);
         const alternating = (row + col) % 2 === 0;
-        graphics.fillStyle(alternating ? 0x1d252e : 0x202a34, 1);
-        graphics.fillRect(col * TILE_PIXELS, row * TILE_PIXELS, TILE_PIXELS, TILE_PIXELS);
+        board.fillStyle(canBuild ? baseColor + (alternating ? 0x020202 : 0) : 0x253039, 1);
+        board.fillRect(x, y, TILE_PIXELS, TILE_PIXELS);
+        board.lineStyle(1, 0xc4cec8, 0.11);
+        board.strokeRect(x, y, TILE_PIXELS, TILE_PIXELS);
       }
     }
+    board.lineStyle(2, laneId === 'lane_p1' ? 0x8eb6a0 : 0xb58c91, 0.55);
+    board.strokeRect(BOARD_X, boardY, BOARD_WIDTH, BOARD_HEIGHT);
+    const path = this.add.graphics().setDepth(2);
+    this.pathGraphics.set(laneId, path);
+    this.drawPath(laneId);
+  }
 
-    for (const lane of MVP_MIRROR_01.lanes) {
-      graphics.lineStyle(24, lane.id === 'lane_p1' ? 0x4e8391 : 0x9a665c, 0.4);
+  private drawPath(laneId?: LaneId): void {
+    const laneIds: readonly LaneId[] = laneId ? [laneId] : ['lane_p1', 'lane_p2'];
+    for (const currentLaneId of laneIds) {
+      const lane = this.simulation.state.lanes[currentLaneId];
+      const graphics = this.pathGraphics.get(currentLaneId);
+      if (!graphics) continue;
+      graphics.clear();
+      graphics.lineStyle(11, currentLaneId === 'lane_p1' ? 0xd4ba72 : 0xb9898b, 0.48);
       graphics.beginPath();
       lane.waypoints.forEach((point, index) => {
-        const pixel = toPixels(point.xMilliTiles, point.yMilliTiles);
+        const pixel = toPixels(currentLaneId, point.xMilliTiles, point.yMilliTiles);
         if (index === 0) graphics.moveTo(pixel.x, pixel.y);
         else graphics.lineTo(pixel.x, pixel.y);
       });
       graphics.strokePath();
     }
-
-    graphics.lineStyle(1, 0xffffff, 0.04);
-    for (let col = 1; col < MVP_MIRROR_01.gridColumns; col += 1) {
-      graphics.lineBetween(col * TILE_PIXELS, 0, col * TILE_PIXELS, 720);
-    }
-    for (let row = 1; row < MVP_MIRROR_01.gridRows; row += 1) {
-      graphics.lineBetween(0, row * TILE_PIXELS, 1280, row * TILE_PIXELS);
-    }
   }
 
-  private createTowerVisuals(state: SimulationState): void {
+  private syncTowerVisuals(state: SimulationState): void {
+    const active = new Set<number>();
     for (const tower of state.towers) {
-      const x = tower.cellX * TILE_PIXELS + TILE_PIXELS / 2;
-      const y = tower.cellY * TILE_PIXELS + TILE_PIXELS / 2;
-      const base = this.add.circle(0, 0, 25, tower.ownerId === 'p1' ? 0x63b3c1 : 0xd18a78);
-      base.setStrokeStyle(3, 0xe9f2f2, 0.85);
-      const marker = this.add.text(0, 0, 'A', {
-        color: '#0d1418',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '22px',
-        fontStyle: 'bold',
-      }).setOrigin(0.5);
-      const arrow = this.add.triangle(19, -18, 0, 12, 7, 0, 0, -12, 0xf1d38a);
-      const container = this.add.container(x, y, [base, marker, arrow]);
-      container.setDepth(10);
-      this.towerVisuals.set(tower.entityId, container);
+      active.add(tower.entityId);
+      let visual = this.towerVisuals.get(tower.entityId);
+      if (!visual) {
+        const laneId: LaneId = tower.ownerId === 'p1' ? 'lane_p1' : 'lane_p2';
+        const pixel = toPixels(laneId, tower.cellX * 1000 + 500, tower.cellY * 1000 + 500);
+        const x = pixel.x;
+        const y = pixel.y;
+        const textureKey = phaserAssetKey(`tower.${tower.towerTypeId}`);
+        const children: Phaser.GameObjects.GameObject[] = [];
+        if (this.textures.exists(textureKey)) {
+          children.push(this.add.image(0, 0, textureKey).setDisplaySize(29, 29).setOrigin(0.5, 0.82));
+        } else {
+          children.push(
+            this.add.circle(0, 0, 12, tower.ownerId === 'p1' ? 0x6ca6a0 : 0xb47c83).setStrokeStyle(1, 0xe7eee9, 0.9),
+            this.add.text(0, 0, tower.towerTypeId.slice(0, 1).toUpperCase(), {
+              color: '#10201d', fontFamily: 'Arial, sans-serif', fontSize: '11px', fontStyle: 'bold',
+            }).setOrigin(0.5),
+          );
+        }
+        visual = this.add.container(x, y, children).setDepth(10).setSize(32, 32);
+        if (tower.ownerId === 'p1') {
+          visual.setInteractive();
+          visual.on(Phaser.Input.Events.POINTER_DOWN, (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+            event.stopPropagation();
+            this.openTowerMenu(tower.entityId, x, y);
+          });
+        }
+        this.towerVisuals.set(tower.entityId, visual);
+      }
+      visual.setScale(this.selectedTowerEntityId === tower.entityId ? 1.12 : 1);
+    }
+    for (const [entityId, visual] of this.towerVisuals) {
+      if (active.has(entityId)) continue;
+      visual.destroy(true);
+      this.towerVisuals.delete(entityId);
     }
   }
 
@@ -182,8 +267,8 @@ export class BattleScene extends Phaser.Scene {
     for (const lane of Object.values(state.lanes)) {
       for (const monster of lane.monsters) {
         if (monster.hp <= 0) continue;
-        const position = calculatePosition(lane.waypoints, lane.segments, monster.pathProgressMilliTiles);
-        const pixel = toPixels(position.x, position.y);
+        const position = calculateMonsterPosition(lane, monster);
+        const pixel = toPixels(lane.laneId, position.x, position.y);
         const visual = this.monsterVisuals.get(monster.entityId);
         if (visual) {
           visual.previousX = visual.currentX;
@@ -197,25 +282,37 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  private snapMonsterVisualsToLane(laneId: LaneId): void {
+    const lane = this.simulation.state.lanes[laneId];
+    for (const monster of lane.monsters) {
+      if (monster.hp <= 0) continue;
+      const visual = this.monsterVisuals.get(monster.entityId);
+      if (!visual) continue;
+      const position = calculateMonsterPosition(lane, monster);
+      const pixel = toPixels(laneId, position.x, position.y);
+      visual.previousX = pixel.x;
+      visual.previousY = pixel.y;
+      visual.currentX = pixel.x;
+      visual.currentY = pixel.y;
+    }
+  }
+
   private createMonsterVisual(monster: MonsterRuntimeState, x: number, y: number): MonsterVisual {
-    const body = this.add.rectangle(x, y, 30, 26, monster.ownerId === 'p1' ? 0x83c5cc : 0xe0a08f);
-    body.setStrokeStyle(2, 0xf5f0df, 0.9).setDepth(20);
-    const marker = this.add.text(x, y, '1', {
-      color: '#152027',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '15px',
-      fontStyle: 'bold',
+    const textureKey = phaserAssetKey(`monster.${monster.monsterTypeId}`);
+    const body = this.textures.exists(textureKey)
+      ? this.add.image(x, y, textureKey).setDisplaySize(25, 25).setOrigin(0.5, 0.72)
+      : this.add.rectangle(x, y, 18, 15, 0xd99578).setStrokeStyle(1, 0xffeadb, 0.9);
+    body.setDepth(20);
+    const marker = this.add.text(x, y, this.textures.exists(textureKey) ? '' : 'S', {
+      color: '#241611', fontFamily: 'Arial, sans-serif', fontSize: '9px', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(21);
     return { body, marker, previousX: x, previousY: y, currentX: x, currentY: y };
   }
 
   private renderMonsters(state: SimulationState, alpha: number): void {
-    const active = new Set<number>();
-    for (const lane of Object.values(state.lanes)) {
-      for (const monster of lane.monsters) {
-        if (monster.hp > 0) active.add(monster.entityId);
-      }
-    }
+    const active = new Set(Object.values(state.lanes).flatMap(
+      (lane) => lane.monsters.filter((monster) => monster.hp > 0).map((monster) => monster.entityId),
+    ));
     for (const [entityId, visual] of this.monsterVisuals) {
       if (!active.has(entityId)) continue;
       const x = Phaser.Math.Linear(visual.previousX, visual.currentX, alpha);
@@ -227,147 +324,330 @@ export class BattleScene extends Phaser.Scene {
 
   private renderEvents(events: readonly DomainEvent[]): void {
     for (const event of events) {
-      if (event.type !== 'attack_fired') continue;
-      const tower = this.towerVisuals.get(event.towerEntityId);
-      const target = this.monsterVisuals.get(event.targetMonsterId);
-      if (!tower || !target) continue;
-      const projectile = this.add.circle(tower.x, tower.y, 4, 0xffe8a3).setDepth(30);
-      this.tweens.add({
-        targets: projectile,
-        x: target.currentX,
-        y: target.currentY,
-        duration: 120,
-        ease: 'Sine.easeOut',
-        onComplete: () => projectile.destroy(),
-      });
+      if (event.type === 'attack_fired') {
+        const tower = this.towerVisuals.get(event.towerEntityId);
+        const target = this.monsterVisuals.get(event.targetMonsterId);
+        if (tower && target) {
+          const projectile = this.add.circle(tower.x, tower.y, 3, 0xffe29a).setDepth(30);
+          this.tweens.add({
+            targets: projectile, x: target.currentX, y: target.currentY, duration: 120,
+            onComplete: () => projectile.destroy(),
+          });
+        }
+      }
+      if (event.type === 'tower_built' || event.type === 'tower_sold') {
+        const laneId: LaneId = event.playerId === 'p1' ? 'lane_p1' : 'lane_p2';
+        this.drawPath(laneId);
+        this.snapMonsterVisualsToLane(laneId);
+        this.closeActionMenu();
+      }
+      if (event.type === 'command_rejected' && event.playerId === 'p1') {
+        const messages: Record<string, string> = {
+          path_blocked: 'Must leave a path open',
+          invalid_cell: 'Build inside your arena',
+          insufficient_gold: 'Not enough gold',
+          cell_occupied: 'Cell occupied',
+        };
+        this.feedbackText?.setText(messages[event.reason] ?? event.reason).setColor('#f1a38f');
+      }
+      if (event.type === 'command_accepted' && event.playerId === 'p1') {
+        this.feedbackText?.setText('Command accepted').setColor('#9ed8b5');
+      }
     }
   }
 
   private removeInactiveMonsterVisuals(state: SimulationState): void {
-    const activeIds = new Set(
-      Object.values(state.lanes).flatMap((lane) => lane.monsters.filter((monster) => monster.hp > 0).map((monster) => monster.entityId)),
-    );
+    const active = new Set(Object.values(state.lanes).flatMap(
+      (lane) => lane.monsters.filter((monster) => monster.hp > 0).map((monster) => monster.entityId),
+    ));
     for (const [entityId, visual] of this.monsterVisuals) {
-      if (activeIds.has(entityId)) continue;
-      this.tweens.add({
-        targets: [visual.body, visual.marker],
-        alpha: 0,
-        scale: 0.35,
-        duration: 140,
-        onComplete: () => {
-          visual.body.destroy();
-          visual.marker.destroy();
-        },
-      });
+      if (active.has(entityId)) continue;
+      visual.body.destroy();
+      visual.marker.destroy();
       this.monsterVisuals.delete(entityId);
     }
   }
 
   private createOverlay(): void {
-    this.add.rectangle(640, 34, 1280, 68, 0x0b0f14, 0.92).setDepth(50);
-    this.add.text(24, 16, 'CHAOS TD', {
-      color: '#f1d38a',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '24px',
-      fontStyle: 'bold',
+    this.add.rectangle(VIEW_WIDTH / 2, 43, VIEW_WIDTH, 86, 0x0b0f12, 0.98).setDepth(50);
+    this.add.text(18, 13, 'CHAOS TD', {
+      color: '#f0cf83', fontFamily: 'Arial, sans-serif', fontSize: '20px', fontStyle: 'bold',
     }).setDepth(51);
-    this.hpText = this.add.text(232, 19, '', {
-      color: '#e8edf0',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '18px',
-    }).setDepth(51);
-    this.debugText = this.add.text(1260, 14, '', {
-      color: '#9fb0bc',
-      fontFamily: 'Consolas, monospace',
-      fontSize: '13px',
-      align: 'right',
+    this.phaseText = this.add.text(462, 15, '', {
+      color: '#9eb1aa', fontFamily: 'Arial, sans-serif', fontSize: '12px', align: 'right',
     }).setOrigin(1, 0).setDepth(51);
-    this.pausedText = this.add.text(640, 360, 'PAUSED', {
-      color: '#f1d38a',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '42px',
-      fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(100).setVisible(false);
-    this.tutorialText = this.add.text(24, 650, '', {
-      color: '#f1d38a',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '18px',
-      backgroundColor: '#0b0f14',
-      padding: { left: 10, right: 10, top: 8, bottom: 8 },
+    this.hpText = this.add.text(18, 49, '', {
+      color: '#e8eeeb', fontFamily: 'Arial, sans-serif', fontSize: '14px',
     }).setDepth(51);
+    this.economyText = this.add.text(462, 49, '', {
+      color: '#d8c98f', fontFamily: 'Arial, sans-serif', fontSize: '14px', align: 'right',
+    }).setOrigin(1, 0).setDepth(51);
+    this.add.text(BOARD_X, 82, 'RIVAL DEFENSE', {
+      color: '#c7a4a8', fontFamily: 'Arial, sans-serif', fontSize: '11px', fontStyle: 'bold',
+    }).setDepth(51);
+    this.add.text(BOARD_X, 448, 'YOUR DEFENSE', {
+      color: '#9fc4ae', fontFamily: 'Arial, sans-serif', fontSize: '11px', fontStyle: 'bold',
+    }).setDepth(51);
+    this.waveText = this.add.text(462, 82, '', {
+      color: '#f0cf83', fontFamily: 'Arial, sans-serif', fontSize: '12px', fontStyle: 'bold', align: 'right',
+    }).setOrigin(1, 0).setDepth(51);
+    this.feedbackText = this.add.text(18, 902, '', {
+      color: '#9ed8b5', fontFamily: 'Arial, sans-serif', fontSize: '12px',
+    }).setOrigin(0, 0.5).setDepth(51);
+    this.pausedText = this.add.text(VIEW_WIDTH / 2, 430, 'PAUSED', {
+      color: '#f0cf83', fontFamily: 'Arial, sans-serif', fontSize: '36px', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(100).setVisible(false);
   }
 
-  private createInputBindings(): void {
-    this.input.keyboard?.on('keydown-ESC', () => {
+  private createSendControls(): void {
+    this.add.rectangle(VIEW_WIDTH / 2, 849, VIEW_WIDTH, 190, 0x171d22, 1).setDepth(40);
+    this.add.text(18, 780, 'SEND TO RIVAL', {
+      color: '#91a49c', fontFamily: 'Arial, sans-serif', fontSize: '11px', fontStyle: 'bold',
+    }).setDepth(51);
+    const monsterIds = ['sheep', 'wolf', 'treant', 'ghost'] as const;
+    monsterIds.forEach((monsterId, index) => {
+      const definition = MONSTER_BY_ID.get(monsterId);
+      this.createButton(18 + index * 112, 838, 102, 58, `${definition?.displayName ?? monsterId}\n${definition?.sendCost ?? 0}G`, () => {
+        this.submitMonster(monsterId);
+      });
+    });
+    this.createButton(414, 928, 46, 42, 'II', () => {
       if (this.loop.isPaused) this.handleVisible();
       else this.handleHidden();
     });
-    this.input.keyboard?.on('keydown-ONE', () => { this.selectedTowerType = 'archer'; });
-    this.input.keyboard?.on('keydown-TWO', () => { this.selectedTowerType = 'mage'; });
-    this.input.keyboard?.on('keydown-THREE', () => { this.selectedTowerType = 'frost'; });
-    this.input.keyboard?.on('keydown-FOUR', () => { this.selectedTowerType = 'sniper'; });
+  }
+
+  private createButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    label: string,
+    action: () => void,
+  ): void {
+    const background = this.add.rectangle(x, y, width, height, 0x273139, 1)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(1, 0xb6c3bc, 0.3)
+      .setDepth(50)
+      .setInteractive({ useHandCursor: true });
+    const text = this.add.text(x + width / 2, y, label, {
+      color: '#edf1ee', fontFamily: 'Arial, sans-serif', fontSize: '13px', align: 'center',
+    }).setOrigin(0.5).setDepth(51);
+    background.on(Phaser.Input.Events.POINTER_DOWN, (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      background.setFillStyle(0x3b4a50);
+      action();
+    });
+    background.on(Phaser.Input.Events.POINTER_UP, () => background.setFillStyle(0x273139));
+    background.on(Phaser.Input.Events.POINTER_OUT, () => background.setFillStyle(0x273139));
+    text.setInteractive({ useHandCursor: true }).on(Phaser.Input.Events.POINTER_DOWN, (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      action();
+    });
+  }
+
+  private createInputBindings(): void {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
-      if (pointer.y < 80 || pointer.y > 640 || this.simulation.state.phase !== 'running') return;
-      const cellX = Math.floor(pointer.x / TILE_PIXELS);
-      const cellY = Math.floor(pointer.y / TILE_PIXELS);
+      if (this.actionMenuBounds && containsPoint(this.actionMenuBounds, pointer.x, pointer.y)) return;
+      const insideLocalBoard = pointer.x >= BOARD_X && pointer.x < BOARD_X + BOARD_WIDTH &&
+        pointer.y >= BOTTOM_BOARD_Y && pointer.y < BOTTOM_BOARD_Y + BOARD_HEIGHT;
+      if (!insideLocalBoard || this.simulation.state.phase !== 'running') {
+        this.closeActionMenu();
+        return;
+      }
+      const cellX = Math.floor((pointer.x - BOARD_X) / TILE_PIXELS);
+      const cellY = Math.floor((pointer.y - BOTTOM_BOARD_Y) / TILE_PIXELS) + LOCAL_LANE_MIN_ROW;
       const existingTower = this.simulation.state.towers.find(
         (tower) => tower.ownerId === 'p1' && tower.cellX === cellX && tower.cellY === cellY,
       );
       if (existingTower) {
-        this.selectedTowerEntityId = existingTower.entityId;
+        this.openTowerMenu(existingTower.entityId, pointer.x, pointer.y);
         return;
       }
-      this.submitBuild(cellX, cellY);
+      this.openBuildMenu(cellX, cellY, pointer.x, pointer.y);
     });
+    this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.loop.isPaused) this.handleVisible();
+      else this.handleHidden();
+    });
+    this.input.keyboard?.on('keydown-ONE', () => this.submitBuild('archer'));
+    this.input.keyboard?.on('keydown-TWO', () => this.submitBuild('mage'));
+    this.input.keyboard?.on('keydown-THREE', () => this.submitBuild('frost'));
+    this.input.keyboard?.on('keydown-FOUR', () => this.submitBuild('sniper'));
     this.input.keyboard?.on('keydown-S', () => this.submitMonster('sheep'));
     this.input.keyboard?.on('keydown-U', () => this.submitUpgrade());
     this.input.keyboard?.on('keydown-X', () => this.submitSell());
-    this.input.keyboard?.on('keydown-T', () => { this.tutorial = skipTutorial(this.tutorial); });
   }
 
-  private submitBuild(cellX: number, cellY: number): void {
-    this.simulation.submitCommand({
-      type: 'build_tower', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1',
-      towerTypeId: this.selectedTowerType, cellX, cellY,
+  private openBuildMenu(cellX: number, cellY: number, pointerX: number, pointerY: number): void {
+    this.closeActionMenu();
+    this.selectedCell = { cellX, cellY };
+    const towerIds: readonly TowerId[] = ['archer', 'mage', 'frost', 'sniper'];
+    const panelWidth = 228;
+    const panelHeight = 132;
+    const panelX = Phaser.Math.Clamp(pointerX - panelWidth / 2, 8, VIEW_WIDTH - panelWidth - 8);
+    const preferredY = pointerY > BOTTOM_BOARD_Y + BOARD_HEIGHT / 2 ? pointerY - panelHeight - 10 : pointerY + 10;
+    const panelY = Phaser.Math.Clamp(preferredY, 318, 772 - panelHeight);
+    const panelBackground = this.createMenuBackground(panelWidth, panelHeight, 0xd2bb7c);
+    const children: Phaser.GameObjects.GameObject[] = [
+      panelBackground,
+      this.add.text(12, 9, `BUILD  ${cellX + 1},${cellY - LOCAL_LANE_MIN_ROW + 1}`, {
+        color: '#f0cf83', fontFamily: 'Arial, sans-serif', fontSize: '12px', fontStyle: 'bold',
+      }),
+    ];
+    towerIds.forEach((towerId, index) => {
+      const definition = TOWER_BY_ID.get(towerId);
+      const button = this.createMenuButton(
+        8 + (index % 2) * 108,
+        34 + Math.floor(index / 2) * 44,
+        100,
+        36,
+        `${definition?.displayName ?? towerId}  ${definition?.levels[0]?.cost ?? 0}G`,
+        () => this.submitBuild(towerId),
+      );
+      children.push(button);
     });
-    this.tutorial = advanceTutorial(this.tutorial, 'build');
+    this.actionMenuBounds = { x: panelX, y: panelY, width: panelWidth, height: panelHeight };
+    this.actionMenu = this.add.container(panelX, panelY, children).setDepth(80);
+  }
+
+  private openTowerMenu(towerEntityId: number, pointerX: number, pointerY: number): void {
+    const tower = this.simulation.state.towers.find((candidate) => candidate.entityId === towerEntityId && candidate.ownerId === 'p1');
+    if (!tower) return;
+    this.closeActionMenu();
+    this.selectedTowerEntityId = towerEntityId;
+    const definition = TOWER_BY_ID.get(tower.towerTypeId);
+    const nextLevel = definition?.levels[tower.level];
+    const refund = Math.floor(tower.totalInvested * SELL_REFUND_PERMILLE / 1000);
+    const panelWidth = 246;
+    const panelHeight = 112;
+    const panelX = Phaser.Math.Clamp(pointerX - panelWidth / 2, 8, VIEW_WIDTH - panelWidth - 8);
+    const preferredY = pointerY > BOTTOM_BOARD_Y + BOARD_HEIGHT / 2 ? pointerY - panelHeight - 10 : pointerY + 10;
+    const panelY = Phaser.Math.Clamp(preferredY, 318, 772 - panelHeight);
+    const panelBackground = this.createMenuBackground(panelWidth, panelHeight, 0x8eb6a0);
+    const children: Phaser.GameObjects.GameObject[] = [
+      panelBackground,
+      this.add.text(12, 10, `${definition?.displayName ?? tower.towerTypeId}  LV.${tower.level}`, {
+        color: '#dce9e0', fontFamily: 'Arial, sans-serif', fontSize: '13px', fontStyle: 'bold',
+      }),
+    ];
+    children.push(this.createMenuButton(10, 48, 108, 44, nextLevel ? `UPGRADE  ${nextLevel.cost}G` : 'MAX LEVEL', () => this.submitUpgrade(), nextLevel !== undefined));
+    children.push(this.createMenuButton(128, 48, 108, 44, `SELL  ${refund}G`, () => this.submitSell()));
+    this.actionMenuBounds = { x: panelX, y: panelY, width: panelWidth, height: panelHeight };
+    this.actionMenu = this.add.container(panelX, panelY, children).setDepth(80);
+  }
+
+  private createMenuBackground(width: number, height: number, borderColor: number): Phaser.GameObjects.Rectangle {
+    const background = this.add.rectangle(0, 0, width, height, 0x11171c, 0.98)
+      .setOrigin(0)
+      .setStrokeStyle(2, borderColor, 0.8)
+      .setInteractive({ useHandCursor: false });
+    background.on(Phaser.Input.Events.POINTER_DOWN, (
+      _pointer: Phaser.Input.Pointer,
+      _x: number,
+      _y: number,
+      event: Phaser.Types.Input.EventData,
+    ) => event.stopPropagation());
+    return background;
+  }
+
+  private createMenuButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    label: string,
+    action: () => void,
+    enabled = true,
+  ): Phaser.GameObjects.Container {
+    const background = this.add.rectangle(0, 0, width, height, enabled ? 0x2c3a40 : 0x20272b, 1)
+      .setOrigin(0)
+      .setStrokeStyle(1, 0xc4cec8, enabled ? 0.35 : 0.12);
+    const text = this.add.text(width / 2, height / 2, label, {
+      color: enabled ? '#edf1ee' : '#66726d', fontFamily: 'Arial, sans-serif', fontSize: '10px', align: 'center',
+    }).setOrigin(0.5);
+    const container = this.add.container(x, y, [background, text]).setSize(width, height);
+    if (enabled) {
+      background.setInteractive({ useHandCursor: true });
+      background.on(Phaser.Input.Events.POINTER_DOWN, (
+        _pointer: Phaser.Input.Pointer,
+        _x: number,
+        _y: number,
+        event: Phaser.Types.Input.EventData,
+      ) => {
+        event.stopPropagation();
+        action();
+      });
+    }
+    return container;
+  }
+
+  private closeActionMenu(): void {
+    this.actionMenu?.destroy(true);
+    delete this.actionMenu;
+    delete this.actionMenuBounds;
+    delete this.selectedCell;
+    delete this.selectedTowerEntityId;
+  }
+
+  private submitBuild(towerTypeId: TowerId): void {
+    if (!this.selectedCell) return;
+    const { cellX, cellY } = this.selectedCell;
+    this.simulation.submitCommand({
+      type: 'build_tower',
+      commandId: this.simulation.getNextCommandId('p1'),
+      playerId: 'p1',
+      towerTypeId,
+      cellX,
+      cellY,
+    });
   }
 
   private submitMonster(monsterTypeId: string): void {
     this.simulation.submitCommand({
-      type: 'queue_monster', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1', monsterTypeId, quantity: 1,
+      type: 'queue_monster',
+      commandId: this.simulation.getNextCommandId('p1'),
+      playerId: 'p1',
+      monsterTypeId,
+      quantity: 1,
     });
-    this.tutorial = advanceTutorial(this.tutorial, 'send');
   }
 
   private submitUpgrade(): void {
-    if (this.selectedTowerEntityId === undefined) return;
-    this.simulation.submitCommand({ type: 'upgrade_tower', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1', towerEntityId: this.selectedTowerEntityId });
-    this.tutorial = advanceTutorial(this.tutorial, 'upgrade');
+    if (this.selectedTowerEntityId === undefined) {
+      this.feedbackText?.setText('Select a tower first').setColor('#f1a38f');
+      return;
+    }
+    this.simulation.submitCommand({
+      type: 'upgrade_tower',
+      commandId: this.simulation.getNextCommandId('p1'),
+      playerId: 'p1',
+      towerEntityId: this.selectedTowerEntityId,
+    });
   }
 
   private submitSell(): void {
-    if (this.selectedTowerEntityId === undefined) return;
-    this.simulation.submitCommand({ type: 'sell_tower', commandId: this.simulation.getNextCommandId('p1'), playerId: 'p1', towerEntityId: this.selectedTowerEntityId });
+    if (this.selectedTowerEntityId === undefined) {
+      this.feedbackText?.setText('Select a tower first').setColor('#f1a38f');
+      return;
+    }
+    this.simulation.submitCommand({
+      type: 'sell_tower',
+      commandId: this.simulation.getNextCommandId('p1'),
+      playerId: 'p1',
+      towerEntityId: this.selectedTowerEntityId,
+    });
+    delete this.selectedTowerEntityId;
   }
 
   private updateOverlay(): void {
     const state = this.simulation.state;
-    this.hpText?.setText(`P1  ${Math.max(0, state.players.p1.hp)} HP     P2  ${Math.max(0, state.players.p2.hp)} HP`);
-    this.debugText?.setText([
-      `${state.phase.toUpperCase()}  TICK ${state.tick}`,
-      `HASH ${state.stateHash}`,
-      `P1 GOLD ${state.players.p1.gold} INCOME ${state.players.p1.income}`,
-      `ENTITIES ${this.monsterVisuals.size + this.towerVisuals.size}  BACKLOG ${this.loop.backlogTicks}`,
-    ]);
-    const tips: Record<TutorialState['step'], string> = {
-      build: 'Click a grid cell to build. 1-4 selects tower type.',
-      send: 'Press S to send a sheep to the opponent.',
-      upgrade: 'Press U after selecting a tower to upgrade it.',
-      result: 'Keep playing until the match result appears.',
-      complete: '',
-    };
-    this.tutorialText?.setText(this.tutorial.skipped ? '' : tips[this.tutorial.step]);
+    this.hpText?.setText(`YOU ${Math.max(0, state.players.p1.hp)} HP   RIVAL ${Math.max(0, state.players.p2.hp)} HP`);
+    this.economyText?.setText(`${state.players.p1.gold}G   +${state.players.p1.income}`);
+    this.phaseText?.setText(`${state.phase.toUpperCase()}  ${Math.floor(state.tick / 20)}s`);
+    const ticksUntilWave = getTicksUntilNextWave(state.phase, state.tick, state.runningStartedAtTick);
+    const secondsUntilWave = Math.ceil(ticksUntilWave / 20);
+    this.waveText?.setText(state.phase === 'running' ? `NEXT WAVE  ${secondsUntilWave}s` : 'NEXT WAVE  --');
   }
 
   private handleHidden(): void {

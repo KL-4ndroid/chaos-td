@@ -134,10 +134,11 @@ MVP：Sheep、Wolf、Treant、Ghost。
 
 ### 建造
 
-- 只能放 Buildable Cell。
-- 每格最多一塔。
-- Path、Spawn、End、Blocked 不可建造。
-- 預覽顯示 Range 與合法性。
+- 只能放自己 Lane 的 Buildable Cell。
+- 每格最多一塔；塔佔據 Navigation Cell 並觸發固定順序尋路。
+- Spawn、End、Blocked 不可建造。
+- 建造不得完全封死 Spawn 到 End；否則回傳 `path_blocked` 且不扣款。
+- 預覽顯示 Range、預計路徑與合法性。
 - 失敗不扣款。
 
 ### 升級

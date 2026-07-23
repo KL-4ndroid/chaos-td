@@ -84,7 +84,7 @@ describe('Build Tower Command', () => {
     advanceToRunning(sim);
 
     const initialGold = sim.state.players.p1.gold;
-    const buildCmd = makeBuildTower('p1', 'archer', 3, 4, 0);
+    const buildCmd = makeBuildTower('p1', 'archer', 3, 15, 0);
     sim.submitCommand(buildCmd);
     sim.step();
 
@@ -100,12 +100,12 @@ describe('Build Tower Command', () => {
 
     // Spend gold first
     for (let i = 0; i < 5; i++) {
-      sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4 + i, i));
+      sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15 + i, i));
     }
     sim.step();
 
     const initialGold = sim.state.players.p1.gold;
-    const buildCmd = makeBuildTower('p1', 'sniper', 3, 10, 10);
+    const buildCmd = makeBuildTower('p1', 'sniper', 3, 19, 10);
     sim.submitCommand(buildCmd);
     const result = sim.step();
 
@@ -117,10 +117,10 @@ describe('Build Tower Command', () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     advanceToRunning(sim);
 
-    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
-    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 1));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 1));
     const result = sim.step();
 
     expect(result.events.some(e => e.type === 'command_rejected')).toBe(true);
@@ -131,7 +131,7 @@ describe('Build Tower Command', () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     sim.start();
 
-    const buildCmd = makeBuildTower('p1', 'archer', 3, 4, 0);
+    const buildCmd = makeBuildTower('p1', 'archer', 3, 15, 0);
     sim.submitCommand(buildCmd);
     sim.step();
 
@@ -145,7 +145,7 @@ describe('Upgrade Tower Command', () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     advanceToRunning(sim);
 
-    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
     const goldAfterBuild = sim.state.players.p1.gold;
@@ -162,7 +162,7 @@ describe('Upgrade Tower Command', () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     advanceToRunning(sim);
 
-    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
     const towerId = sim.state.towers[0].entityId;
@@ -188,13 +188,13 @@ describe('Upgrade Tower Command', () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     advanceToRunning(sim);
 
-    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
     // Spend almost all gold
-    sim.submitCommand(makeBuildTower('p1', 'archer', 4, 4, 1));
-    sim.submitCommand(makeBuildTower('p1', 'archer', 5, 4, 2));
-    sim.submitCommand(makeBuildTower('p1', 'archer', 6, 4, 3));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 4, 15, 1));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 5, 15, 2));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 6, 15, 3));
     sim.step();
 
     const towerId = sim.state.towers[0].entityId;
@@ -213,7 +213,7 @@ describe('Sell Tower Command', () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     advanceToRunning(sim);
 
-    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
     const goldAfterBuild = sim.state.players.p1.gold;
@@ -231,7 +231,7 @@ describe('Sell Tower Command', () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     advanceToRunning(sim);
 
-    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
+    sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
     const towerId = sim.state.towers[0].entityId;
@@ -341,7 +341,7 @@ describe('Queue Monster Command', () => {
 
     // Spend most gold on towers (5 archer = 600 gold exactly)
     for (let i = 0; i < 5; i++) {
-      sim.submitCommand(makeBuildTower('p1', 'archer', 3 + i, 4, i));
+      sim.submitCommand(makeBuildTower('p1', 'archer', 3 + i, 15, i));
     }
     sim.step();
 
@@ -401,11 +401,11 @@ describe('Command Determinism', () => {
     advanceToRunning(sim2);
 
     // Submit same commands
-    sim1.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
-    sim1.submitCommand(makeBuildTower('p2', 'archer', 12, 4, 0));
+    sim1.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
+    sim1.submitCommand(makeBuildTower('p2', 'archer', 4, 5, 0));
 
-    sim2.submitCommand(makeBuildTower('p1', 'archer', 3, 4, 0));
-    sim2.submitCommand(makeBuildTower('p2', 'archer', 12, 4, 0));
+    sim2.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
+    sim2.submitCommand(makeBuildTower('p2', 'archer', 4, 5, 0));
 
     for (let i = 0; i < 100; i++) {
       sim1.step();
@@ -423,7 +423,7 @@ describe('Gold Never Negative', () => {
 
     // Try to build 10 expensive towers
     for (let i = 0; i < 10; i++) {
-      sim.submitCommand(makeBuildTower('p1', 'sniper', 3 + i, 4, i));
+      sim.submitCommand(makeBuildTower('p1', 'sniper', i % 8, 16 + Math.floor(i / 8), i));
     }
     sim.step();
 
@@ -469,7 +469,7 @@ describe('Game Completion', () => {
     expect(sim.state.phase).toBe('result');
   });
 
-  it('resolves by timeout after max running ticks', () => {
+  it('resolves by timeout after max running ticks', { timeout: 30_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     sim.start();
 

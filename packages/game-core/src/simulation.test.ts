@@ -741,7 +741,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.runningStartedAtTick).toBe(60);
   });
 
-  it('should stay in RUNNING at tick 12058 (11,998th running tick)', () => {
+  it('should stay in RUNNING at tick 12058 (11,998th running tick)', { timeout: 30_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 

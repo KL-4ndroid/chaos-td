@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chaos TD Asset Admin</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, "Segoe UI", sans-serif; background: #101418; color: #eef2f3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: #101418; }
+    header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 64px; padding: 12px 28px; border-bottom: 1px solid #30383e; background: #151a1f; }
+    h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
+    .meta { display: flex; gap: 16px; color: #aab6bc; font: 13px Consolas, monospace; }
+    main { max-width: 1280px; margin: 0 auto; padding: 28px; }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+    .filters { display: flex; gap: 8px; }
+    button { min-height: 36px; border: 1px solid #4a565e; border-radius: 6px; background: #222a30; color: #eef2f3; padding: 0 14px; font-weight: 600; cursor: pointer; }
+    button:hover { border-color: #d3ad54; }
+    button.active { background: #d3ad54; border-color: #d3ad54; color: #141414; }
+    button.danger { color: #ffb2a7; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+    .slot { display: grid; grid-template-rows: auto 190px auto; min-width: 0; border: 1px solid #30383e; border-radius: 8px; overflow: hidden; background: #171d22; }
+    .slot-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid #30383e; }
+    .slot h2 { margin: 0; font-size: 15px; }
+    .tag { color: #98a7ae; font-size: 12px; }
+    .preview { position: relative; display: grid; place-items: center; overflow: hidden; background-color: #11161a; background-image: linear-gradient(45deg, #242b30 25%, transparent 25%), linear-gradient(-45deg, #242b30 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #242b30 75%), linear-gradient(-45deg, transparent 75%, #242b30 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0; }
+    .preview img { width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
+    .placeholder { display: grid; place-items: center; width: 88px; aspect-ratio: 1; border: 2px dashed #63717a; border-radius: 6px; color: #7f8e96; font-size: 36px; }
+    .slot.dragging .preview { outline: 3px solid #d3ad54; outline-offset: -3px; }
+    .actions { display: flex; gap: 8px; padding: 12px 14px; }
+    .actions button:first-child { flex: 1; }
+    input[type=file] { display: none; }
+    .status { min-height: 22px; color: #9fb0b8; font-size: 13px; }
+    .status.error { color: #ff9e91; }
+    @media (max-width: 620px) { header { align-items: flex-start; padding: 14px 18px; } .meta { flex-direction: column; gap: 2px; } main { padding: 18px; } .toolbar { align-items: flex-start; flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Chaos TD Asset Admin</h1>
+    <div class="meta"><span id="version">Manifest v0</span><span id="updated">尚未更新</span></div>
+  </header>
+  <main>
+    <div class="toolbar">
+      <div class="filters" id="filters"></div>
+      <div class="status" id="status">上傳 PNG 後，遊戲重新整理即可套用。</div>
+    </div>
+    <section class="grid" id="grid"></section>
+  </main>
+  <script type="module">
+    const grid = document.querySelector('#grid');
+    const filters = document.querySelector('#filters');
+    const status = document.querySelector('#status');
+    let data;
+    let activeCategory = 'All';
+
+    function setStatus(message, error = false) { status.textContent = message; status.classList.toggle('error', error); }
+    async function request(url, options) {
+      const response = await fetch(url, options);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? '操作失敗');
+      return body;
+    }
+    function fileToDataUrl(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+    async function upload(slot, file) {
+      if (!file || file.type !== 'image/png') return setStatus('只接受 PNG 檔案。', true);
+      setStatus(`正在驗證並上傳 ${slot.label}...`);
+      try {
+        await request('/api/assets/upload', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slotId: slot.id, dataUrl: await fileToDataUrl(file) }) });
+        setStatus(`${slot.label} 已替換。`);
+        await load();
+      } catch (error) { setStatus(error.message, true); }
+    }
+    async function remove(slot) {
+      try { await request(`/api/assets/${encodeURIComponent(slot.id)}`, { method: 'DELETE' }); setStatus(`${slot.label} 已恢復 placeholder。`); await load(); }
+      catch (error) { setStatus(error.message, true); }
+    }
+    function renderFilters() {
+      const categories = ['All', ...new Set(data.slots.map((slot) => slot.category))];
+      filters.replaceChildren(...categories.map((category) => { const button = document.createElement('button'); button.textContent = category; button.classList.toggle('active', category === activeCategory); button.onclick = () => { activeCategory = category; renderFilters(); renderSlots(); }; return button; }));
+    }
+    function renderSlots() {
+      const visible = data.slots.filter((slot) => activeCategory === 'All' || slot.category === activeCategory);
+      grid.replaceChildren(...visible.map((slot) => {
+        const article = document.createElement('article'); article.className = 'slot';
+        const head = document.createElement('div'); head.className = 'slot-head'; head.innerHTML = `<div><h2>${slot.label}</h2><div class="tag">${slot.id}</div></div><div class="tag">${slot.width} x ${slot.height}</div>`;
+        const preview = document.createElement('div'); preview.className = 'preview';
+        if (slot.url) { const image = document.createElement('img'); image.src = `${slot.url}?v=${data.manifest.version}`; image.alt = slot.label; preview.append(image); }
+        else { const placeholder = document.createElement('div'); placeholder.className = 'placeholder'; placeholder.textContent = slot.category[0]; preview.append(placeholder); }
+        const actions = document.createElement('div'); actions.className = 'actions';
+        const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/png'; input.onchange = () => upload(slot, input.files?.[0]);
+        const uploadButton = document.createElement('button'); uploadButton.textContent = slot.url ? '替換 PNG' : '上傳 PNG'; uploadButton.onclick = () => input.click();
+        const removeButton = document.createElement('button'); removeButton.textContent = '移除'; removeButton.className = 'danger'; removeButton.disabled = !slot.url; removeButton.onclick = () => remove(slot);
+        actions.append(input, uploadButton, removeButton); article.append(head, preview, actions);
+        for (const event of ['dragenter', 'dragover']) article.addEventListener(event, (value) => { value.preventDefault(); article.classList.add('dragging'); });
+        for (const event of ['dragleave', 'drop']) article.addEventListener(event, (value) => { value.preventDefault(); article.classList.remove('dragging'); });
+        article.addEventListener('drop', (event) => upload(slot, event.dataTransfer.files?.[0]));
+        return article;
+      }));
+    }
+    async function load() {
+      try { data = await request('/api/assets'); document.querySelector('#version').textContent = `Manifest v${data.manifest.version}`; document.querySelector('#updated').textContent = data.manifest.updatedAt ? new Date(data.manifest.updatedAt).toLocaleString() : '尚未更新'; renderFilters(); renderSlots(); }
+      catch (error) { setStatus(error.message, true); }
+    }
+    load();
+  </script>
+</body>
+</html>

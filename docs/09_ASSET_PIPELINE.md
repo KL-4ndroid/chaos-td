@@ -78,6 +78,15 @@ interface AssetManifest {
 
 Preload Scene 只讀 Manifest。
 
+### Asset Admin
+
+- 執行 `npm run start:assets`，開啟 `http://127.0.0.1:4174`。
+- 後台只綁定 localhost，不提供公開網路存取或帳號系統。
+- Tower PNG 必須為 256×256，Monster PNG 必須為 192×192，UI Icon 必須為 128×128。
+- 單檔上限 2 MB；上傳檔案以 SHA-256 內容摘要命名。
+- 更新採原子寫入 `apps/client/public/assets/manifest.json`。
+- 移除資產會恢復 Client 幾何 Placeholder。
+
 ## 8. Asset Gate
 
 M4 完整對局、四塔四怪可辨識、Layout 穩定、Placeholder 可讀、Manifest 完成後才投入正式美術。

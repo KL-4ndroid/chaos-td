@@ -122,6 +122,8 @@ export interface LaneDefinition {
   readonly waypoints: readonly FixedPointPosition[];
   readonly spawnPosition: FixedPointPosition;
   readonly endPosition: FixedPointPosition;
+  /** Cells monsters may traverse; towers placed here become path obstacles. */
+  readonly navigationCells: readonly GridCell[];
   readonly buildableCells: readonly GridCell[];
   readonly blockedCells: readonly GridCell[];
   readonly aiBuildPriorityCells: readonly GridCell[];

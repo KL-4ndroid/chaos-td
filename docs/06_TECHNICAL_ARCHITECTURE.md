@@ -109,6 +109,7 @@ interface MonsterState {
   segmentIndex: number;
   distanceOnSegmentMilliTiles: number;
   pathProgressMilliTiles: number;
+  routeWaypoints: readonly FixedPointPosition[];
   slow: SlowState | null;
   alive: boolean;
 }
@@ -176,6 +177,7 @@ type Result<T, E extends string> =
 - `invalid_quantity`
 - `invalid_cell`
 - `cell_occupied`
+- `path_blocked`
 - `tower_max_level`
 - `queue_full`
 - `monster_locked`

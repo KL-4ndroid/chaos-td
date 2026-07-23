@@ -5,9 +5,10 @@
 - 一張固定地圖。
 - 兩條鏡像 Lane。
 - Lane 互不交叉，怪物不互相碰撞。
-- 玩家不可改變路徑。
-- Buildable Cell 固定，不做堵路或動態 Pathfinding。
-- 怪物沿 Waypoint Polyline 前進。
+- 玩家以塔佔據 Navigation Cell，迫使怪物繞路。
+- 建塔後以固定鄰居順序重新尋路；完全封死 Spawn 到 End 的建造以 `path_blocked` 拒絕。
+- 場上怪物從當前整數位置接續新路徑，不得瞬移；新出生怪物使用 Lane 最新路徑。
+- 怪物沿權威 Core 產生的 Waypoint Polyline 前進。
 - 規則座標使用 milli-tile fixed-point。
 - Render Adapter 再轉為 Pixel。
 
@@ -15,11 +16,11 @@
 
 建議初始：
 
-- Grid：16 × 9。
+- Grid：8 × 21；中央 1 Row 分隔兩個 8 × 10 Lane 區域。
 - Logical Tile：1 tile。
-- Canvas：1280×720。
-- 每 Lane 路徑長度：16–22 tiles。
-- 每方 Buildable Cell：18–24 格，依首張地圖測試調整。
+- Client Canvas：480×960 portrait；本方 Lane 使用 8 × 10 主視圖。
+- 每 Lane 初始路徑長度：9 tiles；建塔可增加路徑長度。
+- 除 Spawn／End 外，Lane Navigation Cell 可建造。
 
 ## 3. 資料契約
 
@@ -43,6 +44,7 @@ interface LaneDefinition {
   waypoints: readonly FixedPointPosition[];
   spawnPosition: FixedPointPosition;
   endPosition: FixedPointPosition;
+  navigationCells: readonly GridCell[];
   buildableCells: readonly GridCell[];
   blockedCells: readonly GridCell[];
   aiBuildPriorityCells: readonly GridCell[];
@@ -64,7 +66,8 @@ interface MapDefinition {
 
 - 重複 Cell。
 - Buildable 與 Blocked 重疊。
-- Spawn／End／Path Cell 被標成 Buildable。
+- Spawn／End 被標成 Buildable。
+- 初始 Navigation Cell 無法連通 Spawn 與 End。
 - Waypoint 少於 2。
 - 相鄰 Waypoint 相同。
 - Defender／Attacker 錯配。
@@ -82,7 +85,7 @@ Monster State 儲存：
 
 規則：
 
-- Progress 只能增加。
+- 同一路徑版本內 Progress 只能增加；重新尋路時以當前位置作新 Route 的 Progress 0。
 - 到 Segment End 後進下一段。
 - 最後 End Position 標記 `pendingLeak`。
 - Movement 使用整數。

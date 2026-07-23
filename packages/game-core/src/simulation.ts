@@ -44,8 +44,18 @@ import {
   MONSTER_BY_ID,
   type LaneId,
   type FixedPointPosition,
+  type GridCell,
+  MVP_MIRROR_01,
 } from '@chaos-td/game-data';
-import { hasReachedEnd, type PathSegment, calculatePosition } from './movement';
+import {
+  hasReachedEnd,
+  type PathSegment,
+  calculatePosition,
+  calculatePathLength,
+  createPathSegments,
+  findGridPath,
+  gridPathToWaypoints,
+} from './movement';
 import { compareTargetPriority, type TowerRuntimeState } from './tower';
 import type { GameCommand, CommandId } from './commands';
 
@@ -106,6 +116,20 @@ export interface MonsterRuntimeState {
   leakDamage: number;
   slowPermille?: number;
   slowDurationTicks?: number;
+  routeWaypoints?: readonly FixedPointPosition[];
+  routeSegments?: readonly PathSegment[];
+  routeTotalPathLength?: number;
+}
+
+export function calculateMonsterPosition(
+  lane: LaneRuntimeState,
+  monster: MonsterRuntimeState,
+): ReturnType<typeof calculatePosition> {
+  return calculatePosition(
+    monster.routeWaypoints ?? lane.waypoints,
+    monster.routeSegments ?? lane.segments,
+    monster.pathProgressMilliTiles,
+  );
 }
 
 export interface SimulationState {
@@ -143,14 +167,16 @@ function computeStateHash(state: SimulationState): string {
   const monsters: MonsterState[] = [];
   for (const lane of Object.values(state.lanes)) {
     for (const monster of lane.monsters) {
-      monsters.push({
+      const canonicalMonster: MonsterState = {
         id: monster.entityId,
         ownerId: monster.ownerId,
         hp: monster.hp,
         shield: monster.shield,
         pathProgressMilliTiles: monster.pathProgressMilliTiles,
         alive: monster.hp > 0,
-      });
+      };
+      if (monster.routeWaypoints !== undefined) canonicalMonster.routeWaypoints = monster.routeWaypoints;
+      monsters.push(canonicalMonster);
     }
   }
 
@@ -264,6 +290,9 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
         pathProgressMilliTiles: 0,
         speedMilliTilesPerTick: spawn.speedMilliTilesPerTick,
         leakDamage: spawn.leakDamage,
+        routeWaypoints: newLane.waypoints,
+        routeSegments: newLane.segments,
+        routeTotalPathLength: newLane.totalPathLength,
       };
 
       newLane.monsters.push(monster);
@@ -321,8 +350,9 @@ function processMovement(state: SimulationState): { state: SimulationState; even
       monster.distanceOnSegmentMilliTiles += speed;
 
       // Update segment if needed
-      while (monster.segmentIndex < newLane.segments.length - 1) {
-        const currentSegment = newLane.segments[monster.segmentIndex];
+      const movementSegments = monster.routeSegments ?? newLane.segments;
+      while (monster.segmentIndex < movementSegments.length - 1) {
+        const currentSegment = movementSegments[monster.segmentIndex];
         if (!currentSegment) {
           break;
         }
@@ -335,7 +365,7 @@ function processMovement(state: SimulationState): { state: SimulationState; even
       }
 
       // Check if reached end
-      if (hasReachedEnd(monster.pathProgressMilliTiles, newLane.totalPathLength)) {
+      if (hasReachedEnd(monster.pathProgressMilliTiles, monster.routeTotalPathLength ?? newLane.totalPathLength)) {
         // Process leak
         const leakDamage = monster.leakDamage;
         defenderHp -= leakDamage;
@@ -409,7 +439,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
       if (monster.hp <= 0) {
         return false;
       }
-      const position = calculatePosition(lane.waypoints, lane.segments, monster.pathProgressMilliTiles);
+      const position = calculateMonsterPosition(lane, monster);
       const dx = position.x - towerX;
       const dy = position.y - towerY;
       return dx * dx + dy * dy <= rangeSquared;
@@ -472,7 +502,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
     if (definition.role === 'splash' && level.splashRadiusMilliTiles && level.splashFactorPermille) {
       for (const other of candidates.slice(1)) {
         if (other.hp <= 0) continue;
-        const otherPos = calculatePosition(lane.waypoints, lane.segments, other.pathProgressMilliTiles);
+        const otherPos = calculateMonsterPosition(lane, other);
         const dx = otherPos.x - towerX;
         const dy = otherPos.y - towerY;
         const distSq = dx * dx + dy * dy;
@@ -545,6 +575,68 @@ function calculateNetWorth(state: SimulationState, playerId: 'p1' | 'p2'): numbe
   return player.gold + Math.floor(towerNetWorth * SELL_REFUND_PERMILLE / 1000);
 }
 
+function positionToCell(position: FixedPointPosition): GridCell {
+  return {
+    col: Math.floor(position.xMilliTiles / 1000),
+    row: Math.floor(position.yMilliTiles / 1000),
+  };
+}
+
+function rerouteLane(
+  lane: LaneRuntimeState,
+  occupiedCells: readonly GridCell[],
+): LaneRuntimeState | null {
+  const definition = MVP_MIRROR_01.lanes.find((candidate) => candidate.id === lane.laneId);
+  if (!definition) return null;
+  const gridPath = findGridPath(
+    MVP_MIRROR_01.gridColumns,
+    MVP_MIRROR_01.gridRows,
+    positionToCell(definition.spawnPosition),
+    positionToCell(definition.endPosition),
+    occupiedCells,
+    definition.navigationCells,
+  );
+  if (!gridPath) return null;
+
+  const pathWaypoints = gridPathToWaypoints(gridPath);
+  const waypoints = [definition.spawnPosition, ...pathWaypoints.slice(1, -1), definition.endPosition];
+  const segments = createPathSegments(waypoints);
+  const totalPathLength = calculatePathLength(waypoints);
+  const monsters = lane.monsters.map((monster) => {
+    if (monster.hp <= 0) return monster;
+    const current = calculateMonsterPosition(lane, monster);
+    const currentCell = positionToCell({ xMilliTiles: current.x, yMilliTiles: current.y });
+    const routeFromMonster = findGridPath(
+      MVP_MIRROR_01.gridColumns,
+      MVP_MIRROR_01.gridRows,
+      currentCell,
+      positionToCell(definition.endPosition),
+      occupiedCells,
+      definition.navigationCells,
+    );
+    if (!routeFromMonster) return monster;
+    const remainingWaypoints = gridPathToWaypoints(routeFromMonster);
+    const currentPosition = { xMilliTiles: current.x, yMilliTiles: current.y };
+    const currentCellCenter = remainingWaypoints[0];
+    const routeWaypoints: readonly FixedPointPosition[] = currentCellCenter === undefined ||
+      (currentCellCenter.xMilliTiles === current.x && currentCellCenter.yMilliTiles === current.y)
+      ? [currentPosition, ...remainingWaypoints.slice(1)]
+      : [currentPosition, currentCellCenter, ...remainingWaypoints.slice(1)];
+    const routeSegments = createPathSegments(routeWaypoints);
+    return {
+      ...monster,
+      pathProgressMilliTiles: 0,
+      segmentIndex: 0,
+      distanceOnSegmentMilliTiles: 0,
+      routeWaypoints,
+      routeSegments,
+      routeTotalPathLength: calculatePathLength(routeWaypoints),
+    };
+  });
+
+  return { ...lane, waypoints, segments, totalPathLength, monsters };
+}
+
 function processCommands(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
   const events: DomainEvent[] = [];
   const newState: SimulationState = {
@@ -587,6 +679,22 @@ function processCommands(state: SimulationState): { state: SimulationState; even
           continue;
         }
 
+        const laneId: LaneId = command.playerId === 'p1' ? 'lane_p1' : 'lane_p2';
+        const laneDefinition = MVP_MIRROR_01.lanes.find((lane) => lane.id === laneId);
+        const buildable = laneDefinition?.buildableCells.some(
+          (cell) => cell.col === command.cellX && cell.row === command.cellY,
+        ) ?? false;
+        if (!buildable) {
+          events.push({
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'invalid_cell',
+          });
+          continue;
+        }
+
         const buildCost = towerDef.levels[0].cost;
         if (player.gold < buildCost) {
           const rejectEvent: CommandRejectedEvent = {
@@ -616,7 +724,22 @@ function processCommands(state: SimulationState): { state: SimulationState; even
           continue;
         }
 
-        // Build the tower
+        const occupiedCells = newState.towers
+          .filter((tower) => tower.ownerId === command.playerId)
+          .map((tower) => ({ col: tower.cellX, row: tower.cellY }));
+        occupiedCells.push({ col: command.cellX, row: command.cellY });
+        const reroutedLane = rerouteLane(newState.lanes[laneId], occupiedCells);
+        if (!reroutedLane) {
+          events.push({
+            type: 'command_rejected',
+            tick: state.tick,
+            playerId: command.playerId,
+            commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
+            reason: 'path_blocked',
+          });
+          continue;
+        }
+
         const newTower: TowerRuntimeState = {
           entityId: newState.nextEntityId++,
           ownerId: command.playerId,
@@ -630,6 +753,7 @@ function processCommands(state: SimulationState): { state: SimulationState; even
         };
 
         newState.towers.push(newTower);
+        newState.lanes[laneId] = reroutedLane;
         player.gold -= buildCost;
         player.totalInvested += buildCost;
 
@@ -753,6 +877,12 @@ function processCommands(state: SimulationState): { state: SimulationState; even
         const refund = Math.floor((tower.totalInvested * SELL_REFUND_PERMILLE) / 1000);
 
         newState.towers.splice(towerIndex, 1);
+        const laneId: LaneId = command.playerId === 'p1' ? 'lane_p1' : 'lane_p2';
+        const occupiedCells = newState.towers
+          .filter((candidate) => candidate.ownerId === command.playerId)
+          .map((candidate) => ({ col: candidate.cellX, row: candidate.cellY }));
+        const reroutedLane = rerouteLane(newState.lanes[laneId], occupiedCells);
+        if (reroutedLane) newState.lanes[laneId] = reroutedLane;
         player.gold += refund;
 
         const acceptEvent: CommandAcceptedEvent = {
@@ -1092,14 +1222,16 @@ class SimulationImpl implements Simulation {
     const monsters: MonsterState[] = [];
     for (const lane of Object.values(this._state.lanes)) {
       for (const monster of lane.monsters) {
-        monsters.push({
+        const canonicalMonster: MonsterState = {
           id: monster.entityId,
           ownerId: monster.ownerId,
           hp: monster.hp,
           shield: monster.shield,
           pathProgressMilliTiles: monster.pathProgressMilliTiles,
           alive: monster.hp > 0,
-        });
+        };
+        if (monster.routeWaypoints !== undefined) canonicalMonster.routeWaypoints = monster.routeWaypoints;
+        monsters.push(canonicalMonster);
       }
     }
 
