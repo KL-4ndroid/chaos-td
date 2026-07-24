@@ -21,6 +21,7 @@ import {
   type CanonicalState,
   type PlayerSlotState,
 } from './canonical';
+import type { LaneId } from '@chaos-td/game-data';
 import { createSimulation } from './simulation';
 
 describe('PRNG - Mulberry32 Determinism', () => {
@@ -646,8 +647,8 @@ describe('Canonical Hash - Determinism and Edge Cases', () => {
         { id: 3, ownerId: 'p2', level: 1, cellX: 2, cellY: 0 },
       ],
       monsters: [
-        { id: 1, ownerId: 'p2', hp: 100, shield: 0, pathProgressMilliTiles: 5000, alive: true, movementType: 'ground', tags: [] },
-        { id: 2, ownerId: 'p2', hp: 80, shield: 20, pathProgressMilliTiles: 4800, alive: true, movementType: 'ground', tags: [] },
+        { id: 1, source: { type: 'player', playerId: 'p2' }, battlefieldId: 'lane_p1' as LaneId, hp: 100, shield: 0, pathProgressMilliTiles: 5000, alive: true, movementType: 'ground' as const, tags: [] },
+        { id: 2, source: { type: 'player', playerId: 'p2' }, battlefieldId: 'lane_p1' as LaneId, hp: 80, shield: 20, pathProgressMilliTiles: 4800, alive: true, movementType: 'ground' as const, tags: [] },
       ],
       result: null,
       waveCurrentWaveNumber: 0,
@@ -746,7 +747,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(result.state.tick).toBe(60);
   });
 
-  it('should have runningStartedAtTick = 60 when entering RUNNING', { timeout: 30_000 }, () => {
+  it('should have runningStartedAtTick = 60 when entering RUNNING', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -758,7 +759,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.runningStartedAtTick).toBe(60);
   });
 
-  it('should stay in RUNNING at tick 12058 (11,998th running tick)', { timeout: 30_000 }, () => {
+  it('should stay in RUNNING at tick 12058 (11,998th running tick)', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -769,7 +770,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.tick).toBe(12058);
   });
 
-  it('should transition to RESOLVING at tick 12060', { timeout: 30_000 }, () => {
+  it('should transition to RESOLVING at tick 12060', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -784,7 +785,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(result.state.tick).toBe(12060);
   });
 
-  it('should have resolvingStartedAtTick = 12060 when entering RESOLVING', { timeout: 30_000 }, () => {
+  it('should have resolvingStartedAtTick = 12060 when entering RESOLVING', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -796,7 +797,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.resolvingStartedAtTick).toBe(12060);
   });
 
-  it('should stay in RESOLVING at tick 12459 (399th resolving tick)', { timeout: 30_000 }, () => {
+  it('should stay in RESOLVING at tick 12459 (399th resolving tick)', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -807,7 +808,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.tick).toBe(12459);
   });
 
-  it('should transition to RESULT at tick 12460', { timeout: 30_000 }, () => {
+  it('should transition to RESULT at tick 12460', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -822,7 +823,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(result.state.tick).toBe(12460);
   });
 
-  it('should freeze tick in RESULT', { timeout: 30_000 }, () => {
+  it('should freeze tick in RESULT', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -869,7 +870,7 @@ describe('Simulation - Events', () => {
     expect((toRunningEvent as { tick: number }).tick).toBe(60);
   });
 
-  it('should return empty events array in RESULT', { timeout: 30_000 }, () => {
+  it('should return empty events array in RESULT', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 

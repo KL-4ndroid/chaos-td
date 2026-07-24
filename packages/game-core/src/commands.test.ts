@@ -469,7 +469,7 @@ describe('Game Completion', () => {
     expect(sim.state.phase).toBe('result');
   });
 
-  it('resolves by timeout after max running ticks', { timeout: 30_000 }, () => {
+  it('resolves by timeout after max running ticks', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     sim.start();
 

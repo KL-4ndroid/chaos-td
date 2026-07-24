@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { LaneId } from '@chaos-td/game-data';
+import type { BattlefieldId } from '@chaos-td/game-data';
 import { createPathSegments } from './movement';
 import {
   createSimulation,
@@ -22,7 +22,8 @@ function createMonster(
 ): MonsterRuntimeState {
   return {
     entityId,
-    ownerId: 'p2',
+    source: { type: 'player', playerId: 'p2' },
+    battlefieldId: 'lane_p1' as BattlefieldId,
     monsterTypeId: 'sheep',
     hp,
     shield: 0,
@@ -41,6 +42,7 @@ function createLane(monsters: MonsterRuntimeState[]): LaneRuntimeState {
   const segments = createPathSegments(WAYPOINTS);
   return {
     laneId: 'lane_p1',
+    battlefieldId: 'lane_p1',
     defenderId: 'p1',
     attackerId: 'p2',
     waypoints: WAYPOINTS,
@@ -55,12 +57,13 @@ function createLane(monsters: MonsterRuntimeState[]): LaneRuntimeState {
   };
 }
 
-function createEmptyLane(laneId: LaneId): LaneRuntimeState {
+function createEmptyLane(laneId: BattlefieldId): LaneRuntimeState {
   const defenderId = laneId === 'lane_p1' ? 'p1' : 'p2';
   const attackerId = defenderId === 'p1' ? 'p2' : 'p1';
   return {
     ...createLane([]),
     laneId,
+    battlefieldId: laneId,
     defenderId,
     attackerId,
   };
@@ -205,7 +208,7 @@ describe('Archer vs Sheep combat', () => {
       simulation.step();
     }
 
-    expect(simulation.state.stateHash).toBe('b1db1f169e4757a0');
+    expect(simulation.state.stateHash).toBe('36c9d521e6b65b57');
   });
 });
 
@@ -213,7 +216,8 @@ describe('Archer vs Sheep combat', () => {
 function createTreant(entityId: number, pathProgressMilliTiles: number): MonsterRuntimeState {
   return {
     entityId,
-    ownerId: 'p2',
+    source: { type: 'player', playerId: 'p2' },
+    battlefieldId: 'lane_p1' as BattlefieldId,
     monsterTypeId: 'treant',
     hp: 390,
     shield: 0,
@@ -231,7 +235,8 @@ function createTreant(entityId: number, pathProgressMilliTiles: number): Monster
 function createGhost(entityId: number, pathProgressMilliTiles: number): MonsterRuntimeState {
   return {
     entityId,
-    ownerId: 'p2',
+    source: { type: 'player', playerId: 'p2' },
+    battlefieldId: 'lane_p1' as BattlefieldId,
     monsterTypeId: 'ghost',
     hp: 215,
     shield: 95, // Shield absorbs damage
@@ -309,7 +314,8 @@ describe('M3-003 Advanced Combat Mechanics', () => {
     // Create a monster with 900 permille armor (90%)
     const tankyMonster: MonsterRuntimeState = {
       entityId: 1,
-      ownerId: 'p2',
+      source: { type: 'player', playerId: 'p2' },
+      battlefieldId: 'lane_p1' as BattlefieldId,
       monsterTypeId: 'treant',
       hp: 390,
       shield: 0,

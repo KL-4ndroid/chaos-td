@@ -3,12 +3,15 @@
 ## 1. 對局結構
 
 - 兩個 Player Slot：`p1`、`p2`。
-- 每方有獨立 Lane、HP、Gold、Income、Tower 與 Send Queue。
-- 玩家在自己的 Lane 建塔。
-- 玩家購買的怪物進入對手 Lane。
+- 每方有獨立 Battlefield（戰場）、HP、Gold、Income、Tower 與 Send Queue。
+- 每個 Battlefield 有一條路徑，防守方在該路徑上建塔。
+- 玩家購買的怪物進入**對手**的 Battlefield（p1 派 → p2 戰場，p2 派 → p1 戰場）。
 - 防守方擊殺怪物取得 Bounty。
 - 怪物到終點造成 Leak Damage。
 - 雙方規則、起始資源、地圖與內容完全相同。
+
+> 內部實作：`battlefield_p1` 映射到 `lane_p1`；`battlefield_p2` 映射到 `lane_p2`。
+> p2 目前由 AI Controller 控制作為對手，未來替換為真人玩家時不影響 Core 規則。
 
 ## 2. Match State Machine
 
@@ -108,7 +111,7 @@ Tick 前進，但不發 Income、不 Spawn、不攻擊、不接受 Gameplay Comm
 
 ## 7. Send Queue
 
-- 每方一個送往對手的 Queue。
+- 每方一個送往**對手 Battlefield** 的 Queue。
 - `quantity` 允許 1–5。
 - 採原子操作：資金不足、未解鎖、數量非法或容量不足時整筆拒絕。
 - 合法 Command 立即扣 `sendCost × quantity`、加 `incomeGain × quantity`，再加入 Queue。
@@ -196,16 +199,25 @@ MVP 不含「怪物主動攻擊塔造成塔損壞」的規則。
 
 ### Wave System
 
-自動波次由 `WaveScheduler` 管理，讀取 `packages/game-data` 提供的 `WaveDefinition[]`。波次由系統（而非玩家）觸發，怪物屬於「系統陣營」。
+自動波次由 `MatchWaveState` 管理，讀取 `packages/game-data` 提供的 `WaveDefinition[]`。波次由系統（而非玩家）觸發，怪物來源記錄為 `source: { type: 'wave', waveNumber }`，不是任何 PlayerSlot。
 
-波次生成規則：
+#### 雙戰場模型（ADR-001）
+
+每位玩家的 Battlefield 有獨立的 `BattlefieldWaveRuntime`：
+- Wave Definition 為**共享唯讀資料**，雙方使用相同定義
+- 每個 Battlefield 各自維護 `currentGroupIndex`、`currentGroupSpawned`、`ticksUntilNextSpawn`、`spawningCompleted`
+- 某 Battlefield 的怪物死亡或漏怪**不影響**另一 Battlefield 的 wave runtime
+- `wave_ended` 為**per-battlefield 事件**，雙方各自獨立觸發
+
+#### 波次生成規則
+
+- Wave Definition 的 `count` 為**每 Battlefield 的數量**（如 Wave 1 = basic × 3，表示 p1 和 p2 各自的戰場各 3 隻）
+- 系統同時在兩個 Battlefield 生成怪物（共享 wave number，獨立 runtime）
 - 第 1 波：僅 Basic 怪物。
 - 每 5 波（第 5, 10, 15…波）：加入 Swift 怪物。
 - 每 10 波（第 10, 20, 30…波）：加入 Siege + Boss 怪物。
 - 第 6 波起每 6 波：加入 Flying 怪物。
 - 難度倍率：每 5 波 +5%。
-
-波次系統生成的怪物視為「自動怪物」，視覺呈現上與玩家 `queue_monster` 的怪物相同，但歸屬於系統結算。兩者共享同一 Lane 的 HP／路徑。
 
 ## 10. Damage
 

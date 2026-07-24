@@ -57,6 +57,7 @@ function createLaneRuntime(definition: LaneDefinition): LaneRuntimeState {
   const segments = createPathSegments(definition.waypoints);
   return {
     laneId: definition.id,
+    battlefieldId: definition.id,
     defenderId: definition.defenderPlayerId,
     attackerId: definition.attackerPlayerId,
     waypoints: definition.waypoints,

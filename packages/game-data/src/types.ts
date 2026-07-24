@@ -11,6 +11,14 @@
 
 export type PlayerSlot = 'p1' | 'p2';
 export type LaneId = 'lane_p1' | 'lane_p2';
+
+/**
+ * Alias for LaneId to clarify domain semantics.
+ * Each BattlefieldId maps to one player's defending path.
+ * 'lane_p1' = battlefield belonging to player p1
+ * 'lane_p2' = battlefield belonging to player p2
+ */
+export type BattlefieldId = LaneId;
 export type TowerId = 'archer' | 'mage' | 'frost' | 'sniper';
 export type MonsterId =
   | 'sheep' | 'wolf' | 'treant' | 'ghost'
@@ -233,6 +241,14 @@ export interface GlobalConfig {
 
 export type WaveMonsterType = 'basic' | 'swift' | 'flying' | 'siege' | 'boss';
 
+/**
+ * Who sent / spawned this monster.
+ * Replaces the previous 'ownerId: PlayerSlot | "system"' pattern.
+ */
+export type MonsterSource =
+  | { readonly type: 'player'; readonly playerId: PlayerSlot }
+  | { readonly type: 'wave'; readonly waveNumber: number };
+
 /** Single wave event: which monster type spawns, how many, and at what difficulty multiplier. */
 export interface WaveGroup {
   readonly monsterType: WaveMonsterType;
@@ -248,6 +264,25 @@ export interface WaveDefinition {
   readonly groups: readonly WaveGroup[];
   /** Total tick duration of this wave from first spawn to last spawn */
   readonly totalDurationTicks: number;
+}
+
+/**
+ * Runtime state for a wave that is actively spawning on a single battlefield.
+ * Each battlefield has its own independent instance of this.
+ */
+export interface BattlefieldWaveRuntime {
+  /** Index into WAVE_DEFINITIONS; -1 = no wave active */
+  currentWaveIndex: number;
+  /** Index of the current group being spawned within the wave */
+  currentGroupIndex: number;
+  /** How many monsters have been spawned from the current group */
+  currentGroupSpawned: number;
+  /** Remaining ticks until next monster spawn */
+  ticksUntilNextSpawn: number;
+  /** Independent cooldown for wave spawns — does not interfere with player spawn queue */
+  waveSpawnCooldownTicks: number;
+  /** All groups for this wave have finished spawning */
+  spawningCompleted: boolean;
 }
 
 /** Runtime state for a wave that is actively spawning. */

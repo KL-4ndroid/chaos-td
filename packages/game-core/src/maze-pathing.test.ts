@@ -13,6 +13,7 @@ function createLane(definition: LaneDefinition): LaneRuntimeState {
   const segments = createPathSegments(definition.waypoints);
   return {
     laneId: definition.id,
+    battlefieldId: definition.id,
     defenderId: definition.defenderPlayerId,
     attackerId: definition.attackerPlayerId,
     waypoints: definition.waypoints,
@@ -66,7 +67,8 @@ describe('tower maze pathing', () => {
     const lane = simulation.state.lanes.lane_p1;
     const monster: MonsterRuntimeState = {
       entityId: 99,
-      ownerId: 'p2',
+      source: { type: 'player', playerId: 'p2' },
+      battlefieldId: 'lane_p1',
       monsterTypeId: 'sheep',
       hp: 100,
       shield: 0,
@@ -100,7 +102,8 @@ describe('tower maze pathing', () => {
     const lane = simulation.state.lanes.lane_p1;
     const monster: MonsterRuntimeState = {
       entityId: 99,
-      ownerId: 'p2',
+      source: { type: 'player', playerId: 'p2' },
+      battlefieldId: 'lane_p1',
       monsterTypeId: 'sheep',
       hp: 100,
       shield: 0,
@@ -139,7 +142,8 @@ describe('tower maze pathing', () => {
     const lane = simulation.state.lanes.lane_p1;
     lane.monsters.push({
       entityId: 99,
-      ownerId: 'p2',
+      source: { type: 'player', playerId: 'p2' },
+      battlefieldId: 'lane_p1',
       monsterTypeId: 'sheep',
       hp: 10_000,
       shield: 0,
@@ -180,7 +184,8 @@ describe('tower maze pathing', () => {
     const lane = simulation.state.lanes.lane_p1;
     lane.monsters.push({
       entityId: 99,
-      ownerId: 'p2',
+      source: { type: 'player', playerId: 'p2' },
+      battlefieldId: 'lane_p1',
       monsterTypeId: 'sheep',
       hp: 100,
       shield: 0,

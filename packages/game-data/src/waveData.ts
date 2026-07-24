@@ -61,7 +61,8 @@ export function generateWaveDefinitions(maxWave: number): readonly WaveDefinitio
     const groups: WaveGroup[] = [];
 
     // Basic sheep: always present, count increases with wave
-    const basicCount = Math.min(3 + Math.floor(wave / 3), 8);
+    // W1-3: 3 monsters; W4+: 3+1=4, W7+: 3+2=5, W10+: 3+3=6 ...
+    const basicCount = Math.min(3 + Math.floor((wave - 1) / 3), 8);
     groups.push(makeGroup('basic', basicCount, mult));
 
     // Swift (wolf) every 5th wave

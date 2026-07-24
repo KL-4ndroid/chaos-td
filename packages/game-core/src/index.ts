@@ -6,6 +6,9 @@
  * Must NOT use: Math.random(), Date.now(), timers, render delta
  */
 
+// Re-export domain types from game-data for consumers
+export type { BattlefieldId, MonsterSource } from '@chaos-td/game-data';
+
 // Constants
 export {
   TICK_DURATION_MS,
@@ -82,7 +85,8 @@ export {
   type LaneRuntimeState,
   type MonsterSpawnParams,
   type MonsterRuntimeState,
-  type WaveSchedulerState,
+  type MatchWaveState,
+  type BattlefieldWaveRuntimeState,
   createSimulation,
   createWithRng,
   calculateMonsterPosition,

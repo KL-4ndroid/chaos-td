@@ -55,6 +55,7 @@ import {
   WAVE_DEFINITIONS,
   getWaveMonsterDefinition,
   scaleWaveMonster,
+  type MonsterSource,
 } from '@chaos-td/game-data';
 import {
   hasReachedEnd,
@@ -90,6 +91,9 @@ export interface PlayerBattleState extends PlayerSlotState {
 }
 
 export interface LaneRuntimeState {
+  /** Battlefield this lane belongs to */
+  battlefieldId: LaneId;
+  /** Alias for battlefieldId — kept for backward compatibility */
   laneId: LaneId;
   defenderId: PlayerSlot;
   attackerId: PlayerSlot;
@@ -106,7 +110,10 @@ export interface LaneRuntimeState {
 
 export interface MonsterSpawnParams {
   entityId: number;
-  ownerId: PlayerSlot;
+  /** Source of this monster */
+  source: MonsterSource;
+  /** Which battlefield this monster will spawn into */
+  targetBattlefieldId: LaneId;
   monsterTypeId: string;
   hp: number;
   shield: number;
@@ -120,9 +127,24 @@ export interface MonsterSpawnParams {
   tags: readonly MonsterTag[];
 }
 
+/**
+ * Who sent / spawned this monster.
+ * - type 'player': player-initiated send; the monster occupies the opponent's battlefield
+ * - type 'wave':   system wave spawn; the monster occupies its owner's battlefield
+ * Replaces the previous ownerId: PlayerSlot | 'system' pattern.
+ * (Imported from @chaos-td/game-data)
+ */
+
 export interface MonsterRuntimeState {
   entityId: number;
-  ownerId: PlayerSlot;
+  /**
+   * Who sent this monster.
+   * For wave monsters: { type: 'wave', waveNumber }
+   * For player sends:  { type: 'player', playerId }
+   */
+  source: MonsterSource;
+  /** Which battlefield this monster occupies */
+  battlefieldId: LaneId;
   monsterTypeId: string;
   hp: number;
   shield: number;
@@ -154,23 +176,34 @@ export function calculateMonsterPosition(
   );
 }
 
-export interface WaveSchedulerState {
+/**
+ * Per-field wave spawning runtime state.
+ * Each battlefield advances its own instance independently.
+ */
+export interface BattlefieldWaveRuntimeState {
+  currentWaveIndex: number;
+  currentGroupIndex: number;
+  currentGroupSpawned: number;
+  ticksUntilNextSpawn: number;
+  /** Independent cooldown for wave spawns — does not interfere with player spawn queue */
+  waveSpawnCooldownTicks: number;
+  spawningCompleted: boolean;
+}
+
+/**
+ * Wave scheduler for the entire match.
+ * - Wave number and timing are shared (global, fair)
+ * - Spawn runtime state is per-battlefield (independent)
+ */
+export interface MatchWaveState {
   /** 1-based wave number, 0 = no active wave */
   currentWaveNumber: number;
-  /** Index into WAVE_DEFINITIONS */
-  currentWaveIndex: number;
-  /** Remaining ticks until next monster spawn in current wave */
-  ticksUntilNextSpawn: number;
-  /** Remaining monsters to spawn in current wave (per lane) */
-  remainingGroupCount: number;
-  /** Is the current wave still active (spawning or monsters on field)? */
-  waveActive: boolean;
-  /** Ticks since RUNNING start, used for wave timing */
+  /** Ticks since RUNNING start */
   ticksSinceRunningStart: number;
-  /** Index of the current group being spawned within the wave */
-  currentGroupIndex: number;
-  /** How many monsters have been spawned from the current group */
-  currentGroupSpawned: number;
+  battlefields: {
+    p1: BattlefieldWaveRuntimeState;
+    p2: BattlefieldWaveRuntimeState;
+  };
 }
 
 export interface SimulationState {
@@ -187,7 +220,7 @@ export interface SimulationState {
   nextCommandIdSequence: number;
   pendingCommands: GameCommand[];
   stateHash: string;
-  waveScheduler: WaveSchedulerState;
+  waveScheduler: MatchWaveState;
 }
 
 export interface StepResult {
@@ -211,7 +244,8 @@ function computeStateHash(state: SimulationState): string {
     for (const monster of lane.monsters) {
       const canonicalMonster: MonsterState = {
         id: monster.entityId,
-        ownerId: monster.ownerId,
+        source: monster.source,
+        battlefieldId: monster.battlefieldId,
         hp: monster.hp,
         shield: monster.shield,
         pathProgressMilliTiles: monster.pathProgressMilliTiles,
@@ -252,16 +286,25 @@ function createInitialPlayers(): Record<PlayerSlot, PlayerBattleState> {
   };
 }
 
-function createInitialWaveScheduler(): WaveSchedulerState {
+function createInitialBattlefieldWaveRuntime(): BattlefieldWaveRuntimeState {
   return {
-    currentWaveNumber: 0,
     currentWaveIndex: -1,
-    ticksUntilNextSpawn: 0,
-    remainingGroupCount: 0,
-    waveActive: false,
-    ticksSinceRunningStart: 0,
     currentGroupIndex: 0,
     currentGroupSpawned: 0,
+    ticksUntilNextSpawn: 0,
+    waveSpawnCooldownTicks: 0,
+    spawningCompleted: false,
+  };
+}
+
+function createInitialMatchWaveState(): MatchWaveState {
+  return {
+    currentWaveNumber: 0,
+    ticksSinceRunningStart: 0,
+    battlefields: {
+      p1: createInitialBattlefieldWaveRuntime(),
+      p2: createInitialBattlefieldWaveRuntime(),
+    },
   };
 }
 
@@ -284,7 +327,7 @@ function createSimulationState(
     nextCommandIdSequence: 0,
     pendingCommands: [],
     stateHash: '',
-    waveScheduler: createInitialWaveScheduler(),
+    waveScheduler: createInitialMatchWaveState(),
   };
   state.stateHash = computeStateHash(state);
   return state;
@@ -339,7 +382,8 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
 
       const monster: MonsterRuntimeState = {
         entityId: spawn.entityId,
-        ownerId: spawn.ownerId,
+        source: spawn.source,
+        battlefieldId: newLane.battlefieldId,
         monsterTypeId: spawn.monsterTypeId,
         hp: spawn.hp,
         shield: spawn.shield,
@@ -361,7 +405,7 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
       const spawnEvent: MonsterSpawnedEvent = {
         type: 'monster_spawned',
         tick: state.tick,
-        playerId: spawn.ownerId,
+        source: spawn.source,
         monsterEntityId: spawn.entityId,
         monsterType: spawn.monsterTypeId,
       };
@@ -435,7 +479,7 @@ function processMovement(state: SimulationState): { state: SimulationState; even
         const leakEvent: MonsterLeakedEvent = {
           type: 'monster_leaked',
           tick: state.tick,
-          ownerId: monster.ownerId,
+          source: monster.source,
           defenderId: lane.defenderId,
           monsterEntityId: monster.entityId,
           leakDamage,
@@ -622,7 +666,8 @@ function processCombat(state: SimulationState): { state: SimulationState; events
       const deathEvent: MonsterDiedEvent = {
         type: 'monster_died',
         tick: state.tick,
-        playerId: target.ownerId,
+        source: target.source,
+        defenderId: lane.defenderId,
         monsterEntityId: target.entityId,
         killerPlayerId: tower.ownerId,
       };
@@ -671,7 +716,8 @@ function processCombat(state: SimulationState): { state: SimulationState; events
             events.push({
               type: 'monster_died',
               tick: state.tick,
-              playerId: other.ownerId,
+              source: other.source,
+              defenderId: lane.defenderId,
               monsterEntityId: other.entityId,
               killerPlayerId: tower.ownerId,
             });
@@ -1116,7 +1162,8 @@ function processCommands(state: SimulationState): { state: SimulationState; even
         for (let i = 0; i < command.quantity; i++) {
           const spawn: MonsterSpawnParams = {
             entityId: newState.nextEntityId++,
-            ownerId: command.playerId,
+            source: { type: 'player', playerId: command.playerId },
+            targetBattlefieldId: laneId,
             monsterTypeId: command.monsterTypeId,
             hp: monsterDef.hp,
             shield: monsterDef.shield,
@@ -1181,8 +1228,8 @@ function processIncome(state: SimulationState): { state: SimulationState; events
 const WAVE_INTERVAL_TICKS = 200 as const; // Every 10 seconds at 20 TPS
 
 /**
- * Advance the wave scheduler and spawn wave monsters.
- * Wave monsters spawn from the system and target both lanes simultaneously.
+ * Advance the wave scheduler and spawn wave monsters on each battlefield.
+ * Wave definitions are shared globally (fair); spawn runtime is per-battlefield (independent).
  * Called every tick during RUNNING phase.
  */
 function processWaveScheduler(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
@@ -1193,59 +1240,89 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
   }
 
   const runningTicks = state.tick - state.runningStartedAtTick;
-  const newState = { ...state, waveScheduler: { ...state.waveScheduler } };
+  const newState: SimulationState = {
+    ...state,
+    waveScheduler: {
+      ...state.waveScheduler,
+      battlefields: {
+        p1: { ...state.waveScheduler.battlefields.p1 },
+        p2: { ...state.waveScheduler.battlefields.p2 },
+      },
+    },
+  };
   newState.waveScheduler.ticksSinceRunningStart = runningTicks;
 
-  // Check if it's time to start a new wave (every WAVE_INTERVAL_TICKS)
-  const ticksSinceLastWave = runningTicks % WAVE_INTERVAL_TICKS;
-  if (ticksSinceLastWave === 0 && runningTicks > 0) {
-    const waveNumber = Math.floor(runningTicks / WAVE_INTERVAL_TICKS);
-    const waveIndex = waveNumber - 1;
+  // Wave number: ticks 1-200 = Wave 1, 201-400 = Wave 2, etc.
+  // (runningTicks - 1) ensures Wave 1 starts immediately at the first running tick.
+  const newWaveNumber = Math.floor((runningTicks - 1) / WAVE_INTERVAL_TICKS) + 1;
+  const prevWaveNumber = state.waveScheduler.currentWaveNumber;
+  // Start a new wave when the computed wave number is greater than what we had.
+  // Wave 1 fires immediately (newWaveNumber=1 > prevWaveNumber=0).
+  if (newWaveNumber > prevWaveNumber && prevWaveNumber >= 0) {
+    const waveIndex = newWaveNumber - 1;
     if (waveIndex >= 0 && waveIndex < WAVE_DEFINITIONS.length) {
       const waveDef = WAVE_DEFINITIONS[waveIndex];
       if (waveDef) {
-        const totalMonsters = waveDef.groups.reduce((sum, g) => sum + g.count, 0) * 2;
+        // Initialize both battlefields to start the new wave (spawn immediately, cooldown=0)
         newState.waveScheduler = {
           ...newState.waveScheduler,
-          currentWaveNumber: waveNumber,
-          currentWaveIndex: waveIndex,
-          ticksUntilNextSpawn: 0,
-          remainingGroupCount: totalMonsters,
-          waveActive: true,
-          currentGroupIndex: 0,
-          currentGroupSpawned: 0,
+          currentWaveNumber: newWaveNumber,
+          battlefields: {
+            p1: {
+              currentWaveIndex: waveIndex,
+              currentGroupIndex: 0,
+              currentGroupSpawned: 0,
+              ticksUntilNextSpawn: 0,
+              waveSpawnCooldownTicks: 0,
+              spawningCompleted: false,
+            },
+            p2: {
+              currentWaveIndex: waveIndex,
+              currentGroupIndex: 0,
+              currentGroupSpawned: 0,
+              ticksUntilNextSpawn: 0,
+              waveSpawnCooldownTicks: 0,
+              spawningCompleted: false,
+            },
+          },
         };
         const waveStartEvent: WaveStartedEvent = {
           type: 'wave_started',
           tick: state.tick,
-          waveNumber,
+          waveNumber: newWaveNumber,
         };
         events.push(waveStartEvent);
       }
     }
   }
 
-  // Spawn monsters if a wave is active and it's time to spawn
-  if (
-    newState.waveScheduler.waveActive &&
-    newState.waveScheduler.ticksUntilNextSpawn === 0 &&
-    newState.waveScheduler.currentWaveIndex >= 0
-  ) {
-    const waveDef = WAVE_DEFINITIONS[newState.waveScheduler.currentWaveIndex];
-    if (waveDef) {
-      const groupIdx = newState.waveScheduler.currentGroupIndex;
-      const groupSpawned = newState.waveScheduler.currentGroupSpawned;
-      const currentGroup = waveDef.groups[groupIdx];
+  // Spawn monsters on each battlefield independently
+  for (const battlefieldId of ['p1', 'p2'] as const) {
+    const bfState = newState.waveScheduler.battlefields[battlefieldId];
+    const laneId: LaneId = battlefieldId === 'p1' ? 'lane_p1' : 'lane_p2';
+    const lane = newState.lanes[laneId];
 
-      if (currentGroup && groupSpawned < currentGroup.count) {
-        const baseDef = getWaveMonsterDefinition(currentGroup.monsterType);
-        const scaled = scaleWaveMonster(currentGroup.monsterType, currentGroup.difficultyMultiplier);
+    // Decrement wave spawn cooldown (but not below 0 — 0 means "ready to spawn")
+    if (bfState.waveSpawnCooldownTicks > 0) {
+      bfState.waveSpawnCooldownTicks--;
+    }
 
-        // Spawn one monster per lane
-        for (const laneId of ['lane_p1', 'lane_p2'] as const) {
+    // Spawn if cooldown reached zero and wave is active
+    if (bfState.waveSpawnCooldownTicks === 0 && bfState.currentWaveIndex >= 0 && !bfState.spawningCompleted) {
+      const waveDef = WAVE_DEFINITIONS[bfState.currentWaveIndex];
+      if (waveDef) {
+        const groupIdx = bfState.currentGroupIndex;
+        const groupSpawned = bfState.currentGroupSpawned;
+        const currentGroup = waveDef.groups[groupIdx];
+
+        if (currentGroup && groupSpawned < currentGroup.count) {
+          const baseDef = getWaveMonsterDefinition(currentGroup.monsterType);
+          const scaled = scaleWaveMonster(currentGroup.monsterType, currentGroup.difficultyMultiplier);
+
           const monster: MonsterRuntimeState = {
             entityId: newState.nextEntityId++,
-            ownerId: 'system' as PlayerSlot,
+            source: { type: 'wave', waveNumber: newState.waveScheduler.currentWaveNumber },
+            battlefieldId: laneId,
             monsterTypeId: scaled.monsterTypeId,
             hp: scaled.hp,
             shield: scaled.shield,
@@ -1257,14 +1334,14 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
             leakDamage: scaled.leakDamage,
             movementType: baseDef.movementType,
             tags: baseDef.tags,
-            routeWaypoints: newState.lanes[laneId].waypoints,
-            routeSegments: newState.lanes[laneId].segments,
-            routeTotalPathLength: newState.lanes[laneId].totalPathLength,
+            routeWaypoints: lane.waypoints,
+            routeSegments: lane.segments,
+            routeTotalPathLength: lane.totalPathLength,
           };
 
           newState.lanes[laneId] = {
-            ...newState.lanes[laneId],
-            monsters: [...newState.lanes[laneId].monsters, monster],
+            ...lane,
+            monsters: [...lane.monsters, monster],
           };
 
           const spawnEvent: WaveMonsterSpawnedEvent = {
@@ -1273,41 +1350,50 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
             waveNumber: newState.waveScheduler.currentWaveNumber,
             monsterEntityId: monster.entityId,
             monsterType: scaled.monsterTypeId,
+            battlefieldId,
           };
           events.push(spawnEvent);
-        }
 
-        newState.waveScheduler.currentGroupSpawned = groupSpawned + 1;
-        newState.waveScheduler.remainingGroupCount -= 2;
-        newState.waveScheduler.ticksUntilNextSpawn = 20;
+          bfState.currentGroupSpawned = groupSpawned + 1;
 
-        if (newState.waveScheduler.currentGroupSpawned >= currentGroup.count) {
-          newState.waveScheduler.currentGroupIndex = groupIdx + 1;
-          newState.waveScheduler.currentGroupSpawned = 0;
-        }
+          if (bfState.currentGroupSpawned >= currentGroup.count) {
+            // Group complete — advance to next group
+            let nextIdx = groupIdx + 1;
+            while (nextIdx < waveDef.groups.length) {
+              const nextGroup = waveDef.groups[nextIdx];
+              if (nextGroup && nextGroup.count > 0) break;
+              nextIdx++;
+            }
+            bfState.currentGroupIndex = nextIdx;
+            bfState.currentGroupSpawned = 0;
 
-        if (newState.waveScheduler.remainingGroupCount <= 0) {
-          newState.waveScheduler.waveActive = false;
+            if (nextIdx >= waveDef.groups.length) {
+              // All groups done — mark complete
+              bfState.spawningCompleted = true;
+              const waveEndEvent: WaveEndedEvent = {
+                type: 'wave_ended',
+                tick: state.tick,
+                waveNumber: newState.waveScheduler.currentWaveNumber,
+                battlefieldId,
+              };
+              events.push(waveEndEvent);
+            } else {
+              // Next group starts immediately (set to 1 → next tick decrement to 0 → spawn)
+              bfState.waveSpawnCooldownTicks = 1;
+            }
+          } else {
+            // Next monster in same group spawns after 20 ticks (set to 21 → decrement 20→1 → 0 → spawn, net 20 tick gap)
+            bfState.waveSpawnCooldownTicks = 21;
+          }
+        } else {
+          bfState.spawningCompleted = true;
           const waveEndEvent: WaveEndedEvent = {
             type: 'wave_ended',
             tick: state.tick,
             waveNumber: newState.waveScheduler.currentWaveNumber,
+            battlefieldId,
           };
           events.push(waveEndEvent);
-        }
-      } else {
-        let nextIdx = groupIdx + 1;
-        while (nextIdx < waveDef.groups.length) {
-          const nextGroup = waveDef.groups[nextIdx];
-          if (nextGroup && nextGroup.count > 0) break;
-          nextIdx++;
-        }
-        newState.waveScheduler.currentGroupIndex = nextIdx;
-        newState.waveScheduler.currentGroupSpawned = 0;
-
-        if (nextIdx >= waveDef.groups.length) {
-          newState.waveScheduler.waveActive = false;
-          newState.waveScheduler.remainingGroupCount = 0;
         }
       }
     }
@@ -1505,7 +1591,8 @@ class SimulationImpl implements Simulation {
       for (const monster of lane.monsters) {
         const canonicalMonster: MonsterState = {
           id: monster.entityId,
-          ownerId: monster.ownerId,
+          source: monster.source,
+          battlefieldId: monster.battlefieldId,
           hp: monster.hp,
           shield: monster.shield,
           pathProgressMilliTiles: monster.pathProgressMilliTiles,
@@ -1574,6 +1661,7 @@ export function createSimulation(
 function createEmptyLane(laneId: LaneId, defenderId: PlayerSlot, attackerId: PlayerSlot): LaneRuntimeState {
   return {
     laneId,
+    battlefieldId: laneId,
     defenderId,
     attackerId,
     waypoints: [],

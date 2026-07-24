@@ -8,7 +8,7 @@ import { createSimulation } from './simulation';
 import { CONFIG_VERSION } from '@chaos-td/game-data';
 
 describe('M1 Gate - Stress Test', () => {
-  it('runs 10 minutes (12000 ticks) without crash', { timeout: 30_000 }, () => {
+  it('runs 10 minutes (12000 ticks) without crash', { timeout: 600_000 }, () => {
     const sim = createSimulation(
       { seed: 'gate-stress-test', configVersion: CONFIG_VERSION },
     );

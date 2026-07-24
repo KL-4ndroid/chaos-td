@@ -8,7 +8,7 @@
  * Events do not accumulate internally.
  */
 
-import type { Phase, PlayerSlot } from './canonical';
+import type { Phase, PlayerSlot, MonsterSource } from './canonical';
 
 export type DomainEvent =
   | CommandAcceptedEvent
@@ -106,7 +106,8 @@ export interface MonsterQueuedEvent {
 export interface MonsterSpawnedEvent {
   type: 'monster_spawned';
   tick: number;
-  playerId: PlayerSlot;
+  /** Source of this monster; undefined for wave monsters (use wave_monster_spawned) */
+  source: MonsterSource;
   monsterEntityId: number;
   monsterType: string;
 }
@@ -114,7 +115,8 @@ export interface MonsterSpawnedEvent {
 export interface MonsterDiedEvent {
   type: 'monster_died';
   tick: number;
-  playerId: PlayerSlot;
+  source: MonsterSource;
+  defenderId: PlayerSlot;
   monsterEntityId: number;
   killerPlayerId: PlayerSlot | null;
 }
@@ -122,7 +124,7 @@ export interface MonsterDiedEvent {
 export interface MonsterLeakedEvent {
   type: 'monster_leaked';
   tick: number;
-  ownerId: PlayerSlot;
+  source: MonsterSource;
   defenderId: PlayerSlot;
   monsterEntityId: number;
   leakDamage: number;
@@ -162,7 +164,7 @@ export interface SlowAppliedEvent {
 // Wave System Events
 // ============================================================================
 
-/** Emitted when a new wave begins. */
+/** Emitted when a new wave begins. Wave is shared globally but both battlefields use the same wave number. */
 export interface WaveStartedEvent {
   type: 'wave_started';
   tick: number;
@@ -171,7 +173,7 @@ export interface WaveStartedEvent {
 
 /**
  * Emitted when a wave monster spawns.
- * ownerId is the system lane the monster belongs to (the lane being defended).
+ * battlefieldId: which battlefield this monster occupies.
  */
 export interface WaveMonsterSpawnedEvent {
   type: 'wave_monster_spawned';
@@ -179,11 +181,16 @@ export interface WaveMonsterSpawnedEvent {
   waveNumber: number;
   monsterEntityId: number;
   monsterType: string;
+  battlefieldId: PlayerSlot;
 }
 
-/** Emitted when all groups in a wave have finished spawning. */
+/**
+ * Emitted when all groups in a wave have finished spawning on a battlefield.
+ * Each battlefield emits its own wave_ended event independently.
+ */
 export interface WaveEndedEvent {
   type: 'wave_ended';
   tick: number;
   waveNumber: number;
+  battlefieldId: PlayerSlot;
 }

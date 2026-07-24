@@ -15,6 +15,7 @@
 export type {
   PlayerSlot,
   LaneId,
+  BattlefieldId,
   TowerId,
   MonsterId,
   MapId,
@@ -37,6 +38,8 @@ export type {
   WaveGroup,
   WaveDefinition,
   WaveRuntimeState,
+  BattlefieldWaveRuntime,
+  MonsterSource,
   AiDifficulty,
   AiPersonality,
   AiCellPriority,
