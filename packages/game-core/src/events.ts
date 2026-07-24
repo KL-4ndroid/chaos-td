@@ -26,7 +26,10 @@ export type DomainEvent =
   | AttackFiredEvent
   | DamageAppliedEvent
   | ShieldBrokenEvent
-  | SlowAppliedEvent;
+  | SlowAppliedEvent
+  | WaveStartedEvent
+  | WaveMonsterSpawnedEvent
+  | WaveEndedEvent;
 
 export interface CommandAcceptedEvent {
   type: 'command_accepted';
@@ -153,4 +156,34 @@ export interface SlowAppliedEvent {
   monsterEntityId: number;
   slowPermille: number;
   durationTicks: number;
+}
+
+// ============================================================================
+// Wave System Events
+// ============================================================================
+
+/** Emitted when a new wave begins. */
+export interface WaveStartedEvent {
+  type: 'wave_started';
+  tick: number;
+  waveNumber: number;
+}
+
+/**
+ * Emitted when a wave monster spawns.
+ * ownerId is the system lane the monster belongs to (the lane being defended).
+ */
+export interface WaveMonsterSpawnedEvent {
+  type: 'wave_monster_spawned';
+  tick: number;
+  waveNumber: number;
+  monsterEntityId: number;
+  monsterType: string;
+}
+
+/** Emitted when all groups in a wave have finished spawning. */
+export interface WaveEndedEvent {
+  type: 'wave_ended';
+  tick: number;
+  waveNumber: number;
 }

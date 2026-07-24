@@ -245,7 +245,7 @@ export const AI_BUILD_PRIORITY_CELLS: readonly { cellX: number; cellY: number }[
  * Calculate expected damage reduction from a tower
  */
 export function calculateExpectedDamageReduction(
-  towerType: string,
+  _towerType: string,
   cooldownTicks: number,
   damage: number,
   monstersInRange: number,

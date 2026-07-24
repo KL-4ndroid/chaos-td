@@ -169,9 +169,26 @@ export function validateTowerDefinition(tower: unknown): ValidationResult {
     errors.push(createError('TOWER_ROLE_INVALID', `Invalid tower role: ${t['role']}`, `towers.${towerId}.role`));
   }
 
-  const validTargeting = ['first', 'strong'];
+  const validTargeting = ['first', 'strong', 'boss'];
   if (!validTargeting.includes(t['targeting'] as string)) {
     errors.push(createError('TOWER_TARGETING_INVALID', `Invalid tower targeting: ${t['targeting']}`, `towers.${towerId}.targeting`));
+  }
+
+  const attackTargets = t['attackTargets'];
+  if (!Array.isArray(attackTargets)) {
+    errors.push(createError('TOWER_ATTACK_TARGETS_INVALID', 'attackTargets must be an array', `towers.${towerId}.attackTargets`));
+  } else {
+    const validTargets = ['ground', 'flying'];
+    for (let i = 0; i < attackTargets.length; i++) {
+      if (!validTargets.includes(attackTargets[i] as string)) {
+        errors.push(createError('TOWER_ATTACK_TARGET_INVALID', `Invalid attack target: ${attackTargets[i]}`, `towers.${towerId}.attackTargets[${i}]`));
+      }
+    }
+  }
+
+  const validDamageTypes = ['physical', 'magic', 'pure'];
+  if (!validDamageTypes.includes(t['damageType'] as string)) {
+    errors.push(createError('TOWER_DAMAGE_TYPE_INVALID', `Invalid damage type: ${t['damageType']}`, `towers.${towerId}.damageType`));
   }
 
   const levels = t['levels'];
@@ -297,6 +314,28 @@ export function validateMonsterDefinition(monster: unknown): ValidationResult {
   const gap = m['spawnGapTicks'];
   if (typeof gap !== 'number' || gap <= 0) {
     errors.push(createError('MONSTER_SPAWN_GAP_INVALID', 'spawnGapTicks must be positive', `monsters.${monsterId}.spawnGapTicks`));
+  }
+
+  const validMovementTypes = ['ground', 'flying'];
+  if (!validMovementTypes.includes(m['movementType'] as string)) {
+    errors.push(createError('MONSTER_MOVEMENT_TYPE_INVALID', `Invalid movementType: ${m['movementType']}`, `monsters.${monsterId}.movementType`));
+  }
+
+  const validTargetPreferences = ['base', 'tower', 'closest'];
+  if (!validTargetPreferences.includes(m['targetPreference'] as string)) {
+    errors.push(createError('MONSTER_TARGET_PREF_INVALID', `Invalid targetPreference: ${m['targetPreference']}`, `monsters.${monsterId}.targetPreference`));
+  }
+
+  const tags = m['tags'];
+  if (!Array.isArray(tags)) {
+    errors.push(createError('MONSTER_TAGS_INVALID', 'tags must be an array', `monsters.${monsterId}.tags`));
+  } else {
+    const validTags = ['boss', 'siege', 'swift', 'magic_resist', 'physical_resist'];
+    for (let i = 0; i < tags.length; i++) {
+      if (!validTags.includes(tags[i] as string)) {
+        errors.push(createError('MONSTER_TAG_INVALID', `Invalid monster tag: ${tags[i]}`, `monsters.${monsterId}.tags[${i}]`));
+      }
+    }
   }
 
   return createResult(errors);

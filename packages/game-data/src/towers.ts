@@ -3,6 +3,12 @@
  *
  * Authoritative tower definitions for MVP.
  * All values derived from docs/03_BALANCE_BASELINE.md
+ *
+ * Targeting:
+ * - attackTargets: which MovementTypes this tower can engage (ground, flying, or both).
+ * - damageType: 'physical' respects armor; 'magic' respects magic_resist; 'pure' ignores all resists.
+ * - bonusDamage: additional multiplier applied to base damage when the primary target carries
+ *   the matching MonsterTag (e.g. anti-boss sniper gets bonus vs 'boss' tagged monsters).
  */
 
 import type { TowerDefinition } from './types.js';
@@ -15,7 +21,8 @@ import type { TowerDefinition } from './types.js';
  */
 
 // ============================================================================
-// Archer Tower - FIRST targeting, single target
+// Archer Tower - FIRST targeting, single target, physical damage
+// AttackTargets: ground only. Low cost, reliable single-target damage.
 // ============================================================================
 
 export const ARCHER_TOWER: TowerDefinition = Object.freeze({
@@ -23,6 +30,8 @@ export const ARCHER_TOWER: TowerDefinition = Object.freeze({
   displayName: 'Archer',
   role: 'single_target',
   targeting: 'first',
+  attackTargets: ['ground'] as const,
+  damageType: 'physical',
   levels: Object.freeze([
     Object.freeze({
       cost: 120,
@@ -46,7 +55,8 @@ export const ARCHER_TOWER: TowerDefinition = Object.freeze({
 });
 
 // ============================================================================
-// Mage Tower - FIRST targeting, splash damage
+// Mage Tower - FIRST targeting, splash damage, magic damage
+// AttackTargets: ground + flying. Splash hits all nearby. High damage.
 // ============================================================================
 
 export const MAGE_TOWER: TowerDefinition = Object.freeze({
@@ -54,6 +64,8 @@ export const MAGE_TOWER: TowerDefinition = Object.freeze({
   displayName: 'Mage',
   role: 'splash',
   targeting: 'first',
+  attackTargets: ['ground', 'flying'] as const,
+  damageType: 'magic',
   levels: Object.freeze([
     Object.freeze({
       cost: 180,
@@ -83,7 +95,8 @@ export const MAGE_TOWER: TowerDefinition = Object.freeze({
 });
 
 // ============================================================================
-// Frost Tower - FIRST targeting, slow effect
+// Frost Tower - FIRST targeting, slow effect, physical damage
+// AttackTargets: ground only. Low damage but applies slow to clusters.
 // ============================================================================
 
 export const FROST_TOWER: TowerDefinition = Object.freeze({
@@ -91,6 +104,8 @@ export const FROST_TOWER: TowerDefinition = Object.freeze({
   displayName: 'Frost',
   role: 'slow',
   targeting: 'first',
+  attackTargets: ['ground'] as const,
+  damageType: 'physical',
   levels: Object.freeze([
     Object.freeze({
       cost: 150,
@@ -123,7 +138,9 @@ export const FROST_TOWER: TowerDefinition = Object.freeze({
 });
 
 // ============================================================================
-// Sniper Tower - STRONG targeting, heavy single target damage
+// Sniper Tower - STRONG targeting, heavy single target, pure damage
+// AttackTargets: ground + flying. Pure damage bypasses all resists.
+// Bonus vs boss targets. Long cooldown, very high burst damage.
 // ============================================================================
 
 export const SNIPER_TOWER: TowerDefinition = Object.freeze({
@@ -131,24 +148,32 @@ export const SNIPER_TOWER: TowerDefinition = Object.freeze({
   displayName: 'Sniper',
   role: 'heavy_hit',
   targeting: 'strong',
+  attackTargets: ['ground', 'flying'] as const,
+  damageType: 'pure',
   levels: Object.freeze([
     Object.freeze({
       cost: 260,
       damage: 95,
       cooldownTicks: 48,
       rangeMilliTiles: 5500,
+      bonusDamagePermille: 1500,   // +50% vs boss
+      bonusDamageTag: 'boss',
     }),
     Object.freeze({
       cost: 330,
       damage: 165,
       cooldownTicks: 44,
       rangeMilliTiles: 5800,
+      bonusDamagePermille: 1500,
+      bonusDamageTag: 'boss',
     }),
     Object.freeze({
       cost: 500,
       damage: 285,
       cooldownTicks: 40,
       rangeMilliTiles: 6200,
+      bonusDamagePermille: 1500,
+      bonusDamageTag: 'boss',
     }),
   ]),
 });

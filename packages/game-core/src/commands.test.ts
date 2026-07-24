@@ -90,8 +90,8 @@ describe('Build Tower Command', () => {
 
     expect(sim.state.players.p1.gold).toBe(initialGold - 120);
     expect(sim.state.towers).toHaveLength(1);
-    expect(sim.state.towers[0].towerTypeId).toBe('archer');
-    expect(sim.state.towers[0].level).toBe(1);
+    expect(sim.state.towers[0]?.towerTypeId).toBe('archer');
+    expect(sim.state.towers[0]?.level).toBe(1);
   });
 
   it('rejects insufficient gold', () => {
@@ -149,12 +149,12 @@ describe('Upgrade Tower Command', () => {
     sim.step();
 
     const goldAfterBuild = sim.state.players.p1.gold;
-    const towerId = sim.state.towers[0].entityId;
+    const towerId = sim.state.towers[0]?.entityId ?? 0;
 
     sim.submitCommand(makeUpgradeTower('p1', towerId, 1));
     sim.step();
 
-    expect(sim.state.towers[0].level).toBe(2);
+    expect(sim.state.towers[0]?.level).toBe(2);
     expect(sim.state.players.p1.gold).toBe(goldAfterBuild - 160);
   });
 
@@ -165,7 +165,7 @@ describe('Upgrade Tower Command', () => {
     sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
-    const towerId = sim.state.towers[0].entityId;
+    const towerId = sim.state.towers[0]?.entityId ?? 0;
 
     // Upgrade to level 2
     sim.submitCommand(makeUpgradeTower('p1', towerId, 1));
@@ -175,7 +175,7 @@ describe('Upgrade Tower Command', () => {
     sim.submitCommand(makeUpgradeTower('p1', towerId, 2));
     sim.step();
 
-    expect(sim.state.towers[0].level).toBe(3);
+    expect(sim.state.towers[0]?.level).toBe(3);
 
     // Try to upgrade past max
     sim.submitCommand(makeUpgradeTower('p1', towerId, 3));
@@ -197,7 +197,7 @@ describe('Upgrade Tower Command', () => {
     sim.submitCommand(makeBuildTower('p1', 'archer', 6, 15, 3));
     sim.step();
 
-    const towerId = sim.state.towers[0].entityId;
+    const towerId = sim.state.towers[0]?.entityId ?? 0;
     const goldBefore = sim.state.players.p1.gold;
 
     sim.submitCommand(makeUpgradeTower('p1', towerId, 4));
@@ -217,7 +217,7 @@ describe('Sell Tower Command', () => {
     sim.step();
 
     const goldAfterBuild = sim.state.players.p1.gold;
-    const towerId = sim.state.towers[0].entityId;
+    const towerId = sim.state.towers[0]?.entityId ?? 0;
 
     sim.submitCommand(makeSellTower('p1', towerId, 1));
     sim.step();
@@ -234,14 +234,14 @@ describe('Sell Tower Command', () => {
     sim.submitCommand(makeBuildTower('p1', 'archer', 3, 15, 0));
     sim.step();
 
-    const towerId = sim.state.towers[0].entityId;
+    const towerId = sim.state.towers[0]?.entityId ?? 0;
 
     sim.submitCommand(makeUpgradeTower('p1', towerId, 1));
     sim.step();
 
     const afterUpgrade = {
-      level: sim.state.towers[0].level,
-      invested: sim.state.towers[0].totalInvested,
+      level: sim.state.towers[0]?.level,
+      invested: sim.state.towers[0]?.totalInvested,
       gold: sim.state.players.p1.gold,
     };
 

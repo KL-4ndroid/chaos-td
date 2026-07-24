@@ -5,7 +5,7 @@
  */
 
 import type { PlayerSlot } from './canonical';
-import type { TowerId, TowerTargeting } from '@chaos-td/game-data';
+import type { TowerId } from '@chaos-td/game-data';
 
 export type TowerLevel = 1 | 2 | 3;
 
@@ -59,19 +59,31 @@ export function createTowerState(
  * Returns comparison result for sorting: negative if a has higher priority.
  */
 export function compareTargetPriority(
-  a: { entityId: number; pathProgressMilliTiles: number; hp: number; shield: number },
-  b: { entityId: number; pathProgressMilliTiles: number; hp: number; shield: number },
-  targeting: TowerTargeting,
+  a: { entityId: number; pathProgressMilliTiles: number; hp: number; shield: number; tags: readonly string[] },
+  b: { entityId: number; pathProgressMilliTiles: number; hp: number; shield: number; tags: readonly string[] },
+  targeting: 'first' | 'strong' | 'boss',
 ): number {
   switch (targeting) {
     case 'first':
-      // FIRST: Highest progress first
       if (a.pathProgressMilliTiles !== b.pathProgressMilliTiles) {
         return b.pathProgressMilliTiles - a.pathProgressMilliTiles;
       }
       break;
     case 'strong': {
-      // STRONG: Highest HP+Shield first
+      const aTotal = a.hp + a.shield;
+      const bTotal = b.hp + b.shield;
+      if (aTotal !== bTotal) {
+        return bTotal - aTotal;
+      }
+      break;
+    }
+    case 'boss': {
+      const aIsBoss = a.tags.includes('boss');
+      const bIsBoss = b.tags.includes('boss');
+      if (aIsBoss !== bIsBoss) {
+        return aIsBoss ? -1 : 1;
+      }
+      // Fall back to STRONG priority within same category
       const aTotal = a.hp + a.shield;
       const bTotal = b.hp + b.shield;
       if (aTotal !== bTotal) {

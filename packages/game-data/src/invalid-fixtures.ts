@@ -232,6 +232,9 @@ export const INVALID_MONSTER_SPEED_ZERO: MonsterDefinition = {
   leakDamage: 1,
   availableAtRunningTick: 0,
   spawnGapTicks: 9,
+  movementType: 'ground',
+  targetPreference: 'closest',
+  tags: [],
 };
 
 export const INVALID_MONSTER_ARMOR_OOB: MonsterDefinition = {
@@ -247,6 +250,9 @@ export const INVALID_MONSTER_ARMOR_OOB: MonsterDefinition = {
   leakDamage: 1,
   availableAtRunningTick: 600,
   spawnGapTicks: 10,
+  movementType: 'ground',
+  targetPreference: 'closest',
+  tags: [],
 };
 
 export const INVALID_MONSTER_NEGATIVE_COST: MonsterDefinition = {
@@ -262,6 +268,9 @@ export const INVALID_MONSTER_NEGATIVE_COST: MonsterDefinition = {
   leakDamage: 2,
   availableAtRunningTick: 1800,
   spawnGapTicks: 14,
+  movementType: 'ground',
+  targetPreference: 'closest',
+  tags: [],
 };
 
 export const INVALID_MONSTER_SPAWN_GAP_ZERO: MonsterDefinition = {
@@ -277,6 +286,9 @@ export const INVALID_MONSTER_SPAWN_GAP_ZERO: MonsterDefinition = {
   leakDamage: 2,
   availableAtRunningTick: 3000,
   spawnGapTicks: 0, // INVALID: must be > 0
+  movementType: 'flying',
+  targetPreference: 'closest',
+  tags: [],
 };
 
 // ============================================================================

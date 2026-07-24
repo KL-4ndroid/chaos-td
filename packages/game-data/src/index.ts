@@ -21,15 +21,22 @@ export type {
   EntityId,
   GridCell,
   FixedPointPosition,
-  ConfigVersion,
-  TowerLevelDefinition,
-  TowerDefinition,
+  MovementType,
+  MonsterTag,
+  DamageType,
+  AttackTarget,
   TowerRole,
   TowerTargeting,
+  TowerLevelDefinition,
+  TowerDefinition,
   MonsterDefinition,
   LaneDefinition,
   MapDefinition,
   GlobalConfig,
+  WaveMonsterType,
+  WaveGroup,
+  WaveDefinition,
+  WaveRuntimeState,
   AiDifficulty,
   AiPersonality,
   AiCellPriority,
@@ -98,6 +105,25 @@ export {
   DIFFICULTY_MULTIPLIERS,
   PERSONALITY_TRAITS,
 } from './ai-config.js';
+
+// ============================================================================
+// Wave System Data
+// ============================================================================
+
+export {
+  WAVE_DEFINITIONS,
+  generateWaveDefinitions,
+} from './waveData.js';
+
+// ============================================================================
+// Wave Monster Stats
+// ============================================================================
+
+export {
+  WAVE_MONSTER_ID,
+  getWaveMonsterDefinition,
+  scaleWaveMonster,
+} from './waveMonsters.js';
 
 // ============================================================================
 // Validation

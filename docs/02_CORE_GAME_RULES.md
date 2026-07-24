@@ -156,6 +156,57 @@ MVP：Sheep、Wolf、Treant、Ghost。
 - 規則攻擊採 Hitscan，沒有規則 Projectile。
 - Client 視覺 Projectile 可完成或淡出，但不改變 State。
 
+### Movement Type and Targeting
+
+塔攻擊前須確認怪物 `movementType` 是否在塔的 `attackTargets` 清單內。`attackTargets` 為空陣列時，塔無法攻擊任何怪物。
+
+- `attackTargets: ['ground']`：只可攻擊地面怪（如 Sheep、Wolf、Treant）。
+- `attackTargets: ['flying']`：只可攻擊飛行怪（如 Ghost）。
+- `attackTargets: ['ground', 'flying']`：兩者皆可。
+
+飛行怪（`movementType: 'flying'`）使用與地面怪獨立的 Elevated Path，兩種路徑起點終點相同，但中間座標不同；飛行怪無視地形障礙。
+
+### 抗性與傷害計算
+
+最終 HP 傷害計算順序（Shield → Armor → Resist → Bonus）：
+
+```text
+1. rawDamage = level.damage
+2. 若 primary target 有 bonusDamageTag 且等於 level.bonusDamageTag：
+      rawDamage = floor(rawDamage × (1000 + bonusDamagePermille) / 1000)
+3. 根據 damageType 套用抗性：
+      physical_resist  tag → damageType === 'physical' 時，armorMultiplierPermille 生效
+      magic_resist     tag → damageType === 'magic'    時，armorMultiplierPermille 生效
+      pure 伤害类型 → 忽略所有抗性
+4. armorMultiplierPermille = 1000 - clamp(armorPermille, 0, 800)
+5. finalHpDamage = max(1, floor(rawDamage × armorMultiplierPermille / 1000))
+```
+
+Shield 先扣，Armor 不影響 Shield，溢出 Damage 再套 Armor。
+
+### Monster AI Behavior
+
+當怪物在塔攻擊範圍內時：
+
+- `targetPreference: 'base'`：忽略塔繼續前進。
+- `targetPreference: 'tower'`：若場上有塔在範圍內，停下來攻擊塔（攻城怪行為）；否則繼續前進。
+- `targetPreference: 'closest'`：普通怪物無視塔，繼續沿路徑前進。
+
+MVP 不含「怪物主動攻擊塔造成塔損壞」的規則。
+
+### Wave System
+
+自動波次由 `WaveScheduler` 管理，讀取 `packages/game-data` 提供的 `WaveDefinition[]`。波次由系統（而非玩家）觸發，怪物屬於「系統陣營」。
+
+波次生成規則：
+- 第 1 波：僅 Basic 怪物。
+- 每 5 波（第 5, 10, 15…波）：加入 Swift 怪物。
+- 每 10 波（第 10, 20, 30…波）：加入 Siege + Boss 怪物。
+- 第 6 波起每 6 波：加入 Flying 怪物。
+- 難度倍率：每 5 波 +5%。
+
+波次系統生成的怪物視為「自動怪物」，視覺呈現上與玩家 `queue_monster` 的怪物相同，但歸屬於系統結算。兩者共享同一 Lane 的 HP／路徑。
+
 ## 10. Damage
 
 ### Hitscan
@@ -187,6 +238,7 @@ finalHpDamage = max(1, floor(rawDamage × armorMultiplierPermille / 1000))
 - LAST：Progress 最低。
 - STRONG：`HP + Shield` 最高。
 - WEAK：`HP + Shield` 最低。
+- BOSS：優先選擇攜帶 `boss` 標籤的怪物；次高優選取決於塔的次要 targeting 策略。
 
 MVP：
 

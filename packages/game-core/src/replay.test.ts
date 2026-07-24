@@ -22,10 +22,9 @@ describe('Replay System', () => {
     tick: 100,
     playerId: 'p1',
     towerEntityId: 1,
-    towerTypeId: 'archer',
+    towerType: 'archer',
     cellX: 3,
     cellY: 4,
-    cost: 120,
   } as const;
 
   describe('createReplayData', () => {

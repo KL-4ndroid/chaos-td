@@ -37,6 +37,8 @@ export interface MonsterState {
   pathProgressMilliTiles: number;
   routeWaypoints?: readonly { xMilliTiles: number; yMilliTiles: number }[];
   alive: boolean;
+  movementType: 'ground' | 'flying';
+  tags: readonly string[];
 }
 
 export interface MatchResult {
@@ -57,6 +59,7 @@ export interface CanonicalState {
   towers: TowerState[];
   monsters: MonsterState[];
   result: MatchResult | null;
+  waveCurrentWaveNumber: number;
 }
 
 // Explicit hash contract

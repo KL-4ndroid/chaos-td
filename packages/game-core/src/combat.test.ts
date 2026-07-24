@@ -32,6 +32,8 @@ function createMonster(
     pathProgressMilliTiles,
     speedMilliTilesPerTick,
     leakDamage: 1,
+    movementType: 'ground',
+    tags: [],
   };
 }
 
@@ -203,7 +205,7 @@ describe('Archer vs Sheep combat', () => {
       simulation.step();
     }
 
-    expect(simulation.state.stateHash).toBe('8f2931f1db7af2c4');
+    expect(simulation.state.stateHash).toBe('b1db1f169e4757a0');
   });
 });
 
@@ -221,6 +223,8 @@ function createTreant(entityId: number, pathProgressMilliTiles: number): Monster
     pathProgressMilliTiles,
     speedMilliTilesPerTick: 28,
     leakDamage: 2,
+    movementType: 'ground',
+    tags: ['physical_resist'],
   };
 }
 
@@ -237,6 +241,8 @@ function createGhost(entityId: number, pathProgressMilliTiles: number): MonsterR
     pathProgressMilliTiles,
     speedMilliTilesPerTick: 44,
     leakDamage: 2,
+    movementType: 'flying',
+    tags: ['magic_resist'],
   };
 }
 
@@ -254,35 +260,38 @@ describe('M3-003 Advanced Combat Mechanics', () => {
   });
 
   it('shield absorbs damage before HP', () => {
-    // Ghost has 95 shield, archer damage is 18
-    // Shield should absorb all damage, HP unchanged
-    const simulation = createCombatSimulation([createGhost(1, 1_000)]);
+    // Ghost has 95 shield. We use Mage (attacks flying) with damage 26.
+    // Shield should absorb 26 damage: 95 - 26 = 69, HP unchanged.
+    const simulation = createCombatSimulation([createGhost(1, 1_000)], 0, 0);
+    // Override tower with mage
+    simulation.state.towers[0] = createTowerState(100, 'p1', 'mage', 0, 0);
 
     const result = simulation.step();
 
-    // HP should still be 215 (shield absorbed 18 damage)
+    // HP should still be 215 (shield absorbed 26 damage)
     expect(result.state.lanes.lane_p1.monsters[0]?.hp).toBe(215);
-    expect(result.state.lanes.lane_p1.monsters[0]?.shield).toBe(77); // 95 - 18 = 77
+    expect(result.state.lanes.lane_p1.monsters[0]?.shield).toBe(69); // 95 - 26 = 69
   });
 
   it('shield depletes before HP takes damage', () => {
-    // Ghost has 95 shield. The archer has cooldown of 13 ticks.
-    // We need to wait for attacks to happen and check shield/HP changes.
-    const simulation = createCombatSimulation([createGhost(1, 1_000)]);
+    // Ghost has 95 shield. The mage has cooldown of 28 ticks.
+    const simulation = createCombatSimulation([createGhost(1, 1_000)], 0, 0);
+    // Override tower with mage
+    simulation.state.towers[0] = createTowerState(100, 'p1', 'mage', 0, 0);
 
-    // Attack 1: shield 95 -> 77
+    // Attack 1: shield 95 -> 69
     let result = simulation.step();
-    expect(result.state.lanes.lane_p1.monsters[0]?.shield).toBe(77);
+    expect(result.state.lanes.lane_p1.monsters[0]?.shield).toBe(69);
     expect(result.state.lanes.lane_p1.monsters[0]?.hp).toBe(215);
 
-    // Advance to next attack (cooldown = 13 ticks)
-    for (let i = 0; i < 12; i++) {
+    // Advance to next attack (cooldown = 28 ticks)
+    for (let i = 0; i < 27; i++) {
       simulation.step();
     }
 
-    // Attack 2: shield 77 -> 59
+    // Attack 2: shield 69 -> 43
     result = simulation.step();
-    expect(result.state.lanes.lane_p1.monsters[0]?.shield).toBe(59);
+    expect(result.state.lanes.lane_p1.monsters[0]?.shield).toBe(43);
     expect(result.state.lanes.lane_p1.monsters[0]?.hp).toBe(215);
   });
 
@@ -310,6 +319,8 @@ describe('M3-003 Advanced Combat Mechanics', () => {
       pathProgressMilliTiles: 1_000,
       speedMilliTilesPerTick: 28,
       leakDamage: 2,
+      movementType: 'ground',
+      tags: [],
     };
     const simulation = createCombatSimulation([tankyMonster]);
 

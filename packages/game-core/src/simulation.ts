@@ -45,7 +45,16 @@ import {
   type LaneId,
   type FixedPointPosition,
   type GridCell,
+  type MovementType,
+  type MonsterTag,
+  type DamageType,
+  type AttackTarget,
   MVP_MIRROR_01,
+} from '@chaos-td/game-data';
+import {
+  WAVE_DEFINITIONS,
+  getWaveMonsterDefinition,
+  scaleWaveMonster,
 } from '@chaos-td/game-data';
 import {
   hasReachedEnd,
@@ -58,6 +67,11 @@ import {
 } from './movement';
 import { compareTargetPriority, type TowerRuntimeState } from './tower';
 import type { GameCommand, CommandId } from './commands';
+import type {
+  WaveStartedEvent,
+  WaveMonsterSpawnedEvent,
+  WaveEndedEvent,
+} from './events';
 
 export interface MatchConfig {
   seed: string;
@@ -100,6 +114,10 @@ export interface MonsterSpawnParams {
   speedMilliTilesPerTick: number;
   leakDamage: number;
   spawnGapTicks: number;
+  /** Ground or flying — determines which towers can target this monster */
+  movementType: MovementType;
+  /** Tags used for resist checks and bonus damage */
+  tags: readonly MonsterTag[];
 }
 
 export interface MonsterRuntimeState {
@@ -119,6 +137,10 @@ export interface MonsterRuntimeState {
   routeWaypoints?: readonly FixedPointPosition[];
   routeSegments?: readonly PathSegment[];
   routeTotalPathLength?: number;
+  /** Ground or flying — used to filter which towers can attack this monster */
+  movementType: MovementType;
+  /** Tags for resist and bonus damage checks */
+  tags: readonly MonsterTag[];
 }
 
 export function calculateMonsterPosition(
@@ -130,6 +152,25 @@ export function calculateMonsterPosition(
     monster.routeSegments ?? lane.segments,
     monster.pathProgressMilliTiles,
   );
+}
+
+export interface WaveSchedulerState {
+  /** 1-based wave number, 0 = no active wave */
+  currentWaveNumber: number;
+  /** Index into WAVE_DEFINITIONS */
+  currentWaveIndex: number;
+  /** Remaining ticks until next monster spawn in current wave */
+  ticksUntilNextSpawn: number;
+  /** Remaining monsters to spawn in current wave (per lane) */
+  remainingGroupCount: number;
+  /** Is the current wave still active (spawning or monsters on field)? */
+  waveActive: boolean;
+  /** Ticks since RUNNING start, used for wave timing */
+  ticksSinceRunningStart: number;
+  /** Index of the current group being spawned within the wave */
+  currentGroupIndex: number;
+  /** How many monsters have been spawned from the current group */
+  currentGroupSpawned: number;
 }
 
 export interface SimulationState {
@@ -146,6 +187,7 @@ export interface SimulationState {
   nextCommandIdSequence: number;
   pendingCommands: GameCommand[];
   stateHash: string;
+  waveScheduler: WaveSchedulerState;
 }
 
 export interface StepResult {
@@ -174,6 +216,8 @@ function computeStateHash(state: SimulationState): string {
         shield: monster.shield,
         pathProgressMilliTiles: monster.pathProgressMilliTiles,
         alive: monster.hp > 0,
+        movementType: monster.movementType,
+        tags: monster.tags,
       };
       if (monster.routeWaypoints !== undefined) canonicalMonster.routeWaypoints = monster.routeWaypoints;
       monsters.push(canonicalMonster);
@@ -196,6 +240,7 @@ function computeStateHash(state: SimulationState): string {
     })),
     monsters,
     result: null,
+    waveCurrentWaveNumber: state.waveScheduler.currentWaveNumber,
   };
   return hashStateToString(canonical);
 }
@@ -204,6 +249,19 @@ function createInitialPlayers(): Record<PlayerSlot, PlayerBattleState> {
   return {
     p1: { playerId: 'p1', hp: INITIAL_HP, gold: INITIAL_GOLD, income: INITIAL_INCOME, totalInvested: 0 },
     p2: { playerId: 'p2', hp: INITIAL_HP, gold: INITIAL_GOLD, income: INITIAL_INCOME, totalInvested: 0 },
+  };
+}
+
+function createInitialWaveScheduler(): WaveSchedulerState {
+  return {
+    currentWaveNumber: 0,
+    currentWaveIndex: -1,
+    ticksUntilNextSpawn: 0,
+    remainingGroupCount: 0,
+    waveActive: false,
+    ticksSinceRunningStart: 0,
+    currentGroupIndex: 0,
+    currentGroupSpawned: 0,
   };
 }
 
@@ -226,6 +284,7 @@ function createSimulationState(
     nextCommandIdSequence: 0,
     pendingCommands: [],
     stateHash: '',
+    waveScheduler: createInitialWaveScheduler(),
   };
   state.stateHash = computeStateHash(state);
   return state;
@@ -293,6 +352,8 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
         routeWaypoints: newLane.waypoints,
         routeSegments: newLane.segments,
         routeTotalPathLength: newLane.totalPathLength,
+        movementType: spawn.movementType,
+        tags: spawn.tags,
       };
 
       newLane.monsters.push(monster);
@@ -364,8 +425,9 @@ function processMovement(state: SimulationState): { state: SimulationState; even
         }
       }
 
-      // Check if reached end
-      if (hasReachedEnd(monster.pathProgressMilliTiles, monster.routeTotalPathLength ?? newLane.totalPathLength)) {
+      // Check if reached end (skip if path length is 0, e.g. wave monsters on empty lane)
+      const pathLength = monster.routeTotalPathLength ?? newLane.totalPathLength;
+      if (pathLength > 0 && hasReachedEnd(monster.pathProgressMilliTiles, pathLength)) {
         // Process leak
         const leakDamage = monster.leakDamage;
         defenderHp -= leakDamage;
@@ -396,6 +458,56 @@ function processMovement(state: SimulationState): { state: SimulationState; even
   }
 
   return { state: newState, events };
+}
+
+/**
+ * Determine if a tower can attack a monster based on movementType.
+ */
+function canTowerAttackMonster(
+  attackTargets: readonly AttackTarget[],
+  monsterMovementType: MovementType,
+): boolean {
+  if (attackTargets.length === 0) return false;
+  return attackTargets.includes(monsterMovementType as AttackTarget);
+}
+
+/**
+ * Calculate post-resist HP damage for a single hit.
+ * Order: bonusDamage → resist (if applicable) → armor → floor → min(1, ...)
+ */
+function calculateDamage(
+  rawDamage: number,
+  towerDamageType: DamageType,
+  towerBonusTag: MonsterTag | undefined,
+  monsterTags: readonly MonsterTag[],
+  monsterArmorPermille: number,
+): number {
+  let damage = rawDamage;
+
+  // Step 1: Bonus damage if tower has a matching tag
+  if (towerBonusTag !== undefined && monsterTags.includes(towerBonusTag)) {
+    damage = Math.floor(damage * (1000 + 1500) / 1000);
+  }
+
+  // Step 2: Apply resist if damage type matches a resist tag
+  // physical_resist → towerDamageType === 'physical'
+  // magic_resist    → towerDamageType === 'magic'
+  // pure damage → ignores all resists
+  if (towerDamageType === 'pure') {
+    // No resist applied
+  } else if (towerDamageType === 'physical' && monsterTags.includes('physical_resist')) {
+    const resistMultiplier = 1000 - Math.min(800, Math.max(0, monsterArmorPermille));
+    damage = Math.max(1, Math.floor(damage * resistMultiplier / 1000));
+  } else if (towerDamageType === 'magic' && monsterTags.includes('magic_resist')) {
+    const resistMultiplier = 1000 - Math.min(800, Math.max(0, monsterArmorPermille));
+    damage = Math.max(1, Math.floor(damage * resistMultiplier / 1000));
+  } else {
+    // Apply armor normally (no matching resist tag)
+    const armorMultiplier = 1000 - Math.min(800, Math.max(0, monsterArmorPermille));
+    damage = Math.max(1, Math.floor(damage * armorMultiplier / 1000));
+  }
+
+  return damage;
 }
 
 function processCombat(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
@@ -432,11 +544,21 @@ function processCombat(state: SimulationState): { state: SimulationState; events
       continue;
     }
 
+    // Skip towers that cannot attack anything
+    if (definition.attackTargets.length === 0) {
+      continue;
+    }
+
     const towerX = tower.cellX * 1000 + 500;
     const towerY = tower.cellY * 1000 + 500;
     const rangeSquared = level.rangeMilliTiles * level.rangeMilliTiles;
+
+    // Filter candidates: alive + in range + movementType matches attackTargets
     const candidates = lane.monsters.filter((monster) => {
       if (monster.hp <= 0) {
+        return false;
+      }
+      if (!canTowerAttackMonster(definition.attackTargets, monster.movementType)) {
         return false;
       }
       const position = calculateMonsterPosition(lane, monster);
@@ -444,6 +566,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
       const dy = position.y - towerY;
       return dx * dx + dy * dy <= rangeSquared;
     });
+
     candidates.sort((a, b) => compareTargetPriority(a, b, definition.targeting));
 
     const target = candidates[0];
@@ -454,12 +577,20 @@ function processCombat(state: SimulationState): { state: SimulationState; events
     tower.targetId = target.entityId;
     tower.cooldownTicks = level.cooldownTicks;
 
-    // Calculate damage with armor
-    let damage = level.damage;
-    const armorMultiplierPermille = 1000 - Math.min(800, Math.max(0, target.armorPermille));
-    damage = Math.max(1, Math.floor(damage * armorMultiplierPermille / 1000));
+    // Calculate raw damage (before resist)
+    const rawDamage = level.damage;
+    const bonusTag = level.bonusDamageTag;
 
-    // Apply damage to primary target
+    // Apply bonus damage + resist + armor (in that order)
+    const damage = calculateDamage(
+      rawDamage,
+      definition.damageType,
+      bonusTag,
+      target.tags,
+      target.armorPermille,
+    );
+
+    // Apply shield then HP
     let actualDamage = damage;
     if (target.shield > 0) {
       if (target.shield >= actualDamage) {
@@ -499,6 +630,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
     }
 
     // Handle splash damage for mage towers
+    // Splash uses the same rawDamage, same resist rules, but splashFactor applied
     if (definition.role === 'splash' && level.splashRadiusMilliTiles && level.splashFactorPermille) {
       for (const other of candidates.slice(1)) {
         if (other.hp <= 0) continue;
@@ -508,10 +640,15 @@ function processCombat(state: SimulationState): { state: SimulationState; events
         const distSq = dx * dx + dy * dy;
         const splashRadiusSq = level.splashRadiusMilliTiles * level.splashRadiusMilliTiles;
         if (distSq <= splashRadiusSq) {
-          let splashDamage = Math.floor(damage * level.splashFactorPermille / 1000);
-          const armorMultiplier = Math.max(0, other.armorPermille);
-          const cappedArmor = Math.min(800, armorMultiplier);
-          splashDamage = Math.max(1, Math.floor(splashDamage * (1000 - cappedArmor) / 1000));
+          // Splash damage: bonusDamage applies to splash targets too
+          const splashRawDamage = Math.floor(rawDamage * level.splashFactorPermille / 1000);
+          const splashDamage = calculateDamage(
+            splashRawDamage,
+            definition.damageType,
+            bonusTag,
+            other.tags,
+            other.armorPermille,
+          );
           let splashActual = splashDamage;
           if (other.shield > 0) {
             if (other.shield >= splashActual) {
@@ -557,7 +694,6 @@ function processCombat(state: SimulationState): { state: SimulationState; events
           durationTicks: level.slowDurationTicks,
         });
       } else if (level.slowPermille === existingSlow && target.slowDurationTicks !== undefined) {
-        // Refresh duration
         target.slowDurationTicks = level.slowDurationTicks;
       }
     }
@@ -988,6 +1124,8 @@ function processCommands(state: SimulationState): { state: SimulationState; even
             speedMilliTilesPerTick: monsterDef.speedMilliTilesPerTick,
             leakDamage: monsterDef.leakDamage,
             spawnGapTicks: monsterDef.spawnGapTicks,
+            movementType: monsterDef.movementType,
+            tags: monsterDef.tags,
           };
           lane.spawnQueue.push(spawn);
         }
@@ -1040,6 +1178,144 @@ function processIncome(state: SimulationState): { state: SimulationState; events
   return { state: newState, events };
 }
 
+const WAVE_INTERVAL_TICKS = 200 as const; // Every 10 seconds at 20 TPS
+
+/**
+ * Advance the wave scheduler and spawn wave monsters.
+ * Wave monsters spawn from the system and target both lanes simultaneously.
+ * Called every tick during RUNNING phase.
+ */
+function processWaveScheduler(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
+  const events: DomainEvent[] = [];
+
+  if (state.phase !== 'running' || state.runningStartedAtTick === null) {
+    return { state, events };
+  }
+
+  const runningTicks = state.tick - state.runningStartedAtTick;
+  const newState = { ...state, waveScheduler: { ...state.waveScheduler } };
+  newState.waveScheduler.ticksSinceRunningStart = runningTicks;
+
+  // Check if it's time to start a new wave (every WAVE_INTERVAL_TICKS)
+  const ticksSinceLastWave = runningTicks % WAVE_INTERVAL_TICKS;
+  if (ticksSinceLastWave === 0 && runningTicks > 0) {
+    const waveNumber = Math.floor(runningTicks / WAVE_INTERVAL_TICKS);
+    const waveIndex = waveNumber - 1;
+    if (waveIndex >= 0 && waveIndex < WAVE_DEFINITIONS.length) {
+      const waveDef = WAVE_DEFINITIONS[waveIndex];
+      if (waveDef) {
+        const totalMonsters = waveDef.groups.reduce((sum, g) => sum + g.count, 0) * 2;
+        newState.waveScheduler = {
+          ...newState.waveScheduler,
+          currentWaveNumber: waveNumber,
+          currentWaveIndex: waveIndex,
+          ticksUntilNextSpawn: 0,
+          remainingGroupCount: totalMonsters,
+          waveActive: true,
+          currentGroupIndex: 0,
+          currentGroupSpawned: 0,
+        };
+        const waveStartEvent: WaveStartedEvent = {
+          type: 'wave_started',
+          tick: state.tick,
+          waveNumber,
+        };
+        events.push(waveStartEvent);
+      }
+    }
+  }
+
+  // Spawn monsters if a wave is active and it's time to spawn
+  if (
+    newState.waveScheduler.waveActive &&
+    newState.waveScheduler.ticksUntilNextSpawn === 0 &&
+    newState.waveScheduler.currentWaveIndex >= 0
+  ) {
+    const waveDef = WAVE_DEFINITIONS[newState.waveScheduler.currentWaveIndex];
+    if (waveDef) {
+      const groupIdx = newState.waveScheduler.currentGroupIndex;
+      const groupSpawned = newState.waveScheduler.currentGroupSpawned;
+      const currentGroup = waveDef.groups[groupIdx];
+
+      if (currentGroup && groupSpawned < currentGroup.count) {
+        const baseDef = getWaveMonsterDefinition(currentGroup.monsterType);
+        const scaled = scaleWaveMonster(currentGroup.monsterType, currentGroup.difficultyMultiplier);
+
+        // Spawn one monster per lane
+        for (const laneId of ['lane_p1', 'lane_p2'] as const) {
+          const monster: MonsterRuntimeState = {
+            entityId: newState.nextEntityId++,
+            ownerId: 'system' as PlayerSlot,
+            monsterTypeId: scaled.monsterTypeId,
+            hp: scaled.hp,
+            shield: scaled.shield,
+            armorPermille: baseDef.armorPermille,
+            segmentIndex: 0,
+            distanceOnSegmentMilliTiles: 0,
+            pathProgressMilliTiles: 0,
+            speedMilliTilesPerTick: scaled.speedMilliTilesPerTick,
+            leakDamage: scaled.leakDamage,
+            movementType: baseDef.movementType,
+            tags: baseDef.tags,
+            routeWaypoints: newState.lanes[laneId].waypoints,
+            routeSegments: newState.lanes[laneId].segments,
+            routeTotalPathLength: newState.lanes[laneId].totalPathLength,
+          };
+
+          newState.lanes[laneId] = {
+            ...newState.lanes[laneId],
+            monsters: [...newState.lanes[laneId].monsters, monster],
+          };
+
+          const spawnEvent: WaveMonsterSpawnedEvent = {
+            type: 'wave_monster_spawned',
+            tick: state.tick,
+            waveNumber: newState.waveScheduler.currentWaveNumber,
+            monsterEntityId: monster.entityId,
+            monsterType: scaled.monsterTypeId,
+          };
+          events.push(spawnEvent);
+        }
+
+        newState.waveScheduler.currentGroupSpawned = groupSpawned + 1;
+        newState.waveScheduler.remainingGroupCount -= 2;
+        newState.waveScheduler.ticksUntilNextSpawn = 20;
+
+        if (newState.waveScheduler.currentGroupSpawned >= currentGroup.count) {
+          newState.waveScheduler.currentGroupIndex = groupIdx + 1;
+          newState.waveScheduler.currentGroupSpawned = 0;
+        }
+
+        if (newState.waveScheduler.remainingGroupCount <= 0) {
+          newState.waveScheduler.waveActive = false;
+          const waveEndEvent: WaveEndedEvent = {
+            type: 'wave_ended',
+            tick: state.tick,
+            waveNumber: newState.waveScheduler.currentWaveNumber,
+          };
+          events.push(waveEndEvent);
+        }
+      } else {
+        let nextIdx = groupIdx + 1;
+        while (nextIdx < waveDef.groups.length) {
+          const nextGroup = waveDef.groups[nextIdx];
+          if (nextGroup && nextGroup.count > 0) break;
+          nextIdx++;
+        }
+        newState.waveScheduler.currentGroupIndex = nextIdx;
+        newState.waveScheduler.currentGroupSpawned = 0;
+
+        if (nextIdx >= waveDef.groups.length) {
+          newState.waveScheduler.waveActive = false;
+          newState.waveScheduler.remainingGroupCount = 0;
+        }
+      }
+    }
+  }
+
+  return { state: newState, events };
+}
+
 function stepSimulation(state: SimulationState): { state: SimulationState; events: readonly DomainEvent[] } {
   const allEvents: DomainEvent[] = [];
 
@@ -1072,7 +1348,12 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
       currentState = afterIncome;
       allEvents.push(...incomeEvents);
 
-      // Process spawns
+      // Advance wave scheduler and spawn wave monsters
+      const { state: afterWave, events: waveEvents } = processWaveScheduler(currentState);
+      currentState = afterWave;
+      allEvents.push(...waveEvents);
+
+      // Process player-sent monster spawns (queue_monster)
       const { state: afterSpawn, events: spawnEvents } = processSpawns(currentState);
       currentState = afterSpawn;
       allEvents.push(...spawnEvents);
@@ -1229,6 +1510,8 @@ class SimulationImpl implements Simulation {
           shield: monster.shield,
           pathProgressMilliTiles: monster.pathProgressMilliTiles,
           alive: monster.hp > 0,
+          movementType: monster.movementType,
+          tags: monster.tags,
         };
         if (monster.routeWaypoints !== undefined) canonicalMonster.routeWaypoints = monster.routeWaypoints;
         monsters.push(canonicalMonster);
@@ -1251,6 +1534,7 @@ class SimulationImpl implements Simulation {
       })),
       monsters,
       result: null,
+      waveCurrentWaveNumber: this._state.waveScheduler.currentWaveNumber,
     };
   }
 

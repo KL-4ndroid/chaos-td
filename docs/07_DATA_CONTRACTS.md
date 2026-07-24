@@ -119,17 +119,29 @@ interface PlayerBattleState {
 
 ## 6. Definitions
 
+### ID Literal Types
+
+```ts
+type MovementType = 'ground' | 'flying';
+type MonsterTag   = 'boss' | 'siege' | 'swift' | 'magic_resist' | 'physical_resist';
+type DamageType   = 'physical' | 'magic' | 'pure';
+type AttackTarget = 'ground' | 'flying';
+type TowerTargeting = 'first' | 'strong' | 'boss';
+```
+
+### Tower Definition
+
 ```ts
 interface TowerDefinition {
   id: TowerId;
   displayName: string;
   role: 'single_target' | 'splash' | 'slow' | 'heavy_hit';
-  targeting: 'first' | 'strong';
-  levels: readonly [
-    TowerLevelDefinition,
-    TowerLevelDefinition,
-    TowerLevelDefinition
-  ];
+  targeting: TowerTargeting;
+  /** Which MovementTypes this tower can attack. Empty = cannot attack anything. */
+  attackTargets: readonly AttackTarget[];
+  /** Damage type used for resist checks. Pure ignores all resist tags. */
+  damageType: DamageType;
+  levels: readonly [TowerLevelDefinition, TowerLevelDefinition, TowerLevelDefinition];
 }
 
 interface TowerLevelDefinition {
@@ -142,8 +154,16 @@ interface TowerLevelDefinition {
   slowRadiusMilliTiles?: number;
   slowPermille?: number;
   slowDurationTicks?: number;
+  /** Bonus damage multiplier (permille) when primary target has matching tag. */
+  bonusDamagePermille?: number;
+  /** Tag that triggers bonusDamage (e.g. 'boss'). */
+  bonusDamageTag?: MonsterTag;
 }
+```
 
+### Monster Definition
+
+```ts
 interface MonsterDefinition {
   id: MonsterId;
   displayName: string;
@@ -157,6 +177,31 @@ interface MonsterDefinition {
   leakDamage: number;
   availableAtRunningTick: number;
   spawnGapTicks: number;
+  /** Ground follows grid path; flying uses a separate elevated path. */
+  movementType: MovementType;
+  /** AI behavior when this monster enters tower range. */
+  targetPreference: 'base' | 'tower' | 'closest';
+  /** Tactical tags that determine tower counter bonuses and UI icons. */
+  tags: readonly MonsterTag[];
+}
+```
+
+### Wave System
+
+```ts
+type WaveMonsterType = 'basic' | 'swift' | 'flying' | 'siege' | 'boss';
+
+interface WaveGroup {
+  monsterType: WaveMonsterType;
+  count: number;
+  /** Scale factor applied to monster HP and damage. */
+  difficultyMultiplier: number;
+}
+
+interface WaveDefinition {
+  waveNumber: number;
+  groups: readonly WaveGroup[];
+  totalDurationTicks: number;
 }
 ```
 

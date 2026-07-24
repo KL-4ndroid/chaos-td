@@ -67,6 +67,9 @@ export {
   type DamageAppliedEvent,
   type ShieldBrokenEvent,
   type SlowAppliedEvent,
+  type WaveStartedEvent,
+  type WaveMonsterSpawnedEvent,
+  type WaveEndedEvent,
 } from './events';
 
 // Simulation
@@ -79,6 +82,7 @@ export {
   type LaneRuntimeState,
   type MonsterSpawnParams,
   type MonsterRuntimeState,
+  type WaveSchedulerState,
   createSimulation,
   createWithRng,
   calculateMonsterPosition,

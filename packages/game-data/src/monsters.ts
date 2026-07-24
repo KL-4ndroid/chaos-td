@@ -3,9 +3,14 @@
  *
  * Authoritative monster definitions for MVP.
  * All values derived from docs/03_BALANCE_BASELINE.md
+ *
+ * Monster categories:
+ * - movementType: ground uses grid path; flying uses separate elevated path.
+ * - tags: tactical labels that trigger tower counter bonuses and UI icons.
+ * - targetPreference: AI behavior when this monster is in a tower's range.
  */
 
-import type { MonsterDefinition } from './types.js';
+import type { MonsterDefinition, MonsterTag } from './types.js';
 
 /**
  * Monster definitions - 4 monster types.
@@ -16,7 +21,7 @@ import type { MonsterDefinition } from './types.js';
  */
 
 // ============================================================================
-// Sheep - Basic cheap monster
+// Sheep - Basic cheap ground monster
 // ============================================================================
 
 export const SHEEP_MONSTER: MonsterDefinition = Object.freeze({
@@ -32,10 +37,13 @@ export const SHEEP_MONSTER: MonsterDefinition = Object.freeze({
   leakDamage: 1,
   availableAtRunningTick: 0,       // available from start
   spawnGapTicks: 9,
+  movementType: 'ground',
+  targetPreference: 'closest',
+  tags: [] as readonly MonsterTag[],
 });
 
 // ============================================================================
-// Wolf - Faster, more HP
+// Wolf - Faster ground monster
 // ============================================================================
 
 export const WOLF_MONSTER: MonsterDefinition = Object.freeze({
@@ -51,10 +59,13 @@ export const WOLF_MONSTER: MonsterDefinition = Object.freeze({
   leakDamage: 1,
   availableAtRunningTick: 600,    // unlocked at 30 seconds
   spawnGapTicks: 10,
+  movementType: 'ground',
+  targetPreference: 'closest',
+  tags: ['swift'] as readonly MonsterTag[],
 });
 
 // ============================================================================
-// Treant - Tank with armor, slow
+// Treant - Tank ground monster with armor
 // ============================================================================
 
 export const TREANT_MONSTER: MonsterDefinition = Object.freeze({
@@ -70,10 +81,13 @@ export const TREANT_MONSTER: MonsterDefinition = Object.freeze({
   leakDamage: 2,
   availableAtRunningTick: 1800,   // unlocked at 90 seconds
   spawnGapTicks: 14,
+  movementType: 'ground',
+  targetPreference: 'closest',
+  tags: ['physical_resist'] as readonly MonsterTag[],
 });
 
 // ============================================================================
-// Ghost - Shield + faster
+// Ghost - Flying monster with shield
 // ============================================================================
 
 export const GHOST_MONSTER: MonsterDefinition = Object.freeze({
@@ -89,6 +103,9 @@ export const GHOST_MONSTER: MonsterDefinition = Object.freeze({
   leakDamage: 2,
   availableAtRunningTick: 3000,   // unlocked at 150 seconds
   spawnGapTicks: 13,
+  movementType: 'flying',
+  targetPreference: 'closest',
+  tags: ['magic_resist'] as readonly MonsterTag[],
 });
 
 // ============================================================================

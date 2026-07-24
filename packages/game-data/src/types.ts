@@ -12,9 +12,38 @@
 export type PlayerSlot = 'p1' | 'p2';
 export type LaneId = 'lane_p1' | 'lane_p2';
 export type TowerId = 'archer' | 'mage' | 'frost' | 'sniper';
-export type MonsterId = 'sheep' | 'wolf' | 'treant' | 'ghost';
+export type MonsterId =
+  | 'sheep' | 'wolf' | 'treant' | 'ghost'
+  | 'basic' | 'swift' | 'flying' | 'siege' | 'boss';
 export type MapId = 'mvp_mirror_01';
 export type EntityId = number;
+
+// ============================================================================
+// Movement Type (monster category for targeting)
+// ============================================================================
+
+/** Which path a monster uses and what can attack it */
+export type MovementType = 'ground' | 'flying';
+
+// ============================================================================
+// Monster Tags (behavioral / tactical labels)
+// ============================================================================
+
+/**
+ * Tags drive tower counter bonuses and client display icons.
+ * - boss: very high HP, appears on boss waves, high priority
+ * - siege: prioritizes attacking towers in range over advancing
+ * - swift: faster movement speed, hard to intercept
+ * - magic_resist: takes reduced damage from magic-type towers
+ * - physical_resist: takes reduced damage from physical-type towers
+ */
+export type MonsterTag = 'boss' | 'siege' | 'swift' | 'magic_resist' | 'physical_resist';
+
+// ============================================================================
+// Tower Damage Type (determines which resist tag applies)
+// ============================================================================
+
+export type DamageType = 'physical' | 'magic' | 'pure';
 
 // ============================================================================
 // Grid and Position Types
@@ -64,6 +93,10 @@ export interface TowerLevelDefinition {
   readonly slowPermille?: number;
   /** Slow duration in ticks (optional) */
   readonly slowDurationTicks?: number;
+  /** Bonus damage multiplier in permille when the primary target has a matching tag (optional) */
+  readonly bonusDamagePermille?: number;
+  /** Tag that triggers bonusDamage (optional, e.g. 'boss') */
+  readonly bonusDamageTag?: MonsterTag;
 }
 
 // ============================================================================
@@ -71,13 +104,24 @@ export interface TowerLevelDefinition {
 // ============================================================================
 
 export type TowerRole = 'single_target' | 'splash' | 'slow' | 'heavy_hit';
-export type TowerTargeting = 'first' | 'strong';
+export type TowerTargeting = 'first' | 'strong' | 'boss';
+
+/**
+ * attackTargets controls which monster movementTypes this tower can engage.
+ * An empty array means the tower cannot attack any monster type.
+ * Example: anti-air tower has attackTargets: ['flying'] only.
+ */
+export type AttackTarget = 'ground' | 'flying';
 
 export interface TowerDefinition {
   readonly id: TowerId;
   readonly displayName: string;
   readonly role: TowerRole;
   readonly targeting: TowerTargeting;
+  /** Which monster movementTypes this tower can target. Empty array = cannot attack. */
+  readonly attackTargets: readonly AttackTarget[];
+  /** Damage type used for resistance checks. Pure damage ignores monster resist tags. */
+  readonly damageType: DamageType;
   readonly levels: readonly TowerLevelDefinition[];
 }
 
@@ -108,6 +152,16 @@ export interface MonsterDefinition {
   readonly availableAtRunningTick: number;
   /** Minimum ticks between spawns */
   readonly spawnGapTicks: number;
+  /** Ground monsters use the grid path; flying monsters use a separate elevated path. */
+  readonly movementType: MovementType;
+  /** AI behavior preference when the monster is in a tower's range. */
+  readonly targetPreference: 'base' | 'tower' | 'closest';
+  /**
+   * Tactical tags used for tower counter-bonus matching and client UI icons.
+   * Examples: 'boss' triggers bonusDamage on anti-boss towers; 'magic_resist'
+   * applies damage reduction to magic-type towers; 'siege' triggers tower-targeting AI.
+   */
+  readonly tags: readonly MonsterTag[];
 }
 
 // ============================================================================
@@ -174,8 +228,35 @@ export interface GlobalConfig {
 }
 
 // ============================================================================
-// AI Config Types
+// Wave System Types
 // ============================================================================
+
+export type WaveMonsterType = 'basic' | 'swift' | 'flying' | 'siege' | 'boss';
+
+/** Single wave event: which monster type spawns, how many, and at what difficulty multiplier. */
+export interface WaveGroup {
+  readonly monsterType: WaveMonsterType;
+  readonly count: number;
+  /** Scale factor applied to monster HP and damage for difficulty progression */
+  readonly difficultyMultiplier: number;
+}
+
+/** A wave is a sequence of monster groups spawned in order. */
+export interface WaveDefinition {
+  /** 1-based wave number */
+  readonly waveNumber: number;
+  readonly groups: readonly WaveGroup[];
+  /** Total tick duration of this wave from first spawn to last spawn */
+  readonly totalDurationTicks: number;
+}
+
+/** Runtime state for a wave that is actively spawning. */
+export interface WaveRuntimeState {
+  readonly waveNumber: number;
+  readonly groups: readonly WaveGroup[];
+  currentGroupIndex: number;
+  ticksUntilNextSpawn: number;
+}
 
 /** AI difficulty level */
 export type AiDifficulty = 'easy' | 'medium' | 'hard';

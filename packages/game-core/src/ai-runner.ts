@@ -83,15 +83,22 @@ export function processAIDecision(
   );
 
   if (defenseAction.type !== 'no_action') {
+    const action: 'build_tower' | 'upgrade_tower' = defenseAction.type === 'build_tower' ? 'build_tower' : 'upgrade_tower';
+    const params: { towerType?: string; cellX?: number; cellY?: number; monsterType?: string; quantity?: number } = {};
+    if (action === 'build_tower' && 'towerType' in defenseAction) {
+      params.towerType = defenseAction.towerType;
+    }
+    if ('cellX' in defenseAction) {
+      params.cellX = defenseAction.cellX;
+    }
+    if ('cellY' in defenseAction) {
+      params.cellY = defenseAction.cellY;
+    }
     return {
       playerId,
-      action: defenseAction.type === 'build_tower' ? 'build_tower' : 'upgrade_tower',
+      action,
       targetTick: currentTick + 2,
-      params: {
-        towerType: defenseAction.towerType,
-        cellX: 'cellX' in defenseAction ? defenseAction.cellX : undefined,
-        cellY: 'cellY' in defenseAction ? defenseAction.cellY : undefined,
-      },
+      params,
     };
   }
 
