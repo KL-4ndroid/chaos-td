@@ -1225,11 +1225,12 @@ function processIncome(state: SimulationState): { state: SimulationState; events
   return { state: newState, events };
 }
 
-const WAVE_INTERVAL_TICKS = 200 as const; // Every 10 seconds at 20 TPS
+const WAVE_INTERVAL_TICKS = 200 as const;
 
 /**
  * Advance the wave scheduler and spawn wave monsters on each battlefield.
  * Wave definitions are shared globally (fair); spawn runtime is per-battlefield (independent).
+ * A scheduled wave starts only after both battlefields finished spawning the prior wave.
  * Called every tick during RUNNING phase.
  */
 function processWaveScheduler(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
@@ -1252,48 +1253,51 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
   };
   newState.waveScheduler.ticksSinceRunningStart = runningTicks;
 
-  // Wave number: ticks 1-200 = Wave 1, 201-400 = Wave 2, etc.
-  // (runningTicks - 1) ensures Wave 1 starts immediately at the first running tick.
-  const newWaveNumber = Math.floor((runningTicks - 1) / WAVE_INTERVAL_TICKS) + 1;
-  const prevWaveNumber = state.waveScheduler.currentWaveNumber;
-  // Start a new wave when the computed wave number is greater than what we had.
-  // Wave 1 fires immediately (newWaveNumber=1 > prevWaveNumber=0).
-  if (newWaveNumber > prevWaveNumber && prevWaveNumber >= 0) {
-    const waveIndex = newWaveNumber - 1;
-    if (waveIndex >= 0 && waveIndex < WAVE_DEFINITIONS.length) {
-      const waveDef = WAVE_DEFINITIONS[waveIndex];
-      if (waveDef) {
-        // Initialize both battlefields to start the new wave (spawn immediately, cooldown=0)
-        newState.waveScheduler = {
-          ...newState.waveScheduler,
-          currentWaveNumber: newWaveNumber,
-          battlefields: {
-            p1: {
-              currentWaveIndex: waveIndex,
-              currentGroupIndex: 0,
-              currentGroupSpawned: 0,
-              ticksUntilNextSpawn: 0,
-              waveSpawnCooldownTicks: 0,
-              spawningCompleted: false,
-            },
-            p2: {
-              currentWaveIndex: waveIndex,
-              currentGroupIndex: 0,
-              currentGroupSpawned: 0,
-              ticksUntilNextSpawn: 0,
-              waveSpawnCooldownTicks: 0,
-              spawningCompleted: false,
-            },
-          },
-        };
-        const waveStartEvent: WaveStartedEvent = {
-          type: 'wave_started',
-          tick: state.tick,
-          waveNumber: newWaveNumber,
-        };
-        events.push(waveStartEvent);
-      }
+  const previousWaveNumber = state.waveScheduler.currentWaveNumber;
+  const scheduledWaveNumber = Math.floor((runningTicks - 1) / WAVE_INTERVAL_TICKS) + 1;
+  const bothBattlefieldsCompleted =
+    state.waveScheduler.battlefields.p1.spawningCompleted &&
+    state.waveScheduler.battlefields.p2.spawningCompleted;
+  const shouldStartWave =
+    scheduledWaveNumber > previousWaveNumber &&
+    (previousWaveNumber === 0 || bothBattlefieldsCompleted);
+
+  if (shouldStartWave && scheduledWaveNumber <= WAVE_DEFINITIONS.length) {
+    const waveIndex = scheduledWaveNumber - 1;
+    const waveDef = WAVE_DEFINITIONS[waveIndex];
+
+    if (!waveDef) {
+      throw new Error(`Missing wave definition for wave ${scheduledWaveNumber}`);
     }
+
+    newState.waveScheduler = {
+      ...newState.waveScheduler,
+      currentWaveNumber: scheduledWaveNumber,
+      battlefields: {
+        p1: {
+          currentWaveIndex: waveIndex,
+          currentGroupIndex: 0,
+          currentGroupSpawned: 0,
+          ticksUntilNextSpawn: 0,
+          waveSpawnCooldownTicks: 0,
+          spawningCompleted: false,
+        },
+        p2: {
+          currentWaveIndex: waveIndex,
+          currentGroupIndex: 0,
+          currentGroupSpawned: 0,
+          ticksUntilNextSpawn: 0,
+          waveSpawnCooldownTicks: 0,
+          spawningCompleted: false,
+        },
+      },
+    };
+    const waveStartEvent: WaveStartedEvent = {
+      type: 'wave_started',
+      tick: state.tick,
+      waveNumber: scheduledWaveNumber,
+    };
+    events.push(waveStartEvent);
   }
 
   // Spawn monsters on each battlefield independently
@@ -1375,6 +1379,7 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
                 tick: state.tick,
                 waveNumber: newState.waveScheduler.currentWaveNumber,
                 battlefieldId,
+                spawningCompleted: true,
               };
               events.push(waveEndEvent);
             } else {
@@ -1392,6 +1397,7 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
             tick: state.tick,
             waveNumber: newState.waveScheduler.currentWaveNumber,
             battlefieldId,
+            spawningCompleted: true,
           };
           events.push(waveEndEvent);
         }

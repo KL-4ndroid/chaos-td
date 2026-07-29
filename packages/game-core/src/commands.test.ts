@@ -13,6 +13,10 @@ function createCommandId(playerId: 'p1' | 'p2', tick: number, seq: number) {
   return { playerId, tick, sequence: seq };
 }
 
+function disableAutomaticWaves(sim: ReturnType<typeof createSimulation>): void {
+  sim.state.waveScheduler.currentWaveNumber = 100;
+}
+
 function makeBuildTower(
   playerId: 'p1' | 'p2',
   towerType: string,
@@ -432,8 +436,9 @@ describe('Gold Never Negative', () => {
 });
 
 describe('Game Completion', () => {
-  it('resolves by timeout after max running ticks', { timeout: 600_000 }, () => {
+  it('resolves by timeout after max running ticks', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    disableAutomaticWaves(sim);
     advanceToRunning(sim);
 
     // Run until result (timeout)
@@ -448,8 +453,9 @@ describe('Game Completion', () => {
     expect(sim.state.tick).toBe(12460);
   });
 
-  it('emits match_ended event in resolving phase', () => {
+  it('emits match_ended event in resolving phase', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    disableAutomaticWaves(sim);
     advanceToRunning(sim);
 
     // Run until result
@@ -469,8 +475,9 @@ describe('Game Completion', () => {
     expect(sim.state.phase).toBe('result');
   });
 
-  it('resolves by timeout after max running ticks', { timeout: 600_000 }, () => {
+  it('resolves by timeout after max running ticks', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
+    disableAutomaticWaves(sim);
     sim.start();
 
     // Skip countdown

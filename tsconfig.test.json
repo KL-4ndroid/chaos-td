@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "ignoreDeprecations": "6.0",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "baseUrl": ".",
+    "paths": {
+      "@chaos-td/game-data": ["packages/game-data/src/index.ts"],
+      "@chaos-td/game-core": ["packages/game-core/src/index.ts"]
+    }
+  },
+  "include": [
+    "apps/client/src/**/*.test.ts",
+    "apps/client/src/**/*.spec.ts",
+    "packages/game-core/src/**/*.test.ts",
+    "packages/game-core/src/**/*.spec.ts",
+    "packages/game-data/src/**/*.test.ts",
+    "packages/game-data/src/**/*.spec.ts",
+    "packages/shared/src/**/*.test.ts",
+    "packages/shared/src/**/*.spec.ts",
+    "packages/test-fixtures/src/**/*.test.ts",
+    "packages/test-fixtures/src/**/*.spec.ts"
+  ]
+}

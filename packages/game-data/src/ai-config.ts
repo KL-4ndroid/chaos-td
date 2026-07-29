@@ -10,10 +10,7 @@ import { CONFIG_VERSION } from './global-config.js';
 /**
  * Create default lane AI config
  */
-function createDefaultLaneConfig(
-  laneId: LaneId,
-  _playerId: PlayerSlot,
-): AiLaneConfig {
+function createDefaultLaneConfig(laneId: LaneId): AiLaneConfig {
   return Object.freeze({
     laneId,
     difficulty: 'medium',
@@ -39,7 +36,7 @@ function createDefaultAiConfig(playerId: PlayerSlot): AiConfig {
     difficulty: 'medium',
     personality: 'balanced',
     lanes: Object.freeze([
-      createDefaultLaneConfig(isP1 ? 'lane_p1' : 'lane_p2', playerId),
+      createDefaultLaneConfig(isP1 ? 'lane_p1' : 'lane_p2'),
     ]),
   });
 }

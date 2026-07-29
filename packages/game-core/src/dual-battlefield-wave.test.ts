@@ -34,9 +34,15 @@ function getBattlefieldMonsters(sim: ReturnType<typeof createSimulation>, bf: 'p
   return sim.state.lanes[laneId].monsters;
 }
 
-/** Count wave monsters in a battlefield (source.type === 'wave') */
-function countWaveMonsters(sim: ReturnType<typeof createSimulation>, bf: 'p1' | 'p2') {
-  return getBattlefieldMonsters(sim, bf).filter(m => m.source.type === 'wave').length;
+/** Count wave monsters for a specific wave in a battlefield. */
+function countWaveMonsters(
+  sim: ReturnType<typeof createSimulation>,
+  bf: 'p1' | 'p2',
+  waveNumber: number,
+) {
+  return getBattlefieldMonsters(sim, bf).filter(
+    (monster) => monster.source.type === 'wave' && monster.source.waveNumber === waveNumber,
+  ).length;
 }
 
 /** Check a monster's source is not a PlayerSlot */
@@ -55,7 +61,9 @@ describe('Dual Battlefield Wave Model', () => {
       tickN(sim, 100); // Wave 1 done by running tick 43 (tick 104 total)
 
       const p1Monsters = getBattlefieldMonsters(sim, 'p1');
-      const p1WaveMonsters = p1Monsters.filter(m => m.source.type === 'wave');
+      const p1WaveMonsters = p1Monsters.filter(
+        (monster) => monster.source.type === 'wave' && monster.source.waveNumber === 1,
+      );
 
       expect(p1WaveMonsters).toHaveLength(3);
       expect(p1WaveMonsters.every(m => m.source.type === 'wave')).toBe(true);
@@ -74,7 +82,9 @@ describe('Dual Battlefield Wave Model', () => {
       tickN(sim, 100); // Wave 1 done by running tick 39
 
       const p2Monsters = getBattlefieldMonsters(sim, 'p2');
-      const p2WaveMonsters = p2Monsters.filter(m => m.source.type === 'wave');
+      const p2WaveMonsters = p2Monsters.filter(
+        (monster) => monster.source.type === 'wave' && monster.source.waveNumber === 1,
+      );
 
       expect(p2WaveMonsters).toHaveLength(3);
       expect(p2WaveMonsters.every(m => m.source.type === 'wave')).toBe(true);
@@ -210,7 +220,7 @@ describe('Dual Battlefield Wave Model', () => {
       // Player queue: quantity=2 sheep, spawnGapTicks=9 → at ticks 1, 10
       // Check before Wave 2 starts (at running tick 180 = tick 241)
       tickN(sim, 180);
-      const waveCount180 = getBattlefieldMonsters(sim, 'p2').filter(m => m.source.type === 'wave').length;
+      const waveCount180 = countWaveMonsters(sim, 'p2', 1);
       const playerCount180 = getBattlefieldMonsters(sim, 'p2').filter(
         m => m.source.type === 'player' && m.source.playerId === 'p1',
       ).length;
@@ -221,7 +231,9 @@ describe('Dual Battlefield Wave Model', () => {
 
       // Also check at tick 281: Wave 2 has started (4 monsters from Wave 2 basic group)
       tickN(sim, 40); // running tick 220 = tick 281
-      const waveCount = getBattlefieldMonsters(sim, 'p2').filter(m => m.source.type === 'wave').length;
+      const waveCount = getBattlefieldMonsters(sim, 'p2').filter(
+        (monster) => monster.source.type === 'wave',
+      ).length;
       const playerCount = getBattlefieldMonsters(sim, 'p2').filter(
         m => m.source.type === 'player' && m.source.playerId === 'p1',
       ).length;
@@ -347,7 +359,7 @@ describe('Dual Battlefield Wave Model', () => {
       tickN(sim, 60); // countdown
       tickN(sim, 100); // tick 161 total: Wave 1 done
 
-      const p1Wave1Count = countWaveMonsters(sim, 'p1');
+      const p1Wave1Count = countWaveMonsters(sim, 'p1', 1);
       expect(p1Wave1Count).toBe(3); // Wave 1 fully spawned
 
       // Wave 2 starts at tick 261, spawns at running ticks 201, 222, 243
@@ -370,20 +382,42 @@ describe('Dual Battlefield Wave Model', () => {
       tickN(sim, 100); // tick 161: Wave 1 done (spawns at running ticks 1, 22, 43)
 
       // Both battlefields should have 3 Wave 1 monsters
-      expect(countWaveMonsters(sim, 'p1')).toBe(3);
-      expect(countWaveMonsters(sim, 'p2')).toBe(3);
+      expect(countWaveMonsters(sim, 'p1', 1)).toBe(3);
+      expect(countWaveMonsters(sim, 'p2', 1)).toBe(3);
 
       // Wave 2 starts at tick 261, done by tick 300
       tickN(sim, 300); // tick 461: Wave 2 done
 
-      const p1Wave = getBattlefieldMonsters(sim, 'p1').filter(m => m.source.type === 'wave');
-      const p2Wave = getBattlefieldMonsters(sim, 'p2').filter(m => m.source.type === 'wave');
+      const p1Wave = getBattlefieldMonsters(sim, 'p1').filter(
+        (monster) => monster.source.type === 'wave',
+      );
+      const p2Wave = getBattlefieldMonsters(sim, 'p2').filter(
+        (monster) => monster.source.type === 'wave',
+      );
 
-      // 3 Wave 1 + 3 Wave 2 per battlefield
-      expect(p1Wave.length).toBe(6);
-      expect(p2Wave.length).toBe(6);
-      expect(p1Wave.every(m => m.source.type === 'wave' && m.source.waveNumber >= 1)).toBe(true);
-      expect(p2Wave.every(m => m.source.type === 'wave' && m.source.waveNumber >= 1)).toBe(true);
+      // Each battlefield advances its own runtime while preserving equal shared-wave output.
+      const p1CountsByWave = new Map<number, number>();
+      const p2CountsByWave = new Map<number, number>();
+      for (const monster of p1Wave) {
+        if (monster.source.type === 'wave') {
+          p1CountsByWave.set(
+            monster.source.waveNumber,
+            (p1CountsByWave.get(monster.source.waveNumber) ?? 0) + 1,
+          );
+        }
+      }
+      for (const monster of p2Wave) {
+        if (monster.source.type === 'wave') {
+          p2CountsByWave.set(
+            monster.source.waveNumber,
+            (p2CountsByWave.get(monster.source.waveNumber) ?? 0) + 1,
+          );
+        }
+      }
+
+      expect(p1CountsByWave).toEqual(p2CountsByWave);
+      expect(p1CountsByWave.get(1)).toBe(3);
+      expect(p1CountsByWave.get(2)).toBe(3);
     });
   });
 });

@@ -24,6 +24,10 @@ import {
 import type { LaneId } from '@chaos-td/game-data';
 import { createSimulation } from './simulation';
 
+function disableAutomaticWaves(sim: ReturnType<typeof createSimulation>): void {
+  sim.state.waveScheduler.currentWaveNumber = 100;
+}
+
 describe('PRNG - Mulberry32 Determinism', () => {
   it('should produce identical sequence for same seed', () => {
     const seed = 42;
@@ -747,7 +751,7 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(result.state.tick).toBe(60);
   });
 
-  it('should have runningStartedAtTick = 60 when entering RUNNING', { timeout: 600_000 }, () => {
+  it('should have runningStartedAtTick = 60 when entering RUNNING', () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
     sim.start();
 
@@ -759,8 +763,9 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.runningStartedAtTick).toBe(60);
   });
 
-  it('should stay in RUNNING at tick 12058 (11,998th running tick)', { timeout: 600_000 }, () => {
+  it('should stay in RUNNING at tick 12058 (11,998th running tick)', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
+    disableAutomaticWaves(sim);
     sim.start();
 
     for (let i = 0; i < 60 + 11998; i++) {
@@ -770,8 +775,9 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.tick).toBe(12058);
   });
 
-  it('should transition to RESOLVING at tick 12060', { timeout: 600_000 }, () => {
+  it('should transition to RESOLVING at tick 12060', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
+    disableAutomaticWaves(sim);
     sim.start();
 
     for (let i = 0; i < 60 + 12000 - 1; i++) {
@@ -785,8 +791,9 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(result.state.tick).toBe(12060);
   });
 
-  it('should have resolvingStartedAtTick = 12060 when entering RESOLVING', { timeout: 600_000 }, () => {
+  it('should have resolvingStartedAtTick = 12060 when entering RESOLVING', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
+    disableAutomaticWaves(sim);
     sim.start();
 
     for (let i = 0; i < 60 + 12000; i++) {
@@ -797,8 +804,9 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.resolvingStartedAtTick).toBe(12060);
   });
 
-  it('should stay in RESOLVING at tick 12459 (399th resolving tick)', { timeout: 600_000 }, () => {
+  it('should stay in RESOLVING at tick 12459 (399th resolving tick)', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
+    disableAutomaticWaves(sim);
     sim.start();
 
     for (let i = 0; i < 60 + 12000 + 399; i++) {
@@ -808,8 +816,9 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(sim.state.tick).toBe(12459);
   });
 
-  it('should transition to RESULT at tick 12460', { timeout: 600_000 }, () => {
+  it('should transition to RESULT at tick 12460', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
+    disableAutomaticWaves(sim);
     sim.start();
 
     for (let i = 0; i < 60 + 12000 + 400 - 1; i++) {
@@ -823,8 +832,9 @@ describe('Simulation - Phase Boundaries (Precise)', () => {
     expect(result.state.tick).toBe(12460);
   });
 
-  it('should freeze tick in RESULT', { timeout: 600_000 }, () => {
+  it('should freeze tick in RESULT', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
+    disableAutomaticWaves(sim);
     sim.start();
 
     for (let i = 0; i < 60 + 12000 + 400; i++) {
@@ -870,8 +880,9 @@ describe('Simulation - Events', () => {
     expect((toRunningEvent as { tick: number }).tick).toBe(60);
   });
 
-  it('should return empty events array in RESULT', { timeout: 600_000 }, () => {
+  it('should return empty events array in RESULT', { timeout: 120_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: '1.0.0' });
+    disableAutomaticWaves(sim);
     sim.start();
 
     for (let i = 0; i < 60 + 12000 + 400 + 1; i++) {

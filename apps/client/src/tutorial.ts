@@ -21,6 +21,7 @@ export function advanceTutorial(state: TutorialState, action: 'build' | 'send' |
   return next ? { ...state, step: next } : state;
 }
 
-export function skipTutorial(_state: TutorialState): TutorialState {
+export function skipTutorial(state: TutorialState): TutorialState {
+  void state;
   return { step: 'complete', skipped: true };
 }

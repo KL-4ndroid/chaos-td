@@ -27,13 +27,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
-
-      - name: Build packages
-        run: |
-          npm run build --workspace=@chaos-td/game-data
-          npm run build --workspace=@chaos-td/game-core
-          npm run build --workspace=@chaos-td/client
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -41,8 +35,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test
+      - name: Test Typecheck
+        run: npm run typecheck:test
 
       - name: Build
         run: npm run build
+
+      - name: Tests
+        run: npm run test

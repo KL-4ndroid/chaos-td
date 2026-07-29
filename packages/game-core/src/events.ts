@@ -193,4 +193,6 @@ export interface WaveEndedEvent {
   tick: number;
   waveNumber: number;
   battlefieldId: PlayerSlot;
+  /** Always true: this event means all configured groups finished spawning. */
+  spawningCompleted: true;
 }
