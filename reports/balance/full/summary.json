@@ -2,38 +2,23 @@
   "schemaVersion": 2,
   "mode": "full",
   "seedCount": 30,
-  "scenarioCount": 9,
-  "matchCount": 270,
+  "scenarioCount": 4,
+  "matchCount": 120,
   "outcomeCounts": {
-    "p2": 210,
+    "p2": 60,
     "draw": 60
   },
   "scenarioOutcomeCounts": {
-    "easy-vs-easy": {
-      "p2": 30
-    },
-    "medium-vs-medium": {
-      "p2": 30
-    },
-    "hard-vs-hard": {
-      "p2": 30
-    },
-    "aggressive-vs-defensive": {
-      "p2": 30
-    },
-    "defensive-vs-aggressive": {
-      "p2": 30
-    },
-    "balanced-vs-balanced": {
+    "normal-ai-vs-normal-ai": {
       "p2": 30
     },
     "none-vs-none": {
       "draw": 30
     },
-    "none-vs-easy": {
+    "none-vs-normal-ai": {
       "p2": 30
     },
-    "easy-vs-none": {
+    "normal-ai-vs-none": {
       "draw": 30
     }
   },
@@ -42,28 +27,28 @@
   "finalTickP90": 1685,
   "finalTickMaximum": 1685,
   "finalWaveCounts": {
-    "7": 270
+    "7": 120
   },
   "p1HpTotal": 0,
-  "p2HpTotal": 4200,
-  "p1NetWorthTotal": 324000,
-  "p2NetWorthTotal": 255960,
+  "p2HpTotal": 1200,
+  "p1NetWorthTotal": 144000,
+  "p2NetWorthTotal": 124560,
   "towerTotals": [
     {
       "towerId": "archer",
       "level": 1,
-      "buildCount": 1890,
+      "buildCount": 540,
       "upgradeCount": 0,
       "sellCount": 0,
-      "attackCount": 23940,
-      "rawDamage": 430920,
+      "attackCount": 6840,
+      "rawDamage": 123120,
       "bonusDamage": 0,
       "resistanceReduction": 0,
       "armorReduction": 0,
       "shieldDamage": 0,
-      "hpDamage": 430920,
-      "killCount": 4830,
-      "groundTargetCount": 23940,
+      "hpDamage": 123120,
+      "killCount": 1380,
+      "groundTargetCount": 6840,
       "flyingTargetCount": 0,
       "bossDamage": 0,
       "splashSecondaryDamage": 0,
@@ -74,17 +59,17 @@
     {
       "monsterId": "basic",
       "source": "wave",
-      "spawnCount": 12420,
-      "deathCount": 4410,
-      "leakCount": 5940,
-      "damageTaken": 400680,
+      "spawnCount": 5520,
+      "deathCount": 1260,
+      "leakCount": 3240,
+      "damageTaken": 114480,
       "shieldDamageTaken": 0,
-      "leakDamage": 5940
+      "leakDamage": 3240
     },
     {
       "monsterId": "flying",
       "source": "wave",
-      "spawnCount": 1080,
+      "spawnCount": 480,
       "deathCount": 0,
       "leakCount": 0,
       "damageTaken": 0,
@@ -94,12 +79,12 @@
     {
       "monsterId": "swift",
       "source": "wave",
-      "spawnCount": 1080,
-      "deathCount": 420,
-      "leakCount": 660,
-      "damageTaken": 30240,
+      "spawnCount": 480,
+      "deathCount": 120,
+      "leakCount": 360,
+      "damageTaken": 8640,
       "shieldDamageTaken": 0,
-      "leakDamage": 660
+      "leakDamage": 360
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runBalanceSimulation } from './runner.js';
-import { aiProfile } from './profiles.js';
+import { NORMAL_AI } from './profiles.js';
 
 describe('balance telemetry attribution', () => {
   it('separates wave telemetry by canonical battlefield ID', () => {
@@ -8,8 +8,8 @@ describe('balance telemetry attribution', () => {
       seed: 'balance-wave-attribution',
       maxTicks: 1_000,
       samplingIntervalTicks: 100,
-      p1Controller: aiProfile('medium', 'balanced'),
-      p2Controller: aiProfile('medium', 'balanced'),
+      p1Controller: NORMAL_AI,
+      p2Controller: NORMAL_AI,
     });
 
     expect(result.waves.some((wave) => wave.battlefieldId === 'lane_p1')).toBe(true);
@@ -24,8 +24,8 @@ describe('balance telemetry attribution', () => {
       seed: 'balance-send-spend',
       maxTicks: 1_000,
       samplingIntervalTicks: 100,
-      p1Controller: aiProfile('medium', 'balanced'),
-      p2Controller: aiProfile('medium', 'defensive'),
+      p1Controller: NORMAL_AI,
+      p2Controller: NORMAL_AI,
       captureEventLog: true,
     });
 
@@ -38,8 +38,8 @@ describe('balance telemetry attribution', () => {
       seed: 'balance-result-attribution',
       maxTicks: 12_600,
       samplingIntervalTicks: 100,
-      p1Controller: aiProfile('medium', 'aggressive'),
-      p2Controller: aiProfile('medium', 'defensive'),
+      p1Controller: NORMAL_AI,
+      p2Controller: NORMAL_AI,
     } as const;
     const captured = runBalanceSimulation({ ...options, captureEventLog: true });
     const uncaptured = runBalanceSimulation({ ...options, captureEventLog: false });
@@ -57,8 +57,8 @@ describe('balance telemetry attribution', () => {
       seed: 'balance-tick-guard',
       maxTicks: 1,
       samplingIntervalTicks: 1,
-      p1Controller: aiProfile('medium', 'balanced'),
-      p2Controller: aiProfile('medium', 'balanced'),
+      p1Controller: NORMAL_AI,
+      p2Controller: NORMAL_AI,
     });
 
     expect(result.match.completion).toBe('tick_guard');
@@ -70,8 +70,8 @@ describe('balance telemetry attribution', () => {
       seed: 'balance-asymmetric-winner',
       maxTicks: 12_600,
       samplingIntervalTicks: 100,
-      p1Controller: aiProfile('medium', 'aggressive'),
-      p2Controller: aiProfile('medium', 'defensive'),
+      p1Controller: NORMAL_AI,
+      p2Controller: NORMAL_AI,
     });
 
     expect(result.match.completion).toBe('result');

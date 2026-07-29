@@ -8,16 +8,16 @@
     "tick_guard_incomplete": 12
   },
   "scenarioOutcomeCounts": {
-    "medium-vs-medium": {
-      "tick_guard_incomplete": 3
-    },
-    "aggressive-vs-defensive": {
-      "tick_guard_incomplete": 3
-    },
-    "defensive-vs-aggressive": {
+    "normal-ai-vs-normal-ai": {
       "tick_guard_incomplete": 3
     },
     "none-vs-none": {
+      "tick_guard_incomplete": 3
+    },
+    "none-vs-normal-ai": {
+      "tick_guard_incomplete": 3
+    },
+    "normal-ai-vs-none": {
       "tick_guard_incomplete": 3
     }
   },
@@ -29,25 +29,25 @@
     "4": 12
   },
   "p1HpTotal": 132,
-  "p2HpTotal": 213,
+  "p2HpTotal": 186,
   "p1NetWorthTotal": 10800,
-  "p2NetWorthTotal": 8856,
+  "p2NetWorthTotal": 9504,
   "towerTotals": [
     {
       "towerId": "archer",
       "level": 1,
-      "buildCount": 54,
+      "buildCount": 36,
       "upgradeCount": 0,
       "sellCount": 0,
-      "attackCount": 585,
-      "rawDamage": 10530,
+      "attackCount": 390,
+      "rawDamage": 7020,
       "bonusDamage": 0,
       "resistanceReduction": 0,
       "armorReduction": 0,
       "shieldDamage": 0,
-      "hpDamage": 10530,
-      "killCount": 117,
-      "groundTargetCount": 585,
+      "hpDamage": 7020,
+      "killCount": 78,
+      "groundTargetCount": 390,
       "flyingTargetCount": 0,
       "bossDamage": 0,
       "splashSecondaryDamage": 0,
@@ -59,11 +59,11 @@
       "monsterId": "basic",
       "source": "wave",
       "spawnCount": 312,
-      "deathCount": 117,
-      "leakCount": 135,
-      "damageTaken": 10530,
+      "deathCount": 78,
+      "leakCount": 162,
+      "damageTaken": 7020,
       "shieldDamageTaken": 0,
-      "leakDamage": 135
+      "leakDamage": 162
     }
   ]
 }

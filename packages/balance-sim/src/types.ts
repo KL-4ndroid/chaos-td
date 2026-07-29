@@ -1,15 +1,14 @@
 import type { BattlefieldId, PlayerSlot } from '@chaos-td/game-core';
 
-export type ControllerKind = 'none' | 'ai';
-export type ControllerDifficulty = 'easy' | 'medium' | 'hard';
-export type ControllerPersonality = 'aggressive' | 'balanced' | 'defensive';
-
-export interface ControllerProfile {
-  readonly id: string;
-  readonly kind: ControllerKind;
-  readonly difficulty?: ControllerDifficulty;
-  readonly personality?: ControllerPersonality;
-}
+export type ControllerProfile =
+  | {
+      readonly id: 'none';
+      readonly kind: 'none';
+    }
+  | {
+      readonly id: 'normal-ai';
+      readonly kind: 'normal_ai';
+    };
 
 export interface BalanceSimulationOptions {
   readonly seed: string;

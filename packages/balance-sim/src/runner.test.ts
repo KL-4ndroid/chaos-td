@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE_SCENARIOS, NO_COMMANDS, runBalanceSimulation } from './index.js';
+import { BALANCE_SCENARIOS, NO_COMMANDS, NORMAL_AI, runBalanceSimulation } from './index.js';
 
 describe('balance simulation', () => {
   const options = {
@@ -31,10 +31,11 @@ describe('balance simulation', () => {
   });
 
   it('generates commands through controller profiles only', () => {
-    const scenario = BALANCE_SCENARIOS.find((candidate) => candidate.id === 'aggressive-vs-defensive');
-    if (!scenario) throw new Error('Missing aggressive-vs-defensive scenario');
+    const scenario = BALANCE_SCENARIOS.find((candidate) => candidate.id === 'normal-ai-vs-normal-ai');
+    if (!scenario) throw new Error('Missing normal-ai-vs-normal-ai scenario');
     const result = runBalanceSimulation({ ...options, p1Controller: scenario.p1Controller, p2Controller: scenario.p2Controller });
 
+    expect(scenario.p1Controller).toBe(NORMAL_AI);
     expect(result.match.commandLog.length).toBeGreaterThan(0);
     expect(result.match.commandLog.every((command) => command.includes('"type"'))).toBe(true);
   });

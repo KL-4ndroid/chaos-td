@@ -12,9 +12,7 @@ import {
 
 const mode = process.env['BALANCE_MODE'] === 'full' ? 'full' : 'smoke';
 const seeds = mode === 'smoke' ? BALANCE_SEEDS.slice(0, 3) : BALANCE_SEEDS;
-const scenarios = mode === 'smoke'
-  ? BALANCE_SCENARIOS.filter((scenario) => ['none-vs-none', 'medium-vs-medium', 'aggressive-vs-defensive', 'defensive-vs-aggressive'].includes(scenario.id))
-  : BALANCE_SCENARIOS;
+const scenarios = BALANCE_SCENARIOS;
 const maxTicks = mode === 'smoke' ? 800 : 12_600;
 
 describe(`balance ${mode} simulation`, () => {
@@ -26,7 +24,7 @@ describe(`balance ${mode} simulation`, () => {
     })));
     const elapsedMilliseconds = Math.round(performance.now() - startedAt);
     const totalSimulatedTicks = runs.reduce((total, run) => total + run.result.match.finalTick, 0);
-    const deterministic = scenarios.slice(0, 5).map((scenario) => {
+    const deterministic = scenarios.map((scenario) => {
       const options = { seed: seeds[0] ?? 'balance-001', maxTicks, samplingIntervalTicks: 100, captureEventLog: true, p1Controller: scenario.p1Controller, p2Controller: scenario.p2Controller };
       const first = runBalanceSimulation(options);
       const second = runBalanceSimulation(options);
