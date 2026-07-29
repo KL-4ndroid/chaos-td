@@ -5,12 +5,13 @@
   "scenarioCount": 4,
   "matchCount": 120,
   "outcomeCounts": {
-    "p2": 60,
-    "draw": 60
+    "draw": 60,
+    "p2": 30,
+    "p1": 30
   },
   "scenarioOutcomeCounts": {
     "normal-ai-vs-normal-ai": {
-      "p2": 30
+      "draw": 30
     },
     "none-vs-none": {
       "draw": 30
@@ -19,36 +20,37 @@
       "p2": 30
     },
     "normal-ai-vs-none": {
-      "draw": 30
+      "p1": 30
     }
   },
   "finalTickMinimum": 1685,
   "finalTickMedian": 1685,
-  "finalTickP90": 1685,
-  "finalTickMaximum": 1685,
+  "finalTickP90": 4295,
+  "finalTickMaximum": 4295,
   "finalWaveCounts": {
-    "7": 120
+    "7": 90,
+    "20": 30
   },
-  "p1HpTotal": 0,
-  "p2HpTotal": 1200,
-  "p1NetWorthTotal": 144000,
-  "p2NetWorthTotal": 124560,
+  "p1HpTotal": 570,
+  "p2HpTotal": 570,
+  "p1NetWorthTotal": 176520,
+  "p2NetWorthTotal": 176520,
   "towerTotals": [
     {
       "towerId": "archer",
       "level": 1,
-      "buildCount": 540,
+      "buildCount": 360,
       "upgradeCount": 0,
       "sellCount": 0,
-      "attackCount": 6840,
-      "rawDamage": 123120,
+      "attackCount": 43740,
+      "rawDamage": 787320,
       "bonusDamage": 0,
-      "resistanceReduction": 0,
-      "armorReduction": 0,
-      "shieldDamage": 0,
-      "hpDamage": 123120,
-      "killCount": 1380,
-      "groundTargetCount": 6840,
+      "resistanceReduction": 12000,
+      "armorReduction": 6600,
+      "shieldDamage": 8100,
+      "hpDamage": 760620,
+      "killCount": 7920,
+      "groundTargetCount": 43740,
       "flyingTargetCount": 0,
       "bossDamage": 0,
       "splashSecondaryDamage": 0,
@@ -59,32 +61,52 @@
     {
       "monsterId": "basic",
       "source": "wave",
-      "spawnCount": 5520,
-      "deathCount": 1260,
-      "leakCount": 3240,
-      "damageTaken": 114480,
+      "spawnCount": 10680,
+      "deathCount": 7260,
+      "leakCount": 2220,
+      "damageTaken": 700920,
       "shieldDamageTaken": 0,
-      "leakDamage": 3240
+      "leakDamage": 2220
+    },
+    {
+      "monsterId": "boss",
+      "source": "wave",
+      "spawnCount": 60,
+      "deathCount": 0,
+      "leakCount": 60,
+      "damageTaken": 0,
+      "shieldDamageTaken": 8100,
+      "leakDamage": 360
     },
     {
       "monsterId": "flying",
       "source": "wave",
-      "spawnCount": 480,
+      "spawnCount": 780,
       "deathCount": 0,
-      "leakCount": 0,
+      "leakCount": 420,
       "damageTaken": 0,
+      "shieldDamageTaken": 0,
+      "leakDamage": 840
+    },
+    {
+      "monsterId": "siege",
+      "source": "wave",
+      "spawnCount": 60,
+      "deathCount": 60,
+      "leakCount": 0,
+      "damageTaken": 16500,
       "shieldDamageTaken": 0,
       "leakDamage": 0
     },
     {
       "monsterId": "swift",
       "source": "wave",
-      "spawnCount": 480,
-      "deathCount": 120,
-      "leakCount": 360,
-      "damageTaken": 8640,
+      "spawnCount": 840,
+      "deathCount": 600,
+      "leakCount": 240,
+      "damageTaken": 43200,
       "shieldDamageTaken": 0,
-      "leakDamage": 360
+      "leakDamage": 240
     }
   ]
 }

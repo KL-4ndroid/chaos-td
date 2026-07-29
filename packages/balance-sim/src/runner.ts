@@ -299,6 +299,7 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
         GLOBAL_CONFIG.sendQueueLimit,
         MONSTER_BY_ID.get('sheep')?.sendCost ?? 0,
         ['archer', 'mage', 'frost', 'sniper'],
+        MVP_MIRROR_01.lanes.find((candidate) => candidate.defenderPlayerId === playerId)?.aiBuildPriorityCells.map((cell) => ({ cellX: cell.col, cellY: cell.row })) ?? [],
       );
       if (decision.reason !== 'not_decision_tick') {
         aiStates = { ...aiStates, [playerId]: updateAIState(aiStates[playerId], simulation.state.tick) };

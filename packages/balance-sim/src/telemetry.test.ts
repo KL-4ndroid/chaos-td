@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runBalanceSimulation } from './runner.js';
-import { NORMAL_AI } from './profiles.js';
+import { NO_COMMANDS, NORMAL_AI } from './profiles.js';
 
 describe('balance telemetry attribution', () => {
   it('separates wave telemetry by canonical battlefield ID', () => {
@@ -38,7 +38,7 @@ describe('balance telemetry attribution', () => {
       seed: 'balance-result-attribution',
       maxTicks: 12_600,
       samplingIntervalTicks: 100,
-      p1Controller: NORMAL_AI,
+      p1Controller: NO_COMMANDS,
       p2Controller: NORMAL_AI,
     } as const;
     const captured = runBalanceSimulation({ ...options, captureEventLog: true });
@@ -70,12 +70,12 @@ describe('balance telemetry attribution', () => {
       seed: 'balance-asymmetric-winner',
       maxTicks: 12_600,
       samplingIntervalTicks: 100,
-      p1Controller: NORMAL_AI,
+      p1Controller: NO_COMMANDS,
       p2Controller: NORMAL_AI,
     });
 
     expect(result.match.completion).toBe('result');
     expect(result.match.outcome).toBe('win');
-    expect(result.match.winnerId).not.toBeNull();
+    expect(result.match.winnerId).toBe('p2');
   });
 });

@@ -28,10 +28,10 @@
   "finalWaveCounts": {
     "4": 12
   },
-  "p1HpTotal": 132,
+  "p1HpTotal": 186,
   "p2HpTotal": 186,
-  "p1NetWorthTotal": 10800,
-  "p2NetWorthTotal": 9504,
+  "p1NetWorthTotal": 10152,
+  "p2NetWorthTotal": 10152,
   "towerTotals": [
     {
       "towerId": "archer",
@@ -39,15 +39,15 @@
       "buildCount": 36,
       "upgradeCount": 0,
       "sellCount": 0,
-      "attackCount": 390,
-      "rawDamage": 7020,
+      "attackCount": 732,
+      "rawDamage": 13176,
       "bonusDamage": 0,
       "resistanceReduction": 0,
       "armorReduction": 0,
       "shieldDamage": 0,
-      "hpDamage": 7020,
-      "killCount": 78,
-      "groundTargetCount": 390,
+      "hpDamage": 13176,
+      "killCount": 144,
+      "groundTargetCount": 732,
       "flyingTargetCount": 0,
       "bossDamage": 0,
       "splashSecondaryDamage": 0,
@@ -59,11 +59,11 @@
       "monsterId": "basic",
       "source": "wave",
       "spawnCount": 312,
-      "deathCount": 78,
-      "leakCount": 162,
-      "damageTaken": 7020,
+      "deathCount": 144,
+      "leakCount": 108,
+      "damageTaken": 13176,
       "shieldDamageTaken": 0,
-      "leakDamage": 162
+      "leakDamage": 108
     }
   ]
 }

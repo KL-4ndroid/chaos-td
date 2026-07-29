@@ -34,17 +34,17 @@
 ## Slot Fairness
 
 - Same-controller mirror results: see the normal-ai-vs-normal-ai scenario.
-- p1/p2 HP difference: -54
-- p1/p2 Net Worth difference: 1296
+- p1/p2 HP difference: 0
+- p1/p2 Net Worth difference: 0
 - p1/p2 Win Difference: 0
 
 ## Towers
 
-- archer L1: build=36; damage=7020; damage per gold=unavailable; kills=78; bonus=0; resistance reduction=0; shield=0; boss=0; slow=0; splash secondary=0
+- archer L1: build=36; damage=13176; damage per gold=unavailable; kills=144; bonus=0; resistance reduction=0; shield=0; boss=0; slow=0; splash secondary=0
 
 ## Monsters
 
-- basic (wave): spawn=312; death=78; leak=162; survival=72/312; leak damage=162; resistance damage reduction=unavailable
+- basic (wave): spawn=312; death=144; leak=108; survival=60/312; leak damage=108; resistance damage reduction=unavailable
 
 ## Warnings
 

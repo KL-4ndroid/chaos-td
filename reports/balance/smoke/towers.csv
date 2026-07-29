@@ -1,7 +1,10 @@
 scenario,towerId,level,buildCount,upgradeCount,attackCount,hpDamage,killCount,slowApplications
-normal-ai-vs-normal-ai,archer,1,6,0,65,1170,13,0
-none-vs-normal-ai,archer,1,6,0,65,1170,13,0
-normal-ai-vs-normal-ai,archer,1,6,0,65,1170,13,0
-none-vs-normal-ai,archer,1,6,0,65,1170,13,0
-normal-ai-vs-normal-ai,archer,1,6,0,65,1170,13,0
-none-vs-normal-ai,archer,1,6,0,65,1170,13,0
+normal-ai-vs-normal-ai,archer,1,6,0,122,2196,24,0
+none-vs-normal-ai,archer,1,3,0,61,1098,12,0
+normal-ai-vs-none,archer,1,3,0,61,1098,12,0
+normal-ai-vs-normal-ai,archer,1,6,0,122,2196,24,0
+none-vs-normal-ai,archer,1,3,0,61,1098,12,0
+normal-ai-vs-none,archer,1,3,0,61,1098,12,0
+normal-ai-vs-normal-ai,archer,1,6,0,122,2196,24,0
+none-vs-normal-ai,archer,1,3,0,61,1098,12,0
+normal-ai-vs-none,archer,1,3,0,61,1098,12,0
