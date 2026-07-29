@@ -68,6 +68,7 @@ export {
   type MonsterLeakedEvent,
   type AttackFiredEvent,
   type DamageAppliedEvent,
+  type DamageResolvedEvent,
   type ShieldBrokenEvent,
   type SlowAppliedEvent,
   type WaveStartedEvent,

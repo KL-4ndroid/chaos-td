@@ -26,11 +26,13 @@ import { hashStateToString } from './canonical';
 import type {
   AttackFiredEvent,
   DamageAppliedEvent,
+  DamageResolvedEvent,
   DomainEvent,
   MonsterDiedEvent,
   PhaseChangedEvent,
   MonsterSpawnedEvent,
   MonsterLeakedEvent,
+  MonsterQueuedEvent,
   TowerBuiltEvent,
   TowerUpgradedEvent,
   TowerSoldEvent,
@@ -622,7 +624,20 @@ function processCombat(state: SimulationState): { state: SimulationState; events
       damage,
       newHp: target.hp,
     };
-    events.push(attackEvent, damageEvent);
+    const resolvedEvent: DamageResolvedEvent = {
+      type: 'damage_resolved',
+      tick: state.tick,
+      towerEntityId: tower.entityId,
+      monsterEntityId: target.entityId,
+      rawDamage: damageResolution.rawDamage,
+      bonusDamage: damageResolution.bonusDamage,
+      resistanceReduction: damageResolution.resistanceReduction,
+      armorReduction: damageResolution.armorReduction,
+      shieldDamage: damageResolution.shieldDamage,
+      hpDamage: damageResolution.hpDamage,
+      isSplash: false,
+    };
+    events.push(attackEvent, damageEvent, resolvedEvent);
 
     if (target.hp === 0) {
       const deathEvent: MonsterDiedEvent = {
@@ -632,6 +647,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
         defenderId: lane.defenderId,
         monsterEntityId: target.entityId,
         killerPlayerId: tower.ownerId,
+        killerTowerEntityId: tower.entityId,
       };
       events.push(deathEvent);
     }
@@ -670,6 +686,18 @@ function processCombat(state: SimulationState): { state: SimulationState; events
             monsterEntityId: other.entityId,
             damage: splashDamage,
             newHp: other.hp,
+          }, {
+            type: 'damage_resolved',
+            tick: state.tick,
+            towerEntityId: tower.entityId,
+            monsterEntityId: other.entityId,
+            rawDamage: splashResolution.rawDamage,
+            bonusDamage: splashResolution.bonusDamage,
+            resistanceReduction: splashResolution.resistanceReduction,
+            armorReduction: splashResolution.armorReduction,
+            shieldDamage: splashResolution.shieldDamage,
+            hpDamage: splashResolution.hpDamage,
+            isSplash: true,
           });
           if (other.hp === 0) {
             events.push({
@@ -679,6 +707,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
               defenderId: lane.defenderId,
               monsterEntityId: other.entityId,
               killerPlayerId: tower.ownerId,
+              killerTowerEntityId: tower.entityId,
             });
           }
         }
@@ -694,6 +723,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
         events.push({
           type: 'slow_applied',
           tick: state.tick,
+          towerEntityId: tower.entityId,
           monsterEntityId: target.entityId,
           slowPermille: level.slowPermille,
           durationTicks: level.slowDurationTicks,
@@ -1144,7 +1174,14 @@ function processCommands(state: SimulationState): { state: SimulationState; even
           playerId: command.playerId,
           commandId: `${command.commandId.playerId}-${command.commandId.tick}-${command.commandId.sequence}`,
         };
-        events.push(acceptEvent);
+        const queuedEvent: MonsterQueuedEvent = {
+          type: 'monster_queued',
+          tick: state.tick,
+          playerId: command.playerId,
+          monsterType: command.monsterTypeId,
+          quantity: command.quantity,
+        };
+        events.push(acceptEvent, queuedEvent);
         break;
       }
     }
@@ -1262,9 +1299,9 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
   }
 
   // Spawn monsters on each battlefield independently
-  for (const battlefieldId of ['p1', 'p2'] as const) {
-    const bfState = newState.waveScheduler.battlefields[battlefieldId];
-    const laneId: LaneId = battlefieldId === 'p1' ? 'lane_p1' : 'lane_p2';
+  for (const defenderId of ['p1', 'p2'] as const) {
+    const bfState = newState.waveScheduler.battlefields[defenderId];
+    const laneId: LaneId = defenderId === 'p1' ? 'lane_p1' : 'lane_p2';
     const lane = newState.lanes[laneId];
 
     // Decrement wave spawn cooldown (but not below 0 — 0 means "ready to spawn")
@@ -1317,7 +1354,7 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
             waveNumber: newState.waveScheduler.currentWaveNumber,
             monsterEntityId: monster.entityId,
             monsterType: scaled.monsterTypeId,
-            battlefieldId,
+            battlefieldId: laneId,
           };
           events.push(spawnEvent);
 
@@ -1341,7 +1378,7 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
                 type: 'wave_ended',
                 tick: state.tick,
                 waveNumber: newState.waveScheduler.currentWaveNumber,
-                battlefieldId,
+                battlefieldId: laneId,
                 spawningCompleted: true,
               };
               events.push(waveEndEvent);
@@ -1359,7 +1396,7 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
             type: 'wave_ended',
             tick: state.tick,
             waveNumber: newState.waveScheduler.currentWaveNumber,
-            battlefieldId,
+            battlefieldId: laneId,
             spawningCompleted: true,
           };
           events.push(waveEndEvent);

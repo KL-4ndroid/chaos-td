@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   CONFIG_VERSION,
   WAVE_DEFINITIONS,
-  type PlayerSlot,
+  type BattlefieldId,
   type WaveDefinition,
 } from '@chaos-td/game-data';
 import type { DomainEvent } from './events';
@@ -10,7 +10,7 @@ import { createSimulation } from './simulation';
 
 const TEST_SEED = 'wave-complete-seed';
 const LAST_WAVE = 30;
-const BATTLEFIELDS: readonly PlayerSlot[] = ['p1', 'p2'];
+const BATTLEFIELDS: readonly BattlefieldId[] = ['lane_p1', 'lane_p2'];
 
 interface SimulationRun {
   readonly events: readonly DomainEvent[];
@@ -80,7 +80,7 @@ function runThroughWave30(seed: string): SimulationRun {
 function spawnsFor(
   events: readonly DomainEvent[],
   waveNumber: number,
-  battlefieldId: PlayerSlot,
+  battlefieldId: BattlefieldId,
 ) {
   return eventsOfType(events, 'wave_monster_spawned').filter(
     (event) => event.waveNumber === waveNumber && event.battlefieldId === battlefieldId,
@@ -96,20 +96,20 @@ describe('Wave 1-30 completion', { timeout: 120_000 }, () => {
 
   it('spawns every configured monster on p1', () => {
     for (let waveNumber = 1; waveNumber <= LAST_WAVE; waveNumber += 1) {
-      expect(spawnsFor(firstRun.events, waveNumber, 'p1')).toHaveLength(expectedSpawnCount(waveNumber));
+      expect(spawnsFor(firstRun.events, waveNumber, 'lane_p1')).toHaveLength(expectedSpawnCount(waveNumber));
     }
   });
 
   it('spawns every configured monster on p2', () => {
     for (let waveNumber = 1; waveNumber <= LAST_WAVE; waveNumber += 1) {
-      expect(spawnsFor(firstRun.events, waveNumber, 'p2')).toHaveLength(expectedSpawnCount(waveNumber));
+      expect(spawnsFor(firstRun.events, waveNumber, 'lane_p2')).toHaveLength(expectedSpawnCount(waveNumber));
     }
   });
 
   it('uses the same per-battlefield count without treating a wave as a six-monster total', () => {
     expect(expectedSpawnCount(1)).toBe(3);
-    expect(spawnsFor(firstRun.events, 1, 'p1')).toHaveLength(3);
-    expect(spawnsFor(firstRun.events, 1, 'p2')).toHaveLength(3);
+    expect(spawnsFor(firstRun.events, 1, 'lane_p1')).toHaveLength(3);
+    expect(spawnsFor(firstRun.events, 1, 'lane_p2')).toHaveLength(3);
   });
 
   it('retains Wave 1 composition', () => {
@@ -149,7 +149,7 @@ describe('Wave 1-30 completion', { timeout: 120_000 }, () => {
 
   it('never overwrites an unfinished wave on p1', () => {
     const events = eventsOfType(firstRun.events, 'wave_ended')
-      .filter((event) => event.battlefieldId === 'p1')
+      .filter((event) => event.battlefieldId === 'lane_p1')
       .sort((left, right) => left.waveNumber - right.waveNumber);
     for (let index = 1; index < events.length; index += 1) {
       const [previous, current] = requireSequentialEvent(events, index);
@@ -160,7 +160,7 @@ describe('Wave 1-30 completion', { timeout: 120_000 }, () => {
 
   it('never overwrites an unfinished wave on p2', () => {
     const events = eventsOfType(firstRun.events, 'wave_ended')
-      .filter((event) => event.battlefieldId === 'p2')
+      .filter((event) => event.battlefieldId === 'lane_p2')
       .sort((left, right) => left.waveNumber - right.waveNumber);
     for (let index = 1; index < events.length; index += 1) {
       const [previous, current] = requireSequentialEvent(events, index);
@@ -239,10 +239,10 @@ describe('Wave 1-30 completion', { timeout: 120_000 }, () => {
 
   it('gives p1 and p2 the same monster type composition for every wave', () => {
     for (let waveNumber = 1; waveNumber <= LAST_WAVE; waveNumber += 1) {
-      const p1Types = spawnsFor(firstRun.events, waveNumber, 'p1').map(
+      const p1Types = spawnsFor(firstRun.events, waveNumber, 'lane_p1').map(
         (event) => event.monsterType,
       );
-      const p2Types = spawnsFor(firstRun.events, waveNumber, 'p2').map(
+      const p2Types = spawnsFor(firstRun.events, waveNumber, 'lane_p2').map(
         (event) => event.monsterType,
       );
       expect(p1Types).toEqual(p2Types);
@@ -250,7 +250,7 @@ describe('Wave 1-30 completion', { timeout: 120_000 }, () => {
   });
 
   it('spawns Wave 1 on p1 with an exact 20-tick gap', () => {
-    const spawns = spawnsFor(firstRun.events, 1, 'p1');
+    const spawns = spawnsFor(firstRun.events, 1, 'lane_p1');
     expect(spawns).toHaveLength(3);
     const [first, second] = requireSequentialEvent(spawns, 1);
     const [middle, last] = requireSequentialEvent(spawns, 2);
@@ -259,7 +259,7 @@ describe('Wave 1-30 completion', { timeout: 120_000 }, () => {
   });
 
   it('spawns Wave 1 on p2 with an exact 20-tick gap', () => {
-    const spawns = spawnsFor(firstRun.events, 1, 'p2');
+    const spawns = spawnsFor(firstRun.events, 1, 'lane_p2');
     expect(spawns).toHaveLength(3);
     const [first, second] = requireSequentialEvent(spawns, 1);
     const [middle, last] = requireSequentialEvent(spawns, 2);

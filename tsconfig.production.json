@@ -16,6 +16,7 @@
     "apps/client/src/**/*.ts",
     "packages/game-core/src/**/*.ts",
     "packages/game-data/src/**/*.ts",
+    "packages/balance-sim/src/**/*.ts",
     "packages/shared/src/**/*.ts",
     "packages/test-fixtures/src/**/*.ts"
   ],
