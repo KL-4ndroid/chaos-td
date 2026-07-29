@@ -6,8 +6,8 @@
  *
  * Targeting:
  * - attackTargets: which MovementTypes this tower can engage (ground, flying, or both).
- * - damageType: 'physical' respects armor; 'magic' respects magic_resist; 'pure' ignores all resists.
- * - bonusDamage: additional multiplier applied to base damage when the primary target carries
+ * - damageType: 'physical' respects physical resistance and armor; 'magic' respects magic resistance; 'pure' ignores both.
+ * - bonusDamage: additional damage applied to base damage when the target carries
  *   the matching MonsterTag (e.g. anti-boss sniper gets bonus vs 'boss' tagged monsters).
  */
 
@@ -156,7 +156,7 @@ export const SNIPER_TOWER: TowerDefinition = Object.freeze({
       damage: 95,
       cooldownTicks: 48,
       rangeMilliTiles: 5500,
-      bonusDamagePermille: 1500,   // +50% vs boss
+      bonusDamagePermille: 500,    // +50% vs boss
       bonusDamageTag: 'boss',
     }),
     Object.freeze({
@@ -164,7 +164,7 @@ export const SNIPER_TOWER: TowerDefinition = Object.freeze({
       damage: 165,
       cooldownTicks: 44,
       rangeMilliTiles: 5800,
-      bonusDamagePermille: 1500,
+      bonusDamagePermille: 500,
       bonusDamageTag: 'boss',
     }),
     Object.freeze({
@@ -172,7 +172,7 @@ export const SNIPER_TOWER: TowerDefinition = Object.freeze({
       damage: 285,
       cooldownTicks: 40,
       rangeMilliTiles: 6200,
-      bonusDamagePermille: 1500,
+      bonusDamagePermille: 500,
       bonusDamageTag: 'boss',
     }),
   ]),

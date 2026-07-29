@@ -47,9 +47,9 @@ import {
   type GridCell,
   type MovementType,
   type MonsterTag,
-  type DamageType,
   type AttackTarget,
   MVP_MIRROR_01,
+  GLOBAL_CONFIG,
 } from '@chaos-td/game-data';
 import {
   WAVE_DEFINITIONS,
@@ -67,6 +67,7 @@ import {
   gridPathToWaypoints,
 } from './movement';
 import { compareTargetPriority, type TowerRuntimeState } from './tower';
+import { resolveDamage } from './combat-modifiers';
 import type { GameCommand, CommandId } from './commands';
 import type {
   WaveStartedEvent,
@@ -118,6 +119,8 @@ export interface MonsterSpawnParams {
   hp: number;
   shield: number;
   armorPermille: number;
+  physicalResistancePermille?: number;
+  magicResistancePermille?: number;
   speedMilliTilesPerTick: number;
   leakDamage: number;
   spawnGapTicks: number;
@@ -149,6 +152,8 @@ export interface MonsterRuntimeState {
   hp: number;
   shield: number;
   armorPermille: number;
+  physicalResistancePermille?: number;
+  magicResistancePermille?: number;
   segmentIndex: number;
   distanceOnSegmentMilliTiles: number;
   pathProgressMilliTiles: number;
@@ -388,6 +393,8 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
         hp: spawn.hp,
         shield: spawn.shield,
         armorPermille: spawn.armorPermille,
+        ...(spawn.physicalResistancePermille !== undefined ? { physicalResistancePermille: spawn.physicalResistancePermille } : {}),
+        ...(spawn.magicResistancePermille !== undefined ? { magicResistancePermille: spawn.magicResistancePermille } : {}),
         segmentIndex: 0,
         distanceOnSegmentMilliTiles: 0,
         pathProgressMilliTiles: 0,
@@ -515,45 +522,6 @@ function canTowerAttackMonster(
   return attackTargets.includes(monsterMovementType as AttackTarget);
 }
 
-/**
- * Calculate post-resist HP damage for a single hit.
- * Order: bonusDamage → resist (if applicable) → armor → floor → min(1, ...)
- */
-function calculateDamage(
-  rawDamage: number,
-  towerDamageType: DamageType,
-  towerBonusTag: MonsterTag | undefined,
-  monsterTags: readonly MonsterTag[],
-  monsterArmorPermille: number,
-): number {
-  let damage = rawDamage;
-
-  // Step 1: Bonus damage if tower has a matching tag
-  if (towerBonusTag !== undefined && monsterTags.includes(towerBonusTag)) {
-    damage = Math.floor(damage * (1000 + 1500) / 1000);
-  }
-
-  // Step 2: Apply resist if damage type matches a resist tag
-  // physical_resist → towerDamageType === 'physical'
-  // magic_resist    → towerDamageType === 'magic'
-  // pure damage → ignores all resists
-  if (towerDamageType === 'pure') {
-    // No resist applied
-  } else if (towerDamageType === 'physical' && monsterTags.includes('physical_resist')) {
-    const resistMultiplier = 1000 - Math.min(800, Math.max(0, monsterArmorPermille));
-    damage = Math.max(1, Math.floor(damage * resistMultiplier / 1000));
-  } else if (towerDamageType === 'magic' && monsterTags.includes('magic_resist')) {
-    const resistMultiplier = 1000 - Math.min(800, Math.max(0, monsterArmorPermille));
-    damage = Math.max(1, Math.floor(damage * resistMultiplier / 1000));
-  } else {
-    // Apply armor normally (no matching resist tag)
-    const armorMultiplier = 1000 - Math.min(800, Math.max(0, monsterArmorPermille));
-    damage = Math.max(1, Math.floor(damage * armorMultiplier / 1000));
-  }
-
-  return damage;
-}
-
 function processCombat(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
   if (state.towers.length === 0) {
     return { state, events: [] };
@@ -625,27 +593,21 @@ function processCombat(state: SimulationState): { state: SimulationState; events
     const rawDamage = level.damage;
     const bonusTag = level.bonusDamageTag;
 
-    // Apply bonus damage + resist + armor (in that order)
-    const damage = calculateDamage(
+    const damageResolution = resolveDamage({
       rawDamage,
-      definition.damageType,
-      bonusTag,
-      target.tags,
-      target.armorPermille,
-    );
-
-    // Apply shield then HP
-    let actualDamage = damage;
-    if (target.shield > 0) {
-      if (target.shield >= actualDamage) {
-        target.shield -= actualDamage;
-        actualDamage = 0;
-      } else {
-        actualDamage -= target.shield;
-        target.shield = 0;
-      }
-    }
-    target.hp = Math.max(0, target.hp - actualDamage);
+      damageType: definition.damageType,
+      ...(level.bonusDamagePermille !== undefined ? { bonusDamagePermille: level.bonusDamagePermille } : {}),
+      ...(bonusTag !== undefined ? { bonusDamageTag: bonusTag } : {}),
+      monsterTags: target.tags,
+      armorPermille: target.armorPermille,
+      ...(target.physicalResistancePermille !== undefined ? { physicalResistancePermille: target.physicalResistancePermille } : {}),
+      ...(target.magicResistancePermille !== undefined ? { magicResistancePermille: target.magicResistancePermille } : {}),
+      shield: target.shield,
+      maximumReductionPermille: GLOBAL_CONFIG.maximumDamageReductionPermille,
+    });
+    const damage = damageResolution.finalDamage;
+    target.shield -= damageResolution.shieldDamage;
+    target.hp = Math.max(0, target.hp - damageResolution.hpDamage);
 
     const attackEvent: AttackFiredEvent = {
       type: 'attack_fired',
@@ -685,26 +647,23 @@ function processCombat(state: SimulationState): { state: SimulationState; events
         const distSq = dx * dx + dy * dy;
         const splashRadiusSq = level.splashRadiusMilliTiles * level.splashRadiusMilliTiles;
         if (distSq <= splashRadiusSq) {
-          // Splash damage: bonusDamage applies to splash targets too
+          // Each splash target independently receives a matching-tag bonus.
           const splashRawDamage = Math.floor(rawDamage * level.splashFactorPermille / 1000);
-          const splashDamage = calculateDamage(
-            splashRawDamage,
-            definition.damageType,
-            bonusTag,
-            other.tags,
-            other.armorPermille,
-          );
-          let splashActual = splashDamage;
-          if (other.shield > 0) {
-            if (other.shield >= splashActual) {
-              other.shield -= splashActual;
-              splashActual = 0;
-            } else {
-              splashActual -= other.shield;
-              other.shield = 0;
-            }
-          }
-          other.hp = Math.max(0, other.hp - splashActual);
+          const splashResolution = resolveDamage({
+            rawDamage: splashRawDamage,
+            damageType: definition.damageType,
+            ...(level.bonusDamagePermille !== undefined ? { bonusDamagePermille: level.bonusDamagePermille } : {}),
+            ...(bonusTag !== undefined ? { bonusDamageTag: bonusTag } : {}),
+            monsterTags: other.tags,
+            armorPermille: other.armorPermille,
+            ...(other.physicalResistancePermille !== undefined ? { physicalResistancePermille: other.physicalResistancePermille } : {}),
+            ...(other.magicResistancePermille !== undefined ? { magicResistancePermille: other.magicResistancePermille } : {}),
+            shield: other.shield,
+            maximumReductionPermille: GLOBAL_CONFIG.maximumDamageReductionPermille,
+          });
+          const splashDamage = splashResolution.finalDamage;
+          other.shield -= splashResolution.shieldDamage;
+          other.hp = Math.max(0, other.hp - splashResolution.hpDamage);
           events.push({
             type: 'damage_applied',
             tick: state.tick,
@@ -1168,6 +1127,8 @@ function processCommands(state: SimulationState): { state: SimulationState; even
             hp: monsterDef.hp,
             shield: monsterDef.shield,
             armorPermille: monsterDef.armorPermille,
+            ...(monsterDef.physicalResistancePermille !== undefined ? { physicalResistancePermille: monsterDef.physicalResistancePermille } : {}),
+            ...(monsterDef.magicResistancePermille !== undefined ? { magicResistancePermille: monsterDef.magicResistancePermille } : {}),
             speedMilliTilesPerTick: monsterDef.speedMilliTilesPerTick,
             leakDamage: monsterDef.leakDamage,
             spawnGapTicks: monsterDef.spawnGapTicks,
@@ -1331,6 +1292,8 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
             hp: scaled.hp,
             shield: scaled.shield,
             armorPermille: baseDef.armorPermille,
+            ...(baseDef.physicalResistancePermille !== undefined ? { physicalResistancePermille: baseDef.physicalResistancePermille } : {}),
+            ...(baseDef.magicResistancePermille !== undefined ? { magicResistancePermille: baseDef.magicResistancePermille } : {}),
             segmentIndex: 0,
             distanceOnSegmentMilliTiles: 0,
             pathProgressMilliTiles: 0,

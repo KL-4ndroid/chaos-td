@@ -76,7 +76,8 @@ export const TREANT_MONSTER: MonsterDefinition = Object.freeze({
   bounty: 26,
   hp: 390,
   shield: 0,
-  armorPermille: 220,             // 22% damage reduction
+  armorPermille: 220,             // 22% physical armor reduction
+  physicalResistancePermille: 250, // additional 25% reduction from physical damage
   speedMilliTilesPerTick: 28,     // ~0.56 tiles/sec
   leakDamage: 2,
   availableAtRunningTick: 1800,   // unlocked at 90 seconds
@@ -99,6 +100,7 @@ export const GHOST_MONSTER: MonsterDefinition = Object.freeze({
   hp: 215,
   shield: 95,
   armorPermille: 0,
+  magicResistancePermille: 250,    // 25% reduction from magic damage
   speedMilliTilesPerTick: 44,     // ~0.88 tiles/sec
   leakDamage: 2,
   availableAtRunningTick: 3000,   // unlocked at 150 seconds

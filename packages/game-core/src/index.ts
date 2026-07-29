@@ -112,6 +112,9 @@ export {
   type TowerRuntimeState,
 } from './tower';
 
+export { resolveDamage } from './combat-modifiers';
+export type { DamageResolution, DamageResolutionInput } from './combat-modifiers';
+
 // Replay
 export {
   type Replay,

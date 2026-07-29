@@ -32,6 +32,14 @@ Cost 定義：L1 是建造成本；L2／L3 是該次升級額外成本。
 
 FIRST；穩定單體；無暴擊。
 
+### Combat Modifier Contract
+
+- `bonusDamagePermille` 是額外傷害：500 代表額外 +50%，不是 150%。
+- Sniper L1/L2/L3 對 `boss` 分別使用 500‰ 額外傷害。
+- 傷害順序固定為 Base Damage → Tag Bonus → Type Resistance → Physical Armor → Shield → HP。
+- Armor 只減少 Physical；`physical_resist` 與 `magic_resist` 只對相對應 damage type 額外減傷；Pure 忽略兩者。
+- Shield 吸收減傷後傷害。Splash 對每個 Splash Target 個別判斷其 bonus tag。
+
 ### Mage
 
 | Level | Cost | Damage | Cooldown | Range | Splash Radius | Factor |

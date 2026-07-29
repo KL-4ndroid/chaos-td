@@ -139,7 +139,7 @@ interface TowerDefinition {
   targeting: TowerTargeting;
   /** Which MovementTypes this tower can attack. Empty = cannot attack anything. */
   attackTargets: readonly AttackTarget[];
-  /** Damage type used for resist checks. Pure ignores all resist tags. */
+  /** Physical uses physical resistance and armor; magic uses magic resistance; pure ignores both. */
   damageType: DamageType;
   levels: readonly [TowerLevelDefinition, TowerLevelDefinition, TowerLevelDefinition];
 }
@@ -154,7 +154,7 @@ interface TowerLevelDefinition {
   slowRadiusMilliTiles?: number;
   slowPermille?: number;
   slowDurationTicks?: number;
-  /** Bonus damage multiplier (permille) when primary target has matching tag. */
+  /** Additional damage permille when the target has matching bonusDamageTag; 500 is +50%. */
   bonusDamagePermille?: number;
   /** Tag that triggers bonusDamage (e.g. 'boss'). */
   bonusDamageTag?: MonsterTag;
@@ -172,7 +172,11 @@ interface MonsterDefinition {
   bounty: number;
   hp: number;
   shield: number;
+  /** Physical-only damage reduction after physical resistance. */
   armorPermille: number;
+  /** Extra reduction when physical_resist or magic_resist applies. */
+  physicalResistancePermille?: number;
+  magicResistancePermille?: number;
   speedMilliTilesPerTick: number;
   leakDamage: number;
   availableAtRunningTick: number;
@@ -204,6 +208,19 @@ interface WaveDefinition {
   totalDurationTicks: number;
 }
 ```
+
+### Combat Modifier Resolution
+
+```text
+Base Damage
+→ Tag Bonus
+→ Type Resistance
+→ Physical Armor
+→ Shield
+→ HP
+```
+
+All permille values come from game-data or Global Config. `bonusDamagePermille` is extra damage, so `500` means +50%. Type resistances apply only when their matching tag and damage type are both present. Pure damage ignores type resistance and armor. Shield always absorbs after reductions. Splash resolves the same sequence separately for every splash target.
 
 ## 7. Domain Events
 

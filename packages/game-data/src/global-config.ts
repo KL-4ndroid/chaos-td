@@ -40,4 +40,5 @@ export const GLOBAL_CONFIG: GlobalConfig = Object.freeze({
   sellRefundPermille: 700,         // 70% refund
   sendQueueLimit: 30,
   slowCapPermille: 500,            // minimum slow effect (50%)
+  maximumDamageReductionPermille: 800,
 });

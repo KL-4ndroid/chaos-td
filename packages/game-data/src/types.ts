@@ -101,7 +101,7 @@ export interface TowerLevelDefinition {
   readonly slowPermille?: number;
   /** Slow duration in ticks (optional) */
   readonly slowDurationTicks?: number;
-  /** Bonus damage multiplier in permille when the primary target has a matching tag (optional) */
+  /** Additional damage in permille when the target has bonusDamageTag; 500 means +50%. */
   readonly bonusDamagePermille?: number;
   /** Tag that triggers bonusDamage (optional, e.g. 'boss') */
   readonly bonusDamageTag?: MonsterTag;
@@ -150,8 +150,12 @@ export interface MonsterDefinition {
   readonly hp: number;
   /** Shield (absorbs damage before HP) */
   readonly shield: number;
-  /** Armor in permille (reduces physical damage) */
+  /** Armor in permille; reduces physical damage after physical resistance. */
   readonly armorPermille: number;
+  /** Extra physical damage reduction when tags includes physical_resist. */
+  readonly physicalResistancePermille?: number;
+  /** Extra magic damage reduction when tags includes magic_resist. */
+  readonly magicResistancePermille?: number;
   /** Movement speed in milli-tiles per tick */
   readonly speedMilliTilesPerTick: number;
   /** Damage dealt when monster reaches the end */
@@ -233,6 +237,8 @@ export interface GlobalConfig {
   readonly sendQueueLimit: number;
   /** Minimum slow effect permille (slow cap) */
   readonly slowCapPermille: number;
+  /** Maximum reduction permitted for armor or a type resistance. */
+  readonly maximumDamageReductionPermille: number;
 }
 
 // ============================================================================

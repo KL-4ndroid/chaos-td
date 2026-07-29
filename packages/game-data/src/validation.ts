@@ -61,6 +61,7 @@ export function validateGlobalConfig(config: unknown): ValidationResult {
     ['sellRefundPermille', 'sellRefundPermille must be 0-1000'],
     ['sendQueueLimit', 'sendQueueLimit must be positive'],
     ['slowCapPermille', 'slowCapPermille must be 0-1000'],
+    ['maximumDamageReductionPermille', 'maximumDamageReductionPermille must be 0-1000'],
   ];
 
   for (const [field, errorMsg] of numberFields) {
@@ -86,6 +87,10 @@ export function validateGlobalConfig(config: unknown): ValidationResult {
   const slowCap = c['slowCapPermille'];
   if (typeof slowCap === 'number' && (slowCap < 0 || slowCap > 1000)) {
     errors.push(createError('GLOBAL_SLOW_CAP_OOB', 'slowCapPermille must be 0-1000', 'global.slowCapPermille'));
+  }
+  const maximumDamageReduction = c['maximumDamageReductionPermille'];
+  if (typeof maximumDamageReduction === 'number' && (maximumDamageReduction < 0 || maximumDamageReduction > 1000)) {
+    errors.push(createError('GLOBAL_MAXIMUM_DAMAGE_REDUCTION_OOB', 'maximumDamageReductionPermille must be 0-1000', 'global.maximumDamageReductionPermille'));
   }
 
   return createResult(errors);
@@ -139,6 +144,15 @@ function validateTowerLevel(
   const slowPermille = l['slowPermille'];
   if (slowPermille !== undefined && (typeof slowPermille !== 'number' || slowPermille < 0 || slowPermille > 1000)) {
     errors.push(createError('LEVEL_SLOW_OOB', `Level ${levelIndex + 1} slowPermille must be 0-1000`, `towers.${towerId}.levels[${levelIndex}].slowPermille`));
+  }
+
+  const bonusDamagePermille = l['bonusDamagePermille'];
+  const bonusDamageTag = l['bonusDamageTag'];
+  if (bonusDamagePermille !== undefined && (typeof bonusDamagePermille !== 'number' || bonusDamagePermille < 0 || bonusDamagePermille > 1000)) {
+    errors.push(createError('LEVEL_BONUS_DAMAGE_OOB', `Level ${levelIndex + 1} bonusDamagePermille must be 0-1000`, `towers.${towerId}.levels[${levelIndex}].bonusDamagePermille`));
+  }
+  if ((bonusDamagePermille === undefined) !== (bonusDamageTag === undefined)) {
+    errors.push(createError('LEVEL_BONUS_DAMAGE_PAIR_INVALID', `Level ${levelIndex + 1} bonusDamagePermille and bonusDamageTag must be set together`, `towers.${towerId}.levels[${levelIndex}]`));
   }
 
   return errors;
@@ -294,6 +308,15 @@ export function validateMonsterDefinition(monster: unknown): ValidationResult {
   const armor = m['armorPermille'];
   if (typeof armor !== 'number' || armor < 0 || armor > 1000) {
     errors.push(createError('MONSTER_ARMOR_OOB', 'armorPermille must be 0-1000', `monsters.${monsterId}.armorPermille`));
+  }
+  for (const [field, errorCode] of [
+    ['physicalResistancePermille', 'MONSTER_PHYSICAL_RESISTANCE_OOB'],
+    ['magicResistancePermille', 'MONSTER_MAGIC_RESISTANCE_OOB'],
+  ] as const) {
+    const value = m[field];
+    if (value !== undefined && (typeof value !== 'number' || value < 0 || value > 1000)) {
+      errors.push(createError(errorCode, `${field} must be 0-1000`, `monsters.${monsterId}.${field}`));
+    }
   }
 
   const speed = m['speedMilliTilesPerTick'];

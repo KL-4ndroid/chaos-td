@@ -30,6 +30,7 @@ export const INVALID_GLOBAL_CONFIG_NEGATIVE_HP: GlobalConfig = {
   sellRefundPermille: 700,
   sendQueueLimit: 30,
   slowCapPermille: 500,
+  maximumDamageReductionPermille: 800,
 };
 
 export const INVALID_GLOBAL_CONFIG_SELL_REFUND_OOB: GlobalConfig = {
@@ -46,6 +47,7 @@ export const INVALID_GLOBAL_CONFIG_SELL_REFUND_OOB: GlobalConfig = {
   sellRefundPermille: 1500, // INVALID: > 1000
   sendQueueLimit: 30,
   slowCapPermille: 500,
+  maximumDamageReductionPermille: 800,
 };
 
 export const INVALID_GLOBAL_CONFIG_SLOW_CAP_OOB: GlobalConfig = {
@@ -62,6 +64,7 @@ export const INVALID_GLOBAL_CONFIG_SLOW_CAP_OOB: GlobalConfig = {
   sellRefundPermille: 700,
   sendQueueLimit: 30,
   slowCapPermille: -100, // INVALID: negative
+  maximumDamageReductionPermille: 800,
 };
 
 // ============================================================================

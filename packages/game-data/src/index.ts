@@ -124,9 +124,13 @@ export {
 
 export {
   WAVE_MONSTER_ID,
+  WAVE_MONSTER_DEFINITIONS,
   getWaveMonsterDefinition,
   scaleWaveMonster,
 } from './waveMonsters.js';
+
+export { getCounterMatrixRows, validateCounterMatrix } from './counter-matrix.js';
+export type { CounterMatrixRow } from './counter-matrix.js';
 
 // ============================================================================
 // Validation

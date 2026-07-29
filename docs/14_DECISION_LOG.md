@@ -68,6 +68,13 @@
 - Decision：每個玩家戰場獨立生成 Wave Monster，MonsterSource 使用區分聯合。
 - Reference：ADR-009-DUAL-BATTLEFIELD-MODEL
 
+## DEC-012｜Combat Modifier Ordering and Permille Semantics
+
+- Status：Accepted
+- Date：2026-07-29
+- Decision：`bonusDamagePermille` 表示額外傷害，500 = +50%；傷害順序為 Base → Tag Bonus → Type Resistance → Physical Armor → Shield → HP。
+- Reference：ADR-010-COMBAT-MODIFIER-ORDERING-AND-PERMILLE-SEMANTICS
+
 ## Open
 
 ### OPEN-001｜上下或左右 Lane

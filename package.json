@@ -17,7 +17,8 @@
     "typecheck:test": "tsc --project tsconfig.test.json --pretty false",
     "test": "vitest run && npm run test --workspace=apps/asset-admin",
     "test:watch": "vitest",
-    "docs:check-balance": "node scripts/check-balance.mjs"
+    "docs:check-balance": "node scripts/check-balance.mjs",
+    "docs:generate-counter-matrix": "npm run build --workspace=@chaos-td/game-data && node scripts/generate-counter-matrix.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

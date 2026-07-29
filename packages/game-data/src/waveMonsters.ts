@@ -76,6 +76,7 @@ const FLYING_MONSTER: MonsterDefinition = freezeMonster({
   hp: 120,
   shield: 40,
   armorPermille: 0,
+  magicResistancePermille: 250,
   speedMilliTilesPerTick: 45,
   leakDamage: 2,
   availableAtRunningTick: 0,
@@ -95,6 +96,7 @@ const SIEGE_MONSTER: MonsterDefinition = freezeMonster({
   hp: 250,
   shield: 0,
   armorPermille: 150,
+  physicalResistancePermille: 250,
   speedMilliTilesPerTick: 25,
   leakDamage: 3,
   availableAtRunningTick: 0,
@@ -114,6 +116,7 @@ const BOSS_MONSTER: MonsterDefinition = freezeMonster({
   hp: 1500,
   shield: 300,
   armorPermille: 300,
+  physicalResistancePermille: 250,
   speedMilliTilesPerTick: 20,
   leakDamage: 5,
   availableAtRunningTick: 0,
@@ -127,7 +130,7 @@ const BOSS_MONSTER: MonsterDefinition = freezeMonster({
 // Registry
 // ============================================================================
 
-const WAVE_MONSTER_DEFINITIONS: ReadonlyMap<WaveMonsterType, MonsterDefinition> = Object.freeze(
+export const WAVE_MONSTER_DEFINITIONS: ReadonlyMap<WaveMonsterType, MonsterDefinition> = Object.freeze(
   new Map<WaveMonsterType, MonsterDefinition>([
     ['basic', BASIC_MONSTER],
     ['swift', SWIFT_MONSTER],

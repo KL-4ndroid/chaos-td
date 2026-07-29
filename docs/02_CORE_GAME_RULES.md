@@ -171,21 +171,24 @@ MVP：Sheep、Wolf、Treant、Ghost。
 
 ### 抗性與傷害計算
 
-最終 HP 傷害計算順序（Shield → Armor → Resist → Bonus）：
+最終 HP 傷害計算順序：
 
 ```text
-1. rawDamage = level.damage
-2. 若 primary target 有 bonusDamageTag 且等於 level.bonusDamageTag：
-      rawDamage = floor(rawDamage × (1000 + bonusDamagePermille) / 1000)
-3. 根據 damageType 套用抗性：
-      physical_resist  tag → damageType === 'physical' 時，armorMultiplierPermille 生效
-      magic_resist     tag → damageType === 'magic'    時，armorMultiplierPermille 生效
-      pure 伤害类型 → 忽略所有抗性
-4. armorMultiplierPermille = 1000 - clamp(armorPermille, 0, 800)
-5. finalHpDamage = max(1, floor(rawDamage × armorMultiplierPermille / 1000))
+Base Damage
+→ Tag Bonus
+→ Type Resistance
+→ Physical Armor
+→ Shield
+→ HP
 ```
 
-Shield 先扣，Armor 不影響 Shield，溢出 Damage 再套 Armor。
+1. `rawDamage = level.damage`。
+2. 若目標有 `bonusDamageTag`，`bonusDamagePermille` 是額外傷害；500 代表 +50%，所以結果為 `floor(rawDamage × (1000 + bonusDamagePermille) / 1000)`。
+3. `physical_resist` 只在 Physical 時套用 `physicalResistancePermille`；`magic_resist` 只在 Magic 時套用 `magicResistancePermille`。
+4. `armorPermille` 只在 Physical 時於 type resistance 後套用。Pure 忽略 type resistance 與 armor。
+5. Shield 吸收所有減傷後的傷害，剩餘部分才扣 HP。Splash 對每一個 splash target 獨立完成上述計算，包括該目標的 bonus tag。
+
+每一個減傷 permille 都由 game-data 或 Global Config 提供，不在 Core 硬編碼。
 
 ### Monster AI Behavior
 
