@@ -17,7 +17,8 @@
 
 import type { WaveDefinition, WaveGroup } from './types.js';
 
-const TICKS_BETWEEN_SPAWNS = 20 as const;  // 1 second at 20 TPS
+// Wave spawn uses a 21-tick cycle: set cooldown to 21, decrement to 0 = 20-tick gap.
+const WAVE_SPAWN_INTERVAL_TICKS = 21 as const;
 
 /**
  * Build a single WaveGroup for a given monster type.
@@ -40,13 +41,14 @@ function waveMultiplier(waveNumber: number): number {
 
 /**
  * Calculate total duration in ticks for a wave.
- * Duration = sum of (spawnGap for each group) + TICKS_BETWEEN_SPAWNS per extra monster.
+ * Duration = (totalSpawns - 1) * WAVE_SPAWN_INTERVAL_TICKS ticks of gap between monsters.
+ * For a 3-monster wave: first spawn + 21-gap + spawn + 21-gap + spawn = 42 ticks total span.
  */
 function totalDuration(groups: readonly WaveGroup[]): number {
-  // Each group spawns its count members with TICKS_BETWEEN_SPAWNS gap
+  // Each group spawns its count members with WAVE_SPAWN_INTERVAL_TICKS (21-tick cycle = 20-tick gap)
   const totalSpawns = groups.reduce((sum, g) => sum + g.count, 0);
-  // First spawn at tick 0, so duration = (totalSpawns - 1) * gap
-  return Math.max(TICKS_BETWEEN_SPAWNS, (totalSpawns - 1) * TICKS_BETWEEN_SPAWNS);
+  // First spawn at tick 0, so duration = (totalSpawns - 1) * WAVE_SPAWN_INTERVAL_TICKS
+  return Math.max(WAVE_SPAWN_INTERVAL_TICKS, (totalSpawns - 1) * WAVE_SPAWN_INTERVAL_TICKS);
 }
 
 /**

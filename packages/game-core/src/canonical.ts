@@ -14,18 +14,12 @@
  * Reference: ADR-008-CANONICAL-HASH
  */
 
-import type { BattlefieldId } from '@chaos-td/game-data';
+import type { BattlefieldId, MonsterSource, PlayerSlot } from '@chaos-td/game-data';
 
-export type PlayerSlot = 'p1' | 'p2';
 export type Phase = 'ready' | 'countdown' | 'running' | 'resolving' | 'result';
 
-/**
- * Who sent / spawned a monster — used in canonical state and hash.
- * Replaces the previous ownerId: PlayerSlot | 'system' pattern.
- */
-export type MonsterSource =
-  | { readonly type: 'player'; readonly playerId: PlayerSlot }
-  | { readonly type: 'wave'; readonly waveNumber: number };
+// Re-export from game-data for consumers of canonical.ts
+export type { PlayerSlot, MonsterSource };
 
 export interface PlayerSlotState {
   playerId: PlayerSlot;

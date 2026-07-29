@@ -201,7 +201,7 @@ MVP 不含「怪物主動攻擊塔造成塔損壞」的規則。
 
 自動波次由 `MatchWaveState` 管理，讀取 `packages/game-data` 提供的 `WaveDefinition[]`。波次由系統（而非玩家）觸發，怪物來源記錄為 `source: { type: 'wave', waveNumber }`，不是任何 PlayerSlot。
 
-#### 雙戰場模型（ADR-001）
+#### 雙戰場模型（ADR-009）
 
 每位玩家的 Battlefield 有獨立的 `BattlefieldWaveRuntime`：
 - Wave Definition 為**共享唯讀資料**，雙方使用相同定義

@@ -61,6 +61,13 @@
 - Reason：零依賴、確定性、debug-friendly、不需密碼安全。
 - Reference：ADR-008-CANONICAL-HASH
 
+## DEC-011｜Dual Battlefield Match Model
+
+- Status：Accepted
+- Date：2026-07-29
+- Decision：每個玩家戰場獨立生成 Wave Monster，MonsterSource 使用區分聯合。
+- Reference：ADR-009-DUAL-BATTLEFIELD-MODEL
+
 ## Open
 
 ### OPEN-001｜上下或左右 Lane

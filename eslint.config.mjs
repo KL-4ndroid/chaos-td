@@ -22,6 +22,13 @@ export default tseslint.config(
     },
   },
   {
+    files: ['scripts/**/*.js'],
+    rules: {
+      'no-undef': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     ignores: [
       '**/node_modules/**',
       '**/dist/**',

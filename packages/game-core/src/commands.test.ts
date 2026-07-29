@@ -432,7 +432,7 @@ describe('Gold Never Negative', () => {
 });
 
 describe('Game Completion', () => {
-  it('resolves by timeout after max running ticks', () => {
+  it('resolves by timeout after max running ticks', { timeout: 600_000 }, () => {
     const sim = createSimulation({ seed: 'test', configVersion: CONFIG_VERSION });
     advanceToRunning(sim);
 

@@ -302,17 +302,17 @@ export function decideDefense(
         (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
       );
 
-      if (affordableTowers.length > 0) {
-        const cell = affordableTowers[0]!;
-        return {
-          type: 'build_tower',
-          towerType: preferredTower,
-          cellX: cell.cellX,
-          cellY: cell.cellY,
-          score: 100, // High priority
-        };
+      const cell = affordableTowers[0];
+      if (!cell) {
+        return { type: 'no_action', reason: 'no_available_cells' };
       }
-      return { type: 'no_action', reason: 'no_available_cells' };
+      return {
+        type: 'build_tower',
+        towerType: preferredTower,
+        cellX: cell.cellX,
+        cellY: cell.cellY,
+        score: 100, // High priority
+      };
     }
 
     case 'strained': {
@@ -323,16 +323,17 @@ export function decideDefense(
           (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
         );
 
-        if (affordableTowers.length > 0) {
-          const cell = affordableTowers[0]!;
-          return {
-            type: 'build_tower',
-            towerType: preferredTower,
-            cellX: cell.cellX,
-            cellY: cell.cellY,
-            score: 50,
-          };
+        const cell = affordableTowers[0];
+        if (!cell) {
+          return { type: 'no_action', reason: 'no_available_cells' };
         }
+        return {
+          type: 'build_tower',
+          towerType: preferredTower,
+          cellX: cell.cellX,
+          cellY: cell.cellY,
+          score: 50,
+        };
       }
       return { type: 'no_action', reason: 'insufficient_extra_gold' };
     }
@@ -345,16 +346,17 @@ export function decideDefense(
           (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
         );
 
-        if (affordableTowers.length > 0) {
-          const cell = affordableTowers[0]!;
-          return {
-            type: 'build_tower',
-            towerType: preferredTower,
-            cellX: cell.cellX,
-            cellY: cell.cellY,
-            score: 10,
-          };
+        const cell = affordableTowers[0];
+        if (!cell) {
+          return { type: 'no_action', reason: 'no_available_cells' };
         }
+        return {
+          type: 'build_tower',
+          towerType: preferredTower,
+          cellX: cell.cellX,
+          cellY: cell.cellY,
+          score: 10,
+        };
       }
       return { type: 'no_action', reason: 'lane_safe' };
     }
@@ -412,7 +414,11 @@ export function selectMonsterType(
   // Default to sheep for safe lanes
   if (laneThreat === 'safe') {
     // Use PRNG to pick between sheep and wolf
-    const useWolf = rng.state[0]! % 2 === 0;
+    const state0 = rng.state[0];
+    if (state0 === undefined) {
+      return 'sheep';
+    }
+    const useWolf = state0 % 2 === 0;
     return useWolf && preferredTypes.includes('wolf') ? 'wolf' : 'sheep';
   }
 
