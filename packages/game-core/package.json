@@ -22,7 +22,7 @@
     "vitest": "^4.1.0"
   },
   "peerDependencies": {
-    "@chaos-td/game-data": "workspace:*"
+    "@chaos-td/game-data": "*"
   },
   "dependencies": {}
 }
