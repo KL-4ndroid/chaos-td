@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Build packages
+        run: |
+          npm run build --workspace=@chaos-td/game-data
+          npm run build --workspace=@chaos-td/game-core
+          npm run build --workspace=@chaos-td/client
+
       - name: Lint
         run: npm run lint
 
