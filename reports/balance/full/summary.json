@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 2,
+  "mode": "full",
+  "seedCount": 30,
+  "scenarioCount": 9,
+  "matchCount": 270,
+  "outcomeCounts": {
+    "p2": 210,
+    "draw": 60
+  },
+  "scenarioOutcomeCounts": {
+    "easy-vs-easy": {
+      "p2": 30
+    },
+    "medium-vs-medium": {
+      "p2": 30
+    },
+    "hard-vs-hard": {
+      "p2": 30
+    },
+    "aggressive-vs-defensive": {
+      "p2": 30
+    },
+    "defensive-vs-aggressive": {
+      "p2": 30
+    },
+    "balanced-vs-balanced": {
+      "p2": 30
+    },
+    "none-vs-none": {
+      "draw": 30
+    },
+    "none-vs-easy": {
+      "p2": 30
+    },
+    "easy-vs-none": {
+      "draw": 30
+    }
+  },
+  "finalTickMinimum": 1685,
+  "finalTickMedian": 1685,
+  "finalTickP90": 1685,
+  "finalTickMaximum": 1685,
+  "finalWaveCounts": {
+    "7": 270
+  },
+  "p1HpTotal": 0,
+  "p2HpTotal": 4200,
+  "p1NetWorthTotal": 324000,
+  "p2NetWorthTotal": 255960,
+  "towerTotals": [
+    {
+      "towerId": "archer",
+      "level": 1,
+      "buildCount": 1890,
+      "upgradeCount": 0,
+      "sellCount": 0,
+      "attackCount": 23940,
+      "rawDamage": 430920,
+      "bonusDamage": 0,
+      "resistanceReduction": 0,
+      "armorReduction": 0,
+      "shieldDamage": 0,
+      "hpDamage": 430920,
+      "killCount": 4830,
+      "groundTargetCount": 23940,
+      "flyingTargetCount": 0,
+      "bossDamage": 0,
+      "splashSecondaryDamage": 0,
+      "slowApplications": 0
+    }
+  ],
+  "monsterTotals": [
+    {
+      "monsterId": "basic",
+      "source": "wave",
+      "spawnCount": 12420,
+      "deathCount": 4410,
+      "leakCount": 5940,
+      "damageTaken": 400680,
+      "shieldDamageTaken": 0,
+      "leakDamage": 5940
+    },
+    {
+      "monsterId": "flying",
+      "source": "wave",
+      "spawnCount": 1080,
+      "deathCount": 0,
+      "leakCount": 0,
+      "damageTaken": 0,
+      "shieldDamageTaken": 0,
+      "leakDamage": 0
+    },
+    {
+      "monsterId": "swift",
+      "source": "wave",
+      "spawnCount": 1080,
+      "deathCount": 420,
+      "leakCount": 660,
+      "damageTaken": 30240,
+      "shieldDamageTaken": 0,
+      "leakDamage": 660
+    }
+  ]
+}

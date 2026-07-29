@@ -1,0 +1,10 @@
+scenario,towerId,level,buildCount,upgradeCount,attackCount,hpDamage,killCount,slowApplications
+medium-vs-medium,archer,1,6,0,65,1170,13,0
+aggressive-vs-defensive,archer,1,6,0,65,1170,13,0
+defensive-vs-aggressive,archer,1,6,0,65,1170,13,0
+medium-vs-medium,archer,1,6,0,65,1170,13,0
+aggressive-vs-defensive,archer,1,6,0,65,1170,13,0
+defensive-vs-aggressive,archer,1,6,0,65,1170,13,0
+medium-vs-medium,archer,1,6,0,65,1170,13,0
+aggressive-vs-defensive,archer,1,6,0,65,1170,13,0
+defensive-vs-aggressive,archer,1,6,0,65,1170,13,0

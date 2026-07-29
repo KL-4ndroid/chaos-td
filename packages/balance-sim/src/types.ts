@@ -91,13 +91,18 @@ export interface WaveBalanceSummary {
   readonly deaths: number;
   readonly leaks: number;
   readonly peakConcurrentMonsterCount: number;
+  readonly peakPlayerSentOverlap: number;
+  readonly peakTotalBattlefieldPressure: number;
 }
+
+export type MatchCompletion = 'result' | 'tick_guard';
 
 export interface MatchSummary {
   readonly seed: string;
   readonly configVersion: string;
   readonly finalTick: number;
   readonly finalWave: number;
+  readonly completion: MatchCompletion;
   readonly winnerId: PlayerSlot | null;
   readonly outcome: 'win' | 'draw';
   readonly reason: string;

@@ -2,10 +2,15 @@ import {
   calculatePathLength,
   createPathSegments,
   createSimulation,
+  calculateLaneThreat,
+  createAIStates,
+  processAIDecision,
+  updateAIState,
   type DomainEvent,
   type GameCommand,
   type LaneRuntimeState,
   type PlayerSlot,
+  type MatchEndedEvent,
 } from '@chaos-td/game-core';
 import {
   CONFIG_VERSION,
@@ -13,12 +18,12 @@ import {
   MONSTER_BY_ID,
   MVP_MIRROR_01,
   TOWER_BY_ID,
+  type TowerId,
 } from '@chaos-td/game-data';
 import type {
   BalanceSimulationOptions,
   BalanceSimulationResult,
   BalanceTimeSample,
-  ControllerProfile,
   MonsterBalanceSummary,
   PlayerBalanceSummary,
   TowerBalanceSummary,
@@ -76,67 +81,6 @@ function emptyPlayerSummary(): MutablePlayerSummary {
   };
 }
 
-function controllerTower(profile: ControllerProfile): 'archer' | 'mage' | 'frost' | 'sniper' {
-  if (profile.personality === 'aggressive') return 'archer';
-  if (profile.personality === 'defensive') return 'frost';
-  return profile.difficulty === 'hard' ? 'sniper' : profile.difficulty === 'easy' ? 'archer' : 'mage';
-}
-
-function controllerInterval(profile: ControllerProfile): number {
-  if (profile.kind === 'none') return Number.MAX_SAFE_INTEGER;
-  if (profile.difficulty === 'hard') return 40;
-  if (profile.difficulty === 'easy') return 100;
-  return 70;
-}
-
-function submitControllerCommand(
-  simulation: ReturnType<typeof createSimulation>,
-  playerId: PlayerSlot,
-  profile: ControllerProfile,
-): GameCommand | null {
-  if (profile.kind === 'none' || simulation.state.phase !== 'running') return null;
-  const tick = simulation.state.tick;
-  if (tick % controllerInterval(profile) !== 0) return null;
-
-  const tower = controllerTower(profile);
-  const lane = MVP_MIRROR_01.lanes.find((candidate) => candidate.defenderPlayerId === playerId);
-  const preferredCell = lane?.aiBuildPriorityCells.find((cell) => !simulation.state.towers.some(
-    (existing) => existing.ownerId === playerId && existing.cellX === cell.col && existing.cellY === cell.row,
-  ));
-  const towerDefinition = TOWER_BY_ID.get(tower);
-  const firstLevel = towerDefinition?.levels[0];
-  const player = simulation.state.players[playerId];
-  if (preferredCell && towerDefinition && firstLevel && player.gold >= firstLevel.cost) {
-    const command: GameCommand = {
-      type: 'build_tower',
-      commandId: simulation.getNextCommandId(playerId),
-      playerId,
-      towerTypeId: tower,
-      cellX: preferredCell.col,
-      cellY: preferredCell.row,
-    };
-    simulation.submitCommand(command);
-    return command;
-  }
-
-  if (profile.personality !== 'defensive' && tick % (controllerInterval(profile) * 2) === 0) {
-    const monsterId = profile.personality === 'aggressive' ? 'wolf' : 'sheep';
-    const monster = MONSTER_BY_ID.get(monsterId);
-    if (monster && player.gold >= monster.sendCost && simulation.state.lanes[playerId === 'p1' ? 'lane_p2' : 'lane_p1'].spawnQueue.length < GLOBAL_CONFIG.sendQueueLimit) {
-      const command: GameCommand = {
-        type: 'queue_monster',
-        commandId: simulation.getNextCommandId(playerId),
-        playerId,
-        monsterTypeId: monsterId,
-        quantity: 1,
-      };
-      simulation.submitCommand(command);
-      return command;
-    }
-  }
-  return null;
-}
-
 function towerKey(towerId: string, level: number): string {
   return `${towerId}:L${level}`;
 }
@@ -160,6 +104,10 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
   const samples: BalanceTimeSample[] = [];
   const commandLog: string[] = [];
   const eventLog: string[] = [];
+  const matchEndObservation: { value: MatchEndedEvent | null } = { value: null };
+  let aiStates = createAIStates(options.seed);
+  const waveActiveCounts = new Map<string, number>();
+  const playerSentActiveCounts: Record<PlayerSlot, number> = { p1: 0, p2: 0 };
   const maximumTicks = options.maxTicks ?? GLOBAL_CONFIG.maxRunningTicks + GLOBAL_CONFIG.countdownTicks + GLOBAL_CONFIG.maxResolvingTicks;
 
   function getTower(towerId: string, level: number): MutableTowerSummary {
@@ -185,6 +133,7 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
   function consume(event: DomainEvent): void {
     if (options.captureEventLog) eventLog.push(JSON.stringify(event));
     switch (event.type) {
+      case 'match_ended': matchEndObservation.value = event; break;
       case 'command_accepted': players[event.playerId].commandsAccepted += 1; break;
       case 'command_rejected': {
         const summary = players[event.playerId];
@@ -223,8 +172,17 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
       case 'monster_spawned': {
         const definition = MONSTER_BY_ID.get(event.monsterType);
         if (definition && event.source.type === 'player') {
-          entities.set(event.monsterEntityId, { monsterId: event.monsterType, source: 'player', battlefieldId: event.source.playerId === 'p1' ? 'lane_p2' : 'lane_p1', movement: definition.movementType, tags: definition.tags });
+          const battlefieldId = event.source.playerId === 'p1' ? 'lane_p2' : 'lane_p1';
+          entities.set(event.monsterEntityId, { monsterId: event.monsterType, source: 'player', battlefieldId, movement: definition.movementType, tags: definition.tags });
           getMonster(event.monsterType, 'player').spawnCount += 1;
+          const defenderId = battlefieldId === 'lane_p1' ? 'p1' : 'p2';
+          playerSentActiveCounts[defenderId] += 1;
+          for (const wave of waves.values()) {
+            if (wave.battlefieldId !== battlefieldId) continue;
+            const activeWaveCount = waveActiveCounts.get(waveKey(wave.battlefieldId, wave.waveNumber)) ?? 0;
+            wave.peakPlayerSentOverlap = Math.max(wave.peakPlayerSentOverlap, playerSentActiveCounts[defenderId]);
+            wave.peakTotalBattlefieldPressure = Math.max(wave.peakTotalBattlefieldPressure, activeWaveCount + playerSentActiveCounts[defenderId]);
+          }
         }
         break;
       }
@@ -235,8 +193,15 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
           getMonster(event.monsterType, 'wave').spawnCount += 1;
         }
         const key = waveKey(event.battlefieldId, event.waveNumber);
-        const wave = waves.get(key) ?? { battlefieldId: event.battlefieldId, waveNumber: event.waveNumber, actualSpawnCount: 0, spawningStartTick: event.tick, spawningEndTick: null, deaths: 0, leaks: 0, peakConcurrentMonsterCount: 0 };
+        const wave = waves.get(key) ?? { battlefieldId: event.battlefieldId, waveNumber: event.waveNumber, actualSpawnCount: 0, spawningStartTick: event.tick, spawningEndTick: null, deaths: 0, leaks: 0, peakConcurrentMonsterCount: 0, peakPlayerSentOverlap: 0, peakTotalBattlefieldPressure: 0 };
         wave.actualSpawnCount += 1;
+        const activeCount = (waveActiveCounts.get(key) ?? 0) + 1;
+        waveActiveCounts.set(key, activeCount);
+        wave.peakConcurrentMonsterCount = Math.max(wave.peakConcurrentMonsterCount, activeCount);
+        const defenderId = event.battlefieldId === 'lane_p1' ? 'p1' : 'p2';
+        const playerSentCount = playerSentActiveCounts[defenderId];
+        wave.peakPlayerSentOverlap = Math.max(wave.peakPlayerSentOverlap, playerSentCount);
+        wave.peakTotalBattlefieldPressure = Math.max(wave.peakTotalBattlefieldPressure, activeCount + playerSentCount);
         waves.set(key, wave);
         break;
       }
@@ -279,8 +244,13 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
         if (entity) {
           getMonster(entity.monsterId, entity.source).deathCount += 1;
           if (entity.source === 'wave' && entity.waveNumber !== undefined) {
-            const wave = waves.get(waveKey(entity.battlefieldId, entity.waveNumber));
+            const key = waveKey(entity.battlefieldId, entity.waveNumber);
+            const wave = waves.get(key);
             if (wave) wave.deaths += 1;
+            waveActiveCounts.set(key, Math.max(0, (waveActiveCounts.get(key) ?? 0) - 1));
+          } else {
+            const defenderId = entity.battlefieldId === 'lane_p1' ? 'p1' : 'p2';
+            playerSentActiveCounts[defenderId] = Math.max(0, playerSentActiveCounts[defenderId] - 1);
           }
           const killer = event.killerTowerEntityId === undefined ? undefined : towerEntities.get(event.killerTowerEntityId);
           if (killer) getTower(killer.towerId, killer.level).killCount += 1;
@@ -294,8 +264,13 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
           summary.leakCount += 1;
           summary.leakDamage += event.leakDamage;
           if (entity.source === 'wave' && entity.waveNumber !== undefined) {
-            const wave = waves.get(waveKey(entity.battlefieldId, entity.waveNumber));
+            const key = waveKey(entity.battlefieldId, entity.waveNumber);
+            const wave = waves.get(key);
             if (wave) wave.leaks += 1;
+            waveActiveCounts.set(key, Math.max(0, (waveActiveCounts.get(key) ?? 0) - 1));
+          } else {
+            const defenderId = entity.battlefieldId === 'lane_p1' ? 'p1' : 'p2';
+            playerSentActiveCounts[defenderId] = Math.max(0, playerSentActiveCounts[defenderId] - 1);
           }
           if (entity.source === 'wave') players[event.defenderId].waveLeakDamage += event.leakDamage;
           else players[event.defenderId].opponentSendLeakDamage += event.leakDamage;
@@ -308,15 +283,40 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
   simulation.start();
   while (simulation.state.phase !== 'result' && simulation.state.tick < maximumTicks) {
     for (const [playerId, profile] of [['p1', options.p1Controller], ['p2', options.p2Controller]] as const) {
-      const command = submitControllerCommand(simulation, playerId, profile);
-      if (command) commandLog.push(JSON.stringify(command));
+      if (profile.kind === 'none' || simulation.state.phase !== 'running') continue;
+      const battlefieldId = playerId === 'p1' ? 'lane_p1' : 'lane_p2';
+      const lane = simulation.state.lanes[battlefieldId];
+      const monstersAtRisk = lane.monsters.filter((monster) => monster.pathProgressMilliTiles * 4 >= lane.totalPathLength * 3).length;
+      const threat = calculateLaneThreat(lane.monsters.length, monstersAtRisk, 0, lane.totalPathLength);
+      const decision = processAIDecision(
+        playerId,
+        aiStates[playerId],
+        simulation.state.tick,
+        simulation.state.players[playerId].gold,
+        threat,
+        simulation.state.towers.filter((tower) => tower.ownerId === playerId).map((tower) => `${tower.cellX},${tower.cellY}`),
+        simulation.state.lanes[playerId === 'p1' ? 'lane_p2' : 'lane_p1'].spawnQueue.length,
+        GLOBAL_CONFIG.sendQueueLimit,
+        MONSTER_BY_ID.get('sheep')?.sendCost ?? 0,
+        ['archer', 'mage', 'frost', 'sniper'],
+      );
+      if (decision.reason !== 'not_decision_tick') {
+        aiStates = { ...aiStates, [playerId]: updateAIState(aiStates[playerId], simulation.state.tick) };
+      }
+      const params = decision.params;
+      let command: GameCommand | null = null;
+      if (decision.action === 'build_tower' && params?.towerType && params.cellX !== undefined && params.cellY !== undefined && TOWER_BY_ID.has(params.towerType)) {
+        command = { type: 'build_tower', commandId: simulation.getNextCommandId(playerId), playerId, towerTypeId: params.towerType as TowerId, cellX: params.cellX, cellY: params.cellY };
+      } else if (decision.action === 'queue_monster' && params?.monsterType && params.quantity !== undefined && MONSTER_BY_ID.has(params.monsterType)) {
+        command = { type: 'queue_monster', commandId: simulation.getNextCommandId(playerId), playerId, monsterTypeId: params.monsterType, quantity: params.quantity };
+      }
+      if (command) {
+        simulation.submitCommand(command);
+        commandLog.push(JSON.stringify(command));
+      }
     }
     const step = simulation.step();
     for (const event of step.events) consume(event);
-    for (const wave of waves.values()) {
-      const lane = step.state.lanes[wave.battlefieldId];
-      wave.peakConcurrentMonsterCount = Math.max(wave.peakConcurrentMonsterCount, lane.monsters.filter((monster) => monster.hp > 0).length);
-    }
     if (step.state.tick % options.samplingIntervalTicks === 0 || step.state.phase === 'result') {
       const snapshot = (playerId: PlayerSlot) => {
         const player = step.state.players[playerId];
@@ -336,9 +336,20 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
     players[playerId].netWorth = final.gold + Math.floor(invested * GLOBAL_CONFIG.sellRefundPermille / 1000);
   }
 
-  const matchEnd = eventLog.map((line) => JSON.parse(line) as { type: string; winnerId?: PlayerSlot | null; outcome?: 'win' | 'draw'; reason?: string }).find((event) => event.type === 'match_ended');
+  const result = matchEndObservation.value;
   return {
-    match: { seed: options.seed, configVersion: CONFIG_VERSION, finalTick: simulation.state.tick, finalWave: simulation.state.waveScheduler.currentWaveNumber, winnerId: matchEnd?.winnerId ?? null, outcome: matchEnd?.outcome ?? 'draw', reason: matchEnd?.reason ?? 'max_ticks', commandLog, eventLog },
+    match: {
+      seed: options.seed,
+      configVersion: CONFIG_VERSION,
+      finalTick: simulation.state.tick,
+      finalWave: simulation.state.waveScheduler.currentWaveNumber,
+      completion: result ? 'result' : 'tick_guard',
+      winnerId: result?.winnerId ?? null,
+      outcome: result?.outcome ?? 'draw',
+      reason: result?.reason ?? 'tick_guard',
+      commandLog,
+      eventLog,
+    },
     players,
     towers: [...towers.values()].sort((left, right) => towerKey(left.towerId, left.level).localeCompare(towerKey(right.towerId, right.level))),
     monsters: [...monsters.values()].sort((left, right) => monsterKey(left.monsterId, left.source).localeCompare(monsterKey(right.monsterId, right.source))),

@@ -1,0 +1,13 @@
+scenario,monsterId,source,spawnCount,deathCount,leakCount,damageTaken,leakDamage
+medium-vs-medium,basic,wave,26,13,9,1170,9
+aggressive-vs-defensive,basic,wave,26,13,9,1170,9
+defensive-vs-aggressive,basic,wave,26,13,9,1170,9
+none-vs-none,basic,wave,26,0,18,0,18
+medium-vs-medium,basic,wave,26,13,9,1170,9
+aggressive-vs-defensive,basic,wave,26,13,9,1170,9
+defensive-vs-aggressive,basic,wave,26,13,9,1170,9
+none-vs-none,basic,wave,26,0,18,0,18
+medium-vs-medium,basic,wave,26,13,9,1170,9
+aggressive-vs-defensive,basic,wave,26,13,9,1170,9
+defensive-vs-aggressive,basic,wave,26,13,9,1170,9
+none-vs-none,basic,wave,26,0,18,0,18
