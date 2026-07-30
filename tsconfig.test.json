@@ -10,7 +10,8 @@
     "baseUrl": ".",
     "paths": {
       "@chaos-td/game-data": ["packages/game-data/src/index.ts"],
-      "@chaos-td/game-core": ["packages/game-core/src/index.ts"]
+      "@chaos-td/game-core": ["packages/game-core/src/index.ts"],
+      "@chaos-td/ai-strategy": ["packages/ai-strategy/src/index.ts"]
     }
   },
   "include": [
@@ -22,6 +23,8 @@
     "packages/game-data/src/**/*.spec.ts",
     "packages/balance-sim/src/**/*.test.ts",
     "packages/balance-sim/src/**/*.spec.ts",
+    "packages/ai-strategy/src/**/*.test.ts",
+    "packages/ai-strategy/src/**/*.spec.ts",
     "packages/shared/src/**/*.test.ts",
     "packages/shared/src/**/*.spec.ts",
     "packages/test-fixtures/src/**/*.test.ts",

@@ -1,0 +1,28 @@
+{
+  "name": "@chaos-td/ai-strategy",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Versioned deterministic AI strategy policy and frozen opponent runtime",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@chaos-td/game-core": "*",
+    "@chaos-td/game-data": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.0"
+  }
+}
