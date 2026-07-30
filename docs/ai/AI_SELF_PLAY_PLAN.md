@@ -26,9 +26,21 @@ P1.6 uses the official game-core simulation and `GameCommand` API. Training is h
 
 Numeric genome values are integer permille or bounded integer scores. Canonical serialization emits fields in a declared order. A strategy identifies its schema, strategy version, compatible content version, and optional opening book. Validation rejects missing fields, non-finite numbers, unsupported schemas, and incompatible content versions.
 
+## Observation Contract (ADR-011)
+
+**Formal AI uses public-information parity. Exact opponent Gold and Income are hidden.**
+
+- Policy functions (`scoreAIAction`, `selectAIAction`, `generateLegalActions`) accept `AIObservation`, never `SimulationState`.
+- `buildAIObservation(playerId, BuildObservationInput)` is the single shared builder entry point for all consumers (balance sim, self-play, client adapter).
+- `SelfAIObservation` includes precise HP, Gold, Income, towers, send queue, role coverage.
+- `PublicOpponentObservation` includes HP, visible tower type/level/position, coverage, pressure. Exact opponent Gold and Income are excluded.
+- `OpponentEconomyEstimate` is reserved (all fields zero / `hasEstimate: false`); no estimator implemented in v1.
+- Training Evaluator may read full `SimulationState`; Policy Runtime never receives it.
+- `leak-prevention.test.ts` verifies opponent Gold/Income changes do not affect observation or decisions.
+
 ## Self-play Contract
 
-Each tick obtains a single immutable simulation state reference. Both policies derive actions from that same state. Converted commands are accumulated before submission, then sorted by a symmetric normalized action key. The simulation validates all commands. Runtime state updates occur only in the policy runtimes after decision creation. Each player has independent seeded PRNG state.
+Each tick the trainer builds an `AIObservation` from the simulation state for each player. Both policies receive sanitized `AIObservation` (never raw `SimulationState`). Converted commands are accumulated before submission, then sorted by a symmetric normalized action key. The simulation validates all commands. Runtime state updates occur only in the policy runtimes after decision creation. Each player has independent seeded PRNG state.
 
 ## Training Configurations
 

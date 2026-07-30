@@ -1,3 +1,4 @@
+// Strategy schema and validation
 export {
   AI_STRATEGY_SCHEMA_VERSION,
   AI_STRATEGY_NUMERIC_MIN,
@@ -10,8 +11,25 @@ export {
   type StrategyValidationError,
   type StrategyValidationResult,
 } from './strategy.js';
+
+// Observation contract
 export {
-  extractAIFeatures,
+  AI_OBSERVATION_SCHEMA_VERSION,
+  buildAIObservation,
+  observationFromDomainEvents,
+  type AIObservation,
+  type BattlefieldObservation,
+  type BuildObservationInput,
+  type GamePhase,
+  type OpponentEconomyEstimate,
+  type PublicOpponentObservation,
+  type SelfAIObservation,
+  type VisibleTower,
+} from './observation.js';
+
+// Policy (accepts AIObservation, never SimulationState)
+export {
+  extractAIFeaturesFromObservation,
   generateLegalActions,
   scoreAIAction,
   selectAIAction,
@@ -20,6 +38,8 @@ export {
   type LegalAIAction,
   type ScoredAIAction,
 } from './policy.js';
+
+// Opening books
 export {
   ADAPTIVE_OPENING_BOOKS,
   applyOpeningBookPreferences,
@@ -27,6 +47,8 @@ export {
   type AIOpeningBook,
   type AIOpeningPreference,
 } from './opening-book.js';
+
+// Frozen strategy pool
 export {
   selectOpponentStrategy,
   validateFrozenStrategyPool,

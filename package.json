@@ -21,7 +21,10 @@
     "docs:generate-counter-matrix": "npm run build --workspace=@chaos-td/game-data && node scripts/generate-counter-matrix.mjs",
     "balance:check": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && node scripts/run-balance-smoke.mjs",
     "balance:simulate": "node scripts/run-balance-full.mjs",
-    "balance:report": "npm run balance:simulate"
+    "balance:report": "npm run balance:simulate",
+    "ai:check": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && npx vitest run packages/ai-training/src/league.test.ts packages/ai-training/src/compat.test.ts",
+    "ai:train": "npx vitest run packages/ai-training/src/league.test.ts packages/ai-training/src/fitness.test.ts packages/ai-training/src/hall-of-fame.test.ts",
+    "ai:compatibility-check": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/ai-strategy && npx vitest run packages/ai-training/src/compat.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
