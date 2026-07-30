@@ -2,13 +2,17 @@
 
 ## Current
 
-- **Branch**: autonomous/phase1-mvp
-- **Milestone**: M6 Balance Playtest Build
-- **Task**: PHASE 1 COMPLETE
-- **Status**: All milestones passed; ready for human evaluation
-- **Last commit**: Phase 1 MVP completion commit
-- **Last push**: 2026-07-22
-- **Test status**: 231 passed; typecheck passed; lint has four pre-existing AI non-null warnings
+- **Branch**: autonomous/phase1-playtest
+- **Milestone**: P1.5-004 Human Playtest Candidate
+- **Task**: P1.5-004
+- **Status**: READY_FOR_HUMAN_PLAYTEST
+- **Baseline**: `ccfafac` (PR #2 merged into `main`)
+- **Formal AI controllers**: `none`, `normal_ai`
+- **Formal balance matrix**: 30 seeds x 4 scenarios = 120 matches
+- **Historical 270-match profile comparison**: `invalid_for_profile_comparison`
+- **P1.5-002**: DONE
+- **P1.5-003**: DONE (slot fairness audit and regressions complete)
+- **P1.5-004**: READY_FOR_HUMAN_PLAYTEST; no game-data balance changes
 
 ## Completed Tasks
 
