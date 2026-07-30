@@ -27,3 +27,11 @@ export {
   type AIOpeningBook,
   type AIOpeningPreference,
 } from './opening-book.js';
+export {
+  selectOpponentStrategy,
+  validateFrozenStrategyPool,
+  type AIArchetype,
+  type AISkillTier,
+  type FrozenAIStrategy,
+  type FrozenStrategyPool,
+} from './frozen-pool.js';
