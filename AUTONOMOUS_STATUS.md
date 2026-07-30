@@ -2,16 +2,20 @@
 
 ## Current
 
-- **Branch**: `autonomous/ai-self-play-v2`
+- **Branch**: `main`
 - **Milestone**: P1.6 v2: AI Observation Contract — Self-play Integrity
-- **Task**: P1.6-010B DONE
-- **Main baseline**: `327ed02f0e14f0a21709f1c364885a4199e78dd0`
+- **Task**: P1.6-010B DONE / MERGED
+- **Main HEAD after PR #6 squash merge**: `96228276e165c3392bd3013d9d5e48ab49b2c3d0`
 - **P1.6-010A**: DONE (PR #5 merged)
-- **P1.6-010B commit**: `6012816159b4956471fad75ff76a614fffcfc5e4`
-- **PR #6**: OPEN / DRAFT / MERGEABLE
-- **Final CI Run**: `30564835228`
+- **P1.6-010B implementation commit**: `6012816159b4956471fad75ff76a614fffcfc5e4`
+- **P1.6-010B documentation closure commit**: `3af2b0170f75fb7ff411fdbd5d89589c50b03e18`
+- **PR #6**: MERGED
+- **PR #6 merged at**: `2026-07-30T17:36:55Z`
+- **Squash merge SHA**: `96228276e165c3392bd3013d9d5e48ab49b2c3d0`
+- **Final PR CI Run**: `30566031200`
 - **CI conclusion**: SUCCESS
-- **Branch relationship**: ahead 1 / behind 0
+- **Next planned task**: P1.6-011 Deterministic Evolutionary AI Trainer
+- **P1.6-011**: NOT_STARTED
 
 ## Completed Tasks
 
@@ -28,7 +32,7 @@
 | P1.6-010 (obs) | 2e69e9c | 22 passed | Yes (PR #5 — merged) |
 | P1.6-010 (compat) | c562f85 | 5 passed | Yes (PR #5 — merged) |
 | P1.6-010A (cleanup) | 327ed02 | DONE | Yes (PR #5 — merged) |
-| P1.6-010B (integrity) | 6012816159b4956471fad75ff76a614fffcfc5e4 | 28 lane/leak tests + existing suite | Yes (PR #6 — Draft) |
+| P1.6-010B (integrity) | 96228276e165c3392bd3013d9d5e48ab49b2c3d0 | 28 lane/leak tests + existing suite | Yes (PR #6 — squash merged) |
 
 ## P1.6-010B Acceptance Criteria (COMPLETE)
 
@@ -89,7 +93,7 @@
 | M6 Gate | PASS |
 | P1.6 | PASS (merged) |
 | P1.6-010A | PASS (merged) |
-| P1.6-010B | COMPLETE |
+| P1.6-010B | PASS (merged) |
 
 ## Phase 1 Summary
 
@@ -104,8 +108,7 @@
 - Client: Phaser rendering with placeholder graphics
 
 ### Test Coverage
-- 228 unit tests
-- All tests passing
+- 462 tests passing at P1.6-010B final verification
 - Deterministic behavior verified
 - Stress testing capability ready
 
@@ -119,6 +122,17 @@
 
 - Client production bundle is 1,405 kB and triggers Vite's chunk-size warning
 - Package-local Vitest scripts inherit root-relative include paths
+
+## Remaining Integration Gaps
+
+- Balance Sim strategy adapter: **NOT_INTEGRATED**
+- Client strategy adapter: **NOT_INTEGRATED**
+- Public Event Reconstruction: **NOT_IMPLEMENTED**
+
+## Next Planned Task
+
+- **P1.6-011**: Deterministic Evolutionary AI Trainer
+- **Status**: NOT_STARTED
 
 ## Phase 2 Gate Assessment
 
