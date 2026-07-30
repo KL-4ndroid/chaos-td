@@ -1,6 +1,7 @@
 export {
   AI_TRAINING_SMOKE_CONFIG,
   createSmokePopulation,
+  decideStrategyCommand,
   runSelfPlayMatch,
   type SelfPlayMatchSummary,
   type TrainingConfig,

@@ -4,15 +4,10 @@ import {
   type PlayerSlot,
   type TowerRole,
 } from '@chaos-td/game-data';
-import type {
-  DomainEvent,
-  Phase,
-} from '@chaos-td/game-core';
-import type { AIStrategyGenome } from './strategy.js';
 
 export const AI_OBSERVATION_SCHEMA_VERSION = 1 as const;
 
-export type GamePhase = Exclude<Phase, 'ready' | 'resolving'>;
+export type GamePhase = 'countdown' | 'running' | 'result';
 
 /** Hidden: exact opponent gold and income are never exposed to the policy layer. */
 export interface OpponentEconomyEstimate {
@@ -31,6 +26,10 @@ export interface VisibleTower {
   readonly cellY: number;
 }
 
+/**
+ * Battlefield-level aggregates for the public battlefield state.
+ * Does NOT include opponent send queue — queued monsters are not yet spawned.
+ */
 export interface BattlefieldObservation {
   readonly activeMonsterCount: number;
   readonly totalMonsterHp: number;
@@ -38,7 +37,8 @@ export interface BattlefieldObservation {
   readonly flyingMonsterCount: number;
   readonly flyingMonsterHp: number;
   readonly bossMonsterCount: number;
-  readonly sendQueueLength: number;
+  /** Self-only: outbound queue length for the owning AI's own decisions. */
+  readonly outboundQueueLength: number;
   readonly visibleTowers: readonly VisibleTower[];
   readonly groundCoverage: number;
   readonly flyingCoverage: number;
@@ -47,6 +47,10 @@ export interface BattlefieldObservation {
   readonly antiBossCoverage: number;
 }
 
+/**
+ * Self-only AI observation.
+ * Includes own economy and outbound send queue — observable private state.
+ */
 export interface SelfAIObservation {
   readonly hp: number;
   readonly gold: number;
@@ -54,9 +58,14 @@ export interface SelfAIObservation {
   readonly totalInvested: number;
   readonly towerCount: number;
   readonly towerRoleCoverage: Readonly<Record<TowerRole, number>>;
-  readonly sendQueueLength: number;
+  readonly outboundQueueLength: number;
 }
 
+/**
+ * Public opponent observation.
+ * Opponent gold / income / send queue are intentionally absent.
+ * Only officially spawned monsters and visible towers are included.
+ */
 export interface PublicOpponentObservation {
   readonly hp: number;
   readonly visibleTowers: readonly VisibleTower[];
@@ -66,7 +75,6 @@ export interface PublicOpponentObservation {
   readonly splashCoverage: number;
   readonly slowCoverage: number;
   readonly antiBossCoverage: number;
-  readonly opponentSendQueueLength: number;
   readonly opponentActiveMonsterCount: number;
   readonly opponentTotalMonsterHp: number;
 }
@@ -95,15 +103,7 @@ export interface AIObservation {
   readonly opponentFlyingCoverage: number;
 }
 
-function opponentOf(playerId: PlayerSlot): PlayerSlot {
-  return playerId === 'p1' ? 'p2' : 'p1';
-}
-
-function laneForDefender(playerId: PlayerSlot): 'lane_p1' | 'lane_p2' {
-  return playerId === 'p1' ? 'lane_p1' : 'lane_p2';
-}
-
-function towerRoleCoverage(towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[]): Record<TowerRole, number> {
+function towerRoleCoverage(towers: readonly { towerTypeId: string }[]): Record<TowerRole, number> {
   const coverage: Record<TowerRole, number> = { single_target: 0, splash: 0, slow: 0, heavy_hit: 0 };
   for (const tower of towers) {
     const def = TOWER_DEFINITIONS.find((d) => d.id === tower.towerTypeId);
@@ -112,43 +112,60 @@ function towerRoleCoverage(towers: readonly { entityId: number; towerTypeId: str
   return coverage;
 }
 
-function groundCoverage(towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[]): number {
+function groundCoverage(towers: readonly { towerTypeId: string }[]): number {
   return towers.filter((tower) =>
     TOWER_DEFINITIONS.find((d) => d.id === tower.towerTypeId)?.attackTargets.includes('ground') ?? false,
   ).length;
 }
 
-function flyingCoverage(towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[]): number {
+function flyingCoverage(towers: readonly { towerTypeId: string }[]): number {
   return towers.filter((tower) =>
     TOWER_DEFINITIONS.find((d) => d.id === tower.towerTypeId)?.attackTargets.includes('flying') ?? false,
   ).length;
 }
 
-function splashCoverage(towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[]): number {
+function splashCoverage(towers: readonly { towerTypeId: string }[]): number {
   return towers.filter((tower) =>
     TOWER_DEFINITIONS.find((d) => d.id === tower.towerTypeId)?.role === 'splash',
   ).length;
 }
 
-function slowCoverage(towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[]): number {
+function slowCoverage(towers: readonly { towerTypeId: string }[]): number {
   return towers.filter((tower) =>
     TOWER_DEFINITIONS.find((d) => d.id === tower.towerTypeId)?.role === 'slow',
   ).length;
 }
 
-function antiBossCoverage(towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[]): number {
+function antiBossCoverage(towers: readonly { towerTypeId: string }[]): number {
   return towers.filter((tower) =>
     TOWER_DEFINITIONS.find((d) => d.id === tower.towerTypeId)?.levels.some((l) => l.bonusDamageTag === 'boss'),
   ).length;
 }
 
-function visibleTowers(towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[]): readonly VisibleTower[] {
-  return towers.map((tower) => ({
-    towerTypeId: tower.towerTypeId,
-    level: tower.level as 1 | 2 | 3,
-    cellX: tower.cellX,
-    cellY: tower.cellY,
-  }));
+/** Canonical sort: towerTypeId → cellX → cellY → level */
+function sortVisibleTowers(towers: readonly VisibleTower[]): readonly VisibleTower[] {
+  return [...towers].sort((a, b) => {
+    const type = a.towerTypeId.localeCompare(b.towerTypeId);
+    if (type !== 0) return type;
+    const cx = a.cellX - b.cellX;
+    if (cx !== 0) return cx;
+    const cy = a.cellY - b.cellY;
+    if (cy !== 0) return cy;
+    return a.level - b.level;
+  });
+}
+
+function buildVisibleTowers(
+  towers: readonly { towerTypeId: string; level: number; cellX: number; cellY: number }[],
+): readonly VisibleTower[] {
+  return sortVisibleTowers(
+    towers.map((tower) => ({
+      towerTypeId: tower.towerTypeId,
+      level: tower.level as 1 | 2 | 3,
+      cellX: tower.cellX,
+      cellY: tower.cellY,
+    })),
+  );
 }
 
 function monsterPressure(
@@ -158,12 +175,17 @@ function monsterPressure(
 }
 
 function battlefieldObservation(
-  lane: { monsters: readonly { hp: number; shield: number; movementType: string; tags: readonly MonsterTag[]; pathProgressMilliTiles: number; leakDamage: number }[]; spawnQueue: readonly unknown[] },
-  towers: readonly { entityId: number; towerTypeId: string; level: number; cellX: number; cellY: number }[],
+  lane: {
+    monsters: readonly { hp: number; shield: number; leakDamage: number; pathProgressMilliTiles: number; movementType: string; tags: readonly MonsterTag[] }[];
+    /** Outbound spawn queue for the battlefield owner. */
+    outboundQueue: readonly unknown[];
+  },
+  towers: readonly { towerTypeId: string; level: number; cellX: number; cellY: number }[],
 ): BattlefieldObservation {
   const allMonsters = lane.monsters;
   const flying = allMonsters.filter((m) => m.movementType === 'flying');
   const boss = allMonsters.filter((m) => m.tags.includes('boss'));
+  const visibleSorted = buildVisibleTowers(towers);
   return {
     activeMonsterCount: allMonsters.length,
     totalMonsterHp: allMonsters.reduce((sum, m) => sum + m.hp, 0),
@@ -171,8 +193,8 @@ function battlefieldObservation(
     flyingMonsterCount: flying.length,
     flyingMonsterHp: flying.reduce((sum, m) => sum + m.hp, 0),
     bossMonsterCount: boss.length,
-    sendQueueLength: lane.spawnQueue.length,
-    visibleTowers: visibleTowers(towers),
+    outboundQueueLength: lane.outboundQueue.length,
+    visibleTowers: visibleSorted,
     groundCoverage: groundCoverage(towers),
     flyingCoverage: flyingCoverage(towers),
     splashCoverage: splashCoverage(towers),
@@ -181,109 +203,147 @@ function battlefieldObservation(
   };
 }
 
-function currentWave(tick: number): number {
-  return Math.max(1, Math.floor(tick / 400) + 1);
-}
+/**
+ * Input to buildAIObservation.
+ *
+ * Type-level isolation: opponent.gold and opponent.income are NOT present.
+ * Callers (self-play, balance sim, client) are responsible for constructing
+ * this input from the simulation state, never leaking hidden information.
+ */
+export interface BuildAIObservationInput {
+  readonly selfPlayer: {
+    readonly hp: number;
+    readonly gold: number;
+    readonly income: number;
+    readonly totalInvested: number;
+  };
 
-export interface BuildObservationInput {
-  readonly players: Record<PlayerSlot, { hp: number; gold: number; income: number; totalInvested: number }>;
-  readonly lanes: Record<'lane_p1' | 'lane_p2', {
-    monsters: readonly { hp: number; shield: number; leakDamage: number; pathProgressMilliTiles: number; movementType: string; tags: readonly MonsterTag[] }[];
-    spawnQueue: readonly unknown[];
-  }>;
-  readonly towers: readonly {
-    readonly entityId: number;
-    readonly ownerId: PlayerSlot;
+  readonly publicOpponent: {
+    /** Only HP is publicly observable. */
+    readonly hp: number;
+  };
+
+  readonly ownBattlefield: {
+    readonly monsters: readonly {
+      readonly hp: number;
+      readonly shield: number;
+      readonly leakDamage: number;
+      readonly pathProgressMilliTiles: number;
+      readonly movementType: string;
+      readonly tags: readonly MonsterTag[];
+    }[];
+    /** Own outbound queue — self-only, needed for send decision. */
+    readonly outboundQueue: readonly unknown[];
+  };
+
+  readonly opponentBattlefield: {
+    readonly monsters: readonly {
+      readonly hp: number;
+      readonly shield: number;
+      readonly leakDamage: number;
+      readonly pathProgressMilliTiles: number;
+      readonly movementType: string;
+      readonly tags: readonly MonsterTag[];
+    }[];
+    /** Opponent outbound queue — intentionally absent from input. */
+  };
+
+  readonly ownTowers: readonly {
     readonly towerTypeId: string;
     readonly level: number;
     readonly cellX: number;
     readonly cellY: number;
   }[];
+
+  readonly opponentTowers: readonly {
+    readonly towerTypeId: string;
+    readonly level: number;
+    readonly cellX: number;
+    readonly cellY: number;
+  }[];
+
   readonly tick: number;
-  readonly phase: 'countdown' | 'running' | 'result';
+  readonly phase: GamePhase;
+  /**
+   * Canonical wave number from the authoritative wave scheduler.
+   * Must NOT be recalculated from tick inside the builder.
+   */
+  readonly waveNumber: number;
 }
 
 export function buildAIObservation(
   playerId: PlayerSlot,
-  input: BuildObservationInput,
+  input: BuildAIObservationInput,
 ): AIObservation {
-  const opponentId = opponentOf(playerId);
-  const ownLaneId = laneForDefender(playerId);
-  const oppLaneId = laneForDefender(opponentId);
-  const ownTowers = input.towers.filter((t) => t.ownerId === playerId);
-  const oppTowers = input.towers.filter((t) => t.ownerId === opponentId);
-
-  const self = input.players[playerId];
-  const oppPlayer = input.players[opponentId];
-
   const selfObs: SelfAIObservation = {
-    hp: self.hp,
-    gold: self.gold,
-    income: self.income,
-    totalInvested: self.totalInvested,
-    towerCount: ownTowers.length,
-    towerRoleCoverage: towerRoleCoverage(ownTowers),
-    sendQueueLength: input.lanes[oppLaneId].spawnQueue.length,
+    hp: input.selfPlayer.hp,
+    gold: input.selfPlayer.gold,
+    income: input.selfPlayer.income,
+    totalInvested: input.selfPlayer.totalInvested,
+    towerCount: input.ownTowers.length,
+    towerRoleCoverage: towerRoleCoverage(input.ownTowers),
+    outboundQueueLength: input.ownBattlefield.outboundQueue.length,
   };
 
   const oppObs: PublicOpponentObservation = {
-    hp: oppPlayer.hp,
-    visibleTowers: visibleTowers(oppTowers),
-    estimatedEcon: { hasEstimate: false, estimatedGoldMinimum: 0, estimatedGoldMaximum: 0, estimatedIncomeMinimum: 0, estimatedIncomeMaximum: 0, confidencePermille: 0 },
-    groundCoverage: groundCoverage(oppTowers),
-    flyingCoverage: flyingCoverage(oppTowers),
-    splashCoverage: splashCoverage(oppTowers),
-    slowCoverage: slowCoverage(oppTowers),
-    antiBossCoverage: antiBossCoverage(oppTowers),
-    opponentSendQueueLength: input.lanes[ownLaneId].spawnQueue.length,
-    opponentActiveMonsterCount: input.lanes[ownLaneId].monsters.length,
-    opponentTotalMonsterHp: input.lanes[ownLaneId].monsters.reduce((s, m) => s + m.hp, 0),
+    hp: input.publicOpponent.hp,
+    visibleTowers: buildVisibleTowers(input.opponentTowers),
+    estimatedEcon: {
+      hasEstimate: false,
+      estimatedGoldMinimum: 0,
+      estimatedGoldMaximum: 0,
+      estimatedIncomeMinimum: 0,
+      estimatedIncomeMaximum: 0,
+      confidencePermille: 0,
+    },
+    groundCoverage: groundCoverage(input.opponentTowers),
+    flyingCoverage: flyingCoverage(input.opponentTowers),
+    splashCoverage: splashCoverage(input.opponentTowers),
+    slowCoverage: slowCoverage(input.opponentTowers),
+    antiBossCoverage: antiBossCoverage(input.opponentTowers),
+    opponentActiveMonsterCount: input.opponentBattlefield.monsters.length,
+    opponentTotalMonsterHp: input.opponentBattlefield.monsters.reduce((s, m) => s + m.hp, 0),
   };
 
-  const ownBattlefield = battlefieldObservation(input.lanes[ownLaneId], ownTowers);
-  const oppBattlefield = battlefieldObservation(input.lanes[oppLaneId], oppTowers);
+  const ownBattlefield = battlefieldObservation(
+    { monsters: input.ownBattlefield.monsters, outboundQueue: input.ownBattlefield.outboundQueue },
+    input.ownTowers,
+  );
+  const oppBattlefield = battlefieldObservation(
+    { monsters: input.opponentBattlefield.monsters, outboundQueue: [] },
+    input.opponentTowers,
+  );
 
-  const ownMonsters = input.lanes[ownLaneId].monsters;
-  const oppMonsters = input.lanes[oppLaneId].monsters;
+  const ownPressure = monsterPressure(input.ownBattlefield.monsters);
+  const oppPressure = monsterPressure(input.opponentBattlefield.monsters);
 
-  const selfPressure = monsterPressure(ownMonsters);
-  const oppPressure = monsterPressure(oppMonsters);
+  const selfFlying = monsterPressure(input.ownBattlefield.monsters.filter((m) => m.movementType === 'flying'));
+  const oppFlying = monsterPressure(input.opponentBattlefield.monsters.filter((m) => m.movementType === 'flying'));
 
-  const selfFlying = monsterPressure(ownMonsters.filter((m) => m.movementType === 'flying'));
-  const oppFlying = monsterPressure(oppMonsters.filter((m) => m.movementType === 'flying'));
-
-  const selfBoss = monsterPressure(ownMonsters.filter((m) => m.tags.includes('boss')));
-  const oppBoss = monsterPressure(oppMonsters.filter((m) => m.tags.includes('boss')));
+  const selfBoss = monsterPressure(input.ownBattlefield.monsters.filter((m) => m.tags.includes('boss')));
+  const oppBoss = monsterPressure(input.opponentBattlefield.monsters.filter((m) => m.tags.includes('boss')));
 
   return {
     schemaVersion: AI_OBSERVATION_SCHEMA_VERSION,
     playerId,
     tick: input.tick,
-    phase: input.phase as GamePhase,
-    waveNumber: currentWave(input.tick),
+    phase: input.phase,
+    waveNumber: input.waveNumber,
     self: selfObs,
     opponent: oppObs,
     ownBattlefield,
     opponentBattlefield: oppBattlefield,
-    selfActiveMonsterPressure: selfPressure,
+    selfActiveMonsterPressure: ownPressure,
     selfFlyingPressure: selfFlying,
     selfBossPressure: selfBoss,
     opponentActiveMonsterPressure: oppPressure,
     opponentFlyingPressure: oppFlying,
     opponentBossPressure: oppBoss,
-    selfLeakRisk: Math.max(0, selfPressure - (ownBattlefield.groundCoverage + ownBattlefield.flyingCoverage) * 200),
+    selfLeakRisk: Math.max(0, ownPressure - (ownBattlefield.groundCoverage + ownBattlefield.flyingCoverage) * 200),
     opponentLeakRisk: Math.max(0, oppPressure - (oppBattlefield.groundCoverage + oppBattlefield.flyingCoverage) * 200),
     selfGroundCoverage: ownBattlefield.groundCoverage,
     selfFlyingCoverage: ownBattlefield.flyingCoverage,
     opponentGroundCoverage: oppBattlefield.groundCoverage,
     opponentFlyingCoverage: oppBattlefield.flyingCoverage,
   };
-}
-
-export function observationFromDomainEvents(
-  _events: readonly DomainEvent[],
-  _playerId: PlayerSlot,
-  _genome: AIStrategyGenome,
-): AIObservation | null {
-  return null;
 }

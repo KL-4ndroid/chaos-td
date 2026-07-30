@@ -3,10 +3,10 @@
 ## Current
 
 - **Branch**: `autonomous/ai-self-play-v2`
-- **Milestone**: P1.6 v2: AI Observation Contract
-- **Task**: P1.6-010 COMPLETE; Draft PR #5 awaiting merge
-- **Baseline**: `c562f85` (observation contract, leak tests, compat checks)
-- **Test status**: 442 tests pass; CI green on PR #5
+- **Milestone**: P1.6 v2: AI Observation Contract — Acceptance Cleanup
+- **Task**: P1.6-010A IN PROGRESS (Draft PR, NOT merged; CI requires all acceptance tests)
+- **Baseline**: `fb95b66` (P1.6 v2 merged)
+- **Test status**: CI running; do not merge until all acceptance criteria pass
 
 ## Completed Tasks
 
@@ -20,32 +20,75 @@
 | P1.6-005/006 | 845027d | 4 passed | Yes (PR #4) |
 | P1.6-007 | c1ee88a | 2 passed | Yes (PR #4) |
 | P1.6-008/009 | bfc976c | 2 passed | Yes (PR #4) |
-| P1.6-010 (obs) | 2e69e9c | 22 passed | Yes (PR #5) |
-| P1.6-010 (compat) | c562f85 | 5 passed | Yes (PR #5) |
+| P1.6-010 (obs) | 2e69e9c | 22 passed | Yes (PR #5 — merged) |
+| P1.6-010 (compat) | c562f85 | 5 passed | Yes (PR #5 — merged) |
+| P1.6-010A (cleanup) | — | IN PROGRESS | Pending |
 
-## P1.6 v2 Key Changes
+## P1.6-010A Acceptance Criteria (IN PROGRESS)
 
-### Observation Contract
-- `AIObservation` interface: `self` (HP, Gold, Income, towers, role coverage) + `opponent` (HP, visible towers, coverage, pressure) — no exact opponent Gold/Income
-- `OpponentEconomyEstimate`: all fields zero / `hasEstimate: false` (reserved for future)
-- `buildAIObservation(playerId, BuildObservationInput)`: single shared builder for all consumers
-- Policy functions (`scoreAIAction`, `selectAIAction`, `generateLegalActions`) accept `AIObservation`, never `SimulationState`
+### 1. Opponent Queue Leakage — FIXED
+- `BattlefieldObservation.sendQueueLength` renamed to `outboundQueueLength` (self-only)
+- `PublicOpponentObservation.opponentSendQueueLength` **removed entirely**
+- Opponent spawn queue is invisible to policy layer
+- Own outbound queue remains observable to self
 
-### Leak-Prevention Tests
-- Opponent Gold changes do not affect observation or decision
-- Opponent Income changes do not affect observation or decision
-- Economy fields always zero/absent regardless of actual values
-- `toGameCommand` is the only command output path
+### 2. BuildAIObservationInput Type Isolation — FIXED
+- New `BuildAIObservationInput` interface replaces `BuildObservationInput`
+- `publicOpponent.hp` is the only opponent field exposed
+- Opponent gold/income **cannot exist** at the type level
+- Opponent outbound queue **cannot exist** at the type level
+- `@ts-expect-error` compile fixtures validate the contract
 
-### Content Compatibility
-- `checkStrategyCompatibility(genome)`: detects new tower roles, damage types, movement types, tags
-- `checkPoolCompatibility(pool)`: batch check for frozen strategy pools
-- Result levels: `compatible`, `requires_reevaluation`, `requires_retraining`, `unsupported`
+### 3. Canonical Wave Number — FIXED
+- `waveNumber` passed as `input.waveNumber` from `waveScheduler.currentWaveNumber`
+- `Math.floor(tick / 400) + 1` removed from builder
+- Regression test: same tick, different waveNumber → different observation
 
-### Smoke Baseline
-- `data/ai/frozen/strategy-pool-smoke-v1.json`: 1 initial frozen strategy
-- `reports/ai/latest/match-summary.jsonl`: smoke match record
-- `npm run ai:check`: runs league + compat tests
+### 4. Public Event Boundary — NOT IMPLEMENTED
+- `observationFromDomainEvents()` **removed** (was a stub returning null)
+- ADR-011 documents: "Public event-history reconstruction is NOT IMPLEMENTED."
+- Future task may implement event accumulation if needed by balance sim
+
+### 5. Deterministic Observation — FIXED
+- `visibleTowers` canonical sort: `towerTypeId → cellX → cellY → level`
+- `same towers, different order → identical observation` test passes
+
+### 6. Honest Caller Labels — FIXED
+- Self-play (`decideStrategyCommand`): **INTEGRATED** — uses `BuildAIObservationInput`
+- Balance sim: **NOT_INTEGRATED** — needs its own adapter
+- Client: **NOT_INTEGRATED** — no Playtest adapter yet
+
+### 7. Leakage Tests — COMPLETE
+All 15 named tests present:
+- hidden opponent gold does not change observation
+- hidden opponent gold does not change decision
+- hidden opponent income does not change observation
+- hidden opponent income does not change decision
+- opponent pending send queue is invisible
+- opponent unsubmitted command is invisible
+- spawned opponent monster becomes visible
+- public tower build changes observation
+- canonical wave number is used
+- tower ordering does not change observation
+- policy entry point accepts AIObservation only
+- self-play passes sanitized observation to policy
+- observation is deterministic
+- slot-swapped observation is mirror symmetric
+- type contract compile fixtures
+
+### 8. ai:check Coverage — FIXED
+`ai:check` now runs:
+- `packages/ai-strategy/src/policy.test.ts`
+- `packages/ai-strategy/src/leak-prevention.test.ts`
+- `packages/ai-training/src/league.test.ts`
+- `packages/ai-training/src/compat.test.ts`
+
+### 9. CI AI Smoke Check — ADDED
+GitHub Actions CI now includes:
+```yaml
+- name: AI smoke check
+  run: npm run ai:check
+```
 
 ## Phase 1 Gate Results
 

@@ -69,7 +69,7 @@ export function extractAIFeaturesFromObservation(obs: AIObservation): AIFeatures
     flyingPressure: obs.selfFlyingPressure,
     bossPressure: obs.selfBossPressure,
     leakRisk: obs.selfLeakRisk,
-    sendQueueCount: obs.self.sendQueueLength,
+    sendQueueCount: obs.self.outboundQueueLength,
     opponentHp: obs.opponent.hp,
     opponentGroundCoverage: obs.opponentGroundCoverage,
     opponentFlyingCoverage: obs.opponentFlyingCoverage,
@@ -108,7 +108,7 @@ export function generateLegalActions(
     }
     actions.push({ type: 'sell_tower', towerEntityId: entityId });
   }
-  if (obs.opponentBattlefield.sendQueueLength < 30) {
+  if (obs.opponentBattlefield.outboundQueueLength < 30) {
     for (const definition of MONSTER_DEFINITIONS) {
       if (obs.self.gold >= definition.sendCost && obs.tick >= definition.availableAtRunningTick) {
         actions.push({ type: 'queue_monster', monsterTypeId: definition.id, quantity: 1 });

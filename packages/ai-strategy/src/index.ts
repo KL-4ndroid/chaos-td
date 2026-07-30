@@ -16,10 +16,9 @@ export {
 export {
   AI_OBSERVATION_SCHEMA_VERSION,
   buildAIObservation,
-  observationFromDomainEvents,
   type AIObservation,
   type BattlefieldObservation,
-  type BuildObservationInput,
+  type BuildAIObservationInput,
   type GamePhase,
   type OpponentEconomyEstimate,
   type PublicOpponentObservation,

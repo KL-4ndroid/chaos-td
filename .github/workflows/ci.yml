@@ -46,3 +46,6 @@ jobs:
 
       - name: Balance simulation smoke check
         run: npm run balance:check
+
+      - name: AI smoke check
+        run: npm run ai:check

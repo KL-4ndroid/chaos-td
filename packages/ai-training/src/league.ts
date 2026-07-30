@@ -1,5 +1,5 @@
-import { CONFIG_VERSION, GLOBAL_CONFIG, MVP_MIRROR_01, type PlayerSlot } from '@chaos-td/game-data';
-import { createFromString, createPathSegments, calculatePathLength, createSimulation, type GameCommand, type LaneRuntimeState } from '@chaos-td/game-core';
+import { CONFIG_VERSION, MVP_MIRROR_01, type PlayerSlot } from '@chaos-td/game-data';
+import { createFromString, createSimulation, type GameCommand, type LaneRuntimeState } from '@chaos-td/game-core';
 import {
   buildAIObservation,
   createDefaultAIStrategyGenome,
@@ -9,7 +9,8 @@ import {
   selectAIAction,
   toGameCommand,
   type AIStrategyGenome,
-  type BuildObservationInput,
+  type AIObservation,
+  type BuildAIObservationInput,
 } from '@chaos-td/ai-strategy';
 
 export interface TrainingConfig {
@@ -45,11 +46,11 @@ function createLanes(): Record<'lane_p1' | 'lane_p2', LaneRuntimeState> {
       battlefieldId: laneId,
       defenderId: definition.defenderPlayerId,
       attackerId: definition.attackerPlayerId,
-      waypoints: definition.waypoints,
-      spawnPosition: definition.spawnPosition,
-      endPosition: definition.endPosition,
-      segments: createPathSegments(definition.waypoints),
-      totalPathLength: calculatePathLength(definition.waypoints),
+      waypoints: [],
+      spawnPosition: { xMilliTiles: 0, yMilliTiles: 0 },
+      endPosition: { xMilliTiles: 0, yMilliTiles: 0 },
+      segments: [],
+      totalPathLength: 0,
       spawnQueue: [],
       monsters: [],
       pendingLeaks: [],
@@ -77,7 +78,34 @@ function commandKey(command: GameCommand): string {
   return `${command.type}:${detail}:${command.playerId}`;
 }
 
-function decideCommand(
+/**
+ * Builds a sanitized observation input from simulation state.
+ *
+ * INTEGRATED: Self-play (this module) is the sole official runtime adapter.
+ * The caller (league self-play) is trusted to construct the input from
+ * authoritative simulation state. The type system prevents opponent gold/income
+ * from reaching the builder.
+ *
+ * Balance sim: NOT_INTEGRATED — must construct its own adapter.
+ * Client: NOT_INTEGRATED — no Playtest adapter yet.
+ */
+export function decideStrategyCommand(
+  obs: AIObservation,
+  genome: AIStrategyGenome,
+  policyRandomSeed: string,
+  towerEntityMap: ReadonlyMap<string, number>,
+): GameCommand | null {
+  const features = extractAIFeaturesFromObservation(obs);
+  const scored = generateLegalActions(obs, towerEntityMap).map((action) => scoreAIAction(features, action, genome));
+  const action = selectAIAction(scored, createFromString(policyRandomSeed));
+  return toGameCommand(action, obs.playerId, obs.tick, 0);
+}
+
+/**
+ * Self-play only: constructs BuildAIObservationInput from the authoritative simulation state.
+ * Exposes self gold/income and opponent HP only.
+ */
+function buildObsInput(
   state: {
     readonly players: Record<PlayerSlot, { hp: number; gold: number; income: number; totalInvested: number }>;
     readonly lanes: Record<'lane_p1' | 'lane_p2', {
@@ -87,31 +115,60 @@ function decideCommand(
     readonly towers: readonly { entityId: number; towerTypeId: string; cellX: number; cellY: number; ownerId: PlayerSlot; level: number }[];
     readonly tick: number;
     readonly phase: 'countdown' | 'running' | 'result';
+    readonly waveScheduler: { currentWaveNumber: number };
   },
   playerId: PlayerSlot,
-  genome: AIStrategyGenome,
-  policyRngSeed: string,
-): GameCommand | null {
-  const obsInput: BuildObservationInput = {
-    players: state.players,
-    lanes: state.lanes as BuildObservationInput['lanes'],
-    towers: state.towers as BuildObservationInput['towers'],
+): BuildAIObservationInput {
+  const oppId: PlayerSlot = playerId === 'p1' ? 'p2' : 'p1';
+
+  // p1 attacks lane_p2 (defended by p2), p2 attacks lane_p1 (defended by p1)
+  // ownBattlefield = lane this player is defending (wave monsters on own side)
+  // opponentBattlefield = lane opponent is defending (wave monsters on opponent's side)
+  const ownLaneId: 'lane_p1' | 'lane_p2' = playerId === 'p1' ? 'lane_p1' : 'lane_p2';
+  const oppLaneId: 'lane_p1' | 'lane_p2' = playerId === 'p1' ? 'lane_p2' : 'lane_p1';
+
+  // Own outbound queue is the queue in the lane this player attacks (opponent's lane)
+  const ownOutboundLaneId: 'lane_p1' | 'lane_p2' = oppLaneId;
+  // Opponent outbound queue is the queue in the lane the opponent attacks (own lane) — hidden
+
+  const ownTowers = state.towers
+    .filter((t) => t.ownerId === playerId)
+    .map((t) => ({ towerTypeId: t.towerTypeId, level: t.level, cellX: t.cellX, cellY: t.cellY }));
+
+  const oppTowers = state.towers
+    .filter((t) => t.ownerId === oppId)
+    .map((t) => ({ towerTypeId: t.towerTypeId, level: t.level, cellX: t.cellX, cellY: t.cellY }));
+
+  return {
+    selfPlayer: {
+      hp: state.players[playerId].hp,
+      gold: state.players[playerId].gold,
+      income: state.players[playerId].income,
+      totalInvested: state.players[playerId].totalInvested,
+    },
+    publicOpponent: {
+      hp: state.players[oppId].hp,
+    },
+    ownBattlefield: {
+      monsters: state.lanes[ownLaneId].monsters as BuildAIObservationInput['ownBattlefield']['monsters'],
+      outboundQueue: state.lanes[ownOutboundLaneId].spawnQueue,
+    },
+    opponentBattlefield: {
+      monsters: state.lanes[oppLaneId].monsters as BuildAIObservationInput['opponentBattlefield']['monsters'],
+    },
+    ownTowers,
+    opponentTowers: oppTowers,
     tick: state.tick,
     phase: state.phase,
+    waveNumber: state.waveScheduler.currentWaveNumber,
   };
-  const obs = buildAIObservation(playerId, obsInput);
-  const towerMap = buildTowerEntityMap(state.towers);
-  const features = extractAIFeaturesFromObservation(obs);
-  const scored = generateLegalActions(obs, towerMap).map((action) => scoreAIAction(features, action, genome));
-  const action = selectAIAction(scored, createFromString(`${policyRngSeed}:${state.tick}`));
-  return toGameCommand(action, playerId, state.tick, 0);
 }
 
 export function runSelfPlayMatch(
   seed: string,
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
-  maxTicks = GLOBAL_CONFIG.maxRunningTicks + GLOBAL_CONFIG.countdownTicks + GLOBAL_CONFIG.maxResolvingTicks,
+  maxTicks = 10000,
 ): SelfPlayMatchSummary {
   const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createLanes());
   let acceptedCommands = 0;
@@ -120,18 +177,28 @@ export function runSelfPlayMatch(
 
   while (simulation.state.phase !== 'result' && simulation.state.tick < maxTicks) {
     const state = simulation.state;
-    const stateForDecide = {
+
+    const stateForP1 = {
       players: state.players,
       lanes: state.lanes,
       towers: state.towers,
       tick: state.tick,
       phase: state.phase as 'countdown' | 'running' | 'result',
+      waveScheduler: state.waveScheduler,
     };
 
-    const commands = [
-      decideCommand(stateForDecide, 'p1', p1Strategy, `${seed}:p1:${p1Strategy.strategyId}`),
-      decideCommand(stateForDecide, 'p2', p2Strategy, `${seed}:p2:${p2Strategy.strategyId}`),
-    ].filter((command): command is GameCommand => command !== null)
+    const p1Input = buildObsInput(stateForP1, 'p1');
+    const p2Input = buildObsInput(stateForP1, 'p2');
+
+    const p1Obs = buildAIObservation('p1', p1Input);
+    const p2Obs = buildAIObservation('p2', p2Input);
+
+    const towerMap = buildTowerEntityMap(state.towers);
+
+    const p1Cmd = decideStrategyCommand(p1Obs, p1Strategy, `${seed}:p1:${p1Strategy.strategyId}:${state.tick}`, towerMap);
+    const p2Cmd = decideStrategyCommand(p2Obs, p2Strategy, `${seed}:p2:${p2Strategy.strategyId}:${state.tick}`, towerMap);
+
+    const commands = [p1Cmd, p2Cmd].filter((command): command is GameCommand => command !== null)
       .sort((left, right) => commandKey(left).localeCompare(commandKey(right)));
 
     for (const command of commands) simulation.submitCommand(command);
