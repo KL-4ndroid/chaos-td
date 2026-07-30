@@ -68,6 +68,7 @@ export {
   type MonsterLeakedEvent,
   type AttackFiredEvent,
   type DamageAppliedEvent,
+  type DamageResolvedEvent,
   type ShieldBrokenEvent,
   type SlowAppliedEvent,
   type WaveStartedEvent,
@@ -114,6 +115,21 @@ export {
 
 export { resolveDamage } from './combat-modifiers';
 export type { DamageResolution, DamageResolutionInput } from './combat-modifiers';
+
+// AI command generation
+export {
+  createAIStates,
+  processAIDecision,
+  updateAIState,
+  validateAIDecision,
+  calculateRejectionRate,
+  type AIDecision,
+} from './ai-runner';
+export {
+  calculateLaneThreat,
+  type AIState,
+  type ThreatLevel,
+} from './ai-core';
 
 // Replay
 export {

@@ -143,6 +143,14 @@ Gate 使用 Product Scope 的 Phase 2 Gate。未達標回到玩法／平衡，�
 - 第二固定 Map。
 - 第二 AI Personality。
 
+## Future AI Profile Contract
+
+- Future Task: Official AI Difficulty and Personality Contract。
+- Difficulty may later define decision interval, resource usage, or decision quality differences。
+- Personality may later define defense/offense allocation differences。
+- The contract must be public, versioned, and shared by Client and Balance Sim through one API。
+- This task is explicitly outside P1.5-002 and is not implemented here。
+
 ## Phase 2
 
 見 `15_MULTIPLAYER_PHASE_2.md`。

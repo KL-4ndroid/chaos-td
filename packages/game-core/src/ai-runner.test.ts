@@ -20,6 +20,9 @@ describe('AI Runner', () => {
       expect(states.p2).toBeDefined();
       expect(states.p1.offenseBudgetRatioPermille).toBeGreaterThanOrEqual(350);
       expect(states.p1.offenseBudgetRatioPermille).toBeLessThanOrEqual(549);
+      expect(states.p1.rng).not.toBe(states.p2.rng);
+      expect(states.p1.rng.state).not.toBe(states.p2.rng.state);
+      expect(states.p1.rng.state[0]).toBe(states.p2.rng.state[0]);
     });
   });
 
@@ -63,6 +66,28 @@ describe('AI Runner', () => {
 
       // Should make some decision
       expect(decision.targetTick).toBe(12); // currentTick + 2
+    });
+  });
+
+  it('uses the caller-provided legal build priorities', () => {
+    const state = createAIStates('test-seed').p1;
+    const decision = processAIDecision(
+      'p1',
+      state,
+      10,
+      600,
+      'safe',
+      [],
+      0,
+      30,
+      60,
+      ['archer'],
+      [{ cellX: 3, cellY: 14 }],
+    );
+
+    expect(decision).toMatchObject({
+      action: 'build_tower',
+      params: { cellX: 3, cellY: 14 },
     });
   });
 

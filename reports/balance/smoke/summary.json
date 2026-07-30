@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 2,
+  "mode": "smoke",
+  "seedCount": 3,
+  "scenarioCount": 4,
+  "matchCount": 12,
+  "outcomeCounts": {
+    "tick_guard_incomplete": 12
+  },
+  "scenarioOutcomeCounts": {
+    "normal-ai-vs-normal-ai": {
+      "tick_guard_incomplete": 3
+    },
+    "none-vs-none": {
+      "tick_guard_incomplete": 3
+    },
+    "none-vs-normal-ai": {
+      "tick_guard_incomplete": 3
+    },
+    "normal-ai-vs-none": {
+      "tick_guard_incomplete": 3
+    }
+  },
+  "finalTickMinimum": 800,
+  "finalTickMedian": 800,
+  "finalTickP90": 800,
+  "finalTickMaximum": 800,
+  "finalWaveCounts": {
+    "4": 12
+  },
+  "p1HpTotal": 186,
+  "p2HpTotal": 186,
+  "p1NetWorthTotal": 10152,
+  "p2NetWorthTotal": 10152,
+  "towerTotals": [
+    {
+      "towerId": "archer",
+      "level": 1,
+      "buildCount": 36,
+      "upgradeCount": 0,
+      "sellCount": 0,
+      "attackCount": 732,
+      "rawDamage": 13176,
+      "bonusDamage": 0,
+      "resistanceReduction": 0,
+      "armorReduction": 0,
+      "shieldDamage": 0,
+      "hpDamage": 13176,
+      "killCount": 144,
+      "groundTargetCount": 732,
+      "flyingTargetCount": 0,
+      "bossDamage": 0,
+      "splashSecondaryDamage": 0,
+      "slowApplications": 0
+    }
+  ],
+  "monsterTotals": [
+    {
+      "monsterId": "basic",
+      "source": "wave",
+      "spawnCount": 312,
+      "deathCount": 144,
+      "leakCount": 108,
+      "damageTaken": 13176,
+      "shieldDamageTaken": 0,
+      "leakDamage": 108
+    }
+  ]
+}

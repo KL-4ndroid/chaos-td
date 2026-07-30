@@ -6,6 +6,7 @@
     "declaration": false,
     "declarationMap": false,
     "sourceMap": false,
+    "types": ["node", "vitest/globals"],
     "baseUrl": ".",
     "paths": {
       "@chaos-td/game-data": ["packages/game-data/src/index.ts"],
@@ -19,6 +20,8 @@
     "packages/game-core/src/**/*.spec.ts",
     "packages/game-data/src/**/*.test.ts",
     "packages/game-data/src/**/*.spec.ts",
+    "packages/balance-sim/src/**/*.test.ts",
+    "packages/balance-sim/src/**/*.spec.ts",
     "packages/shared/src/**/*.test.ts",
     "packages/shared/src/**/*.spec.ts",
     "packages/test-fixtures/src/**/*.test.ts",

@@ -42,7 +42,7 @@ export function createAIStates(seed: string): { p1: AIState; p2: AIState } {
 
   return {
     p1: { ...createAIState(offenseBudget), rng: { version: 1, state: new Uint32Array([seedNum]) } },
-    p2: { ...createAIState(offenseBudget), rng: { version: 1, state: new Uint32Array([seedNum + 1]) } },
+    p2: { ...createAIState(offenseBudget), rng: { version: 1, state: new Uint32Array([seedNum]) } },
   };
 }
 
@@ -60,6 +60,7 @@ export function processAIDecision(
   maxQueueSize: number,
   monsterCost: number,
   preferredTypes: readonly string[],
+  buildPriorityCells?: readonly { cellX: number; cellY: number }[],
 ): AIDecision {
   // Check if AI should make a decision
   if (!shouldMakeDecision(state, currentTick)) {
@@ -80,6 +81,7 @@ export function processAIDecision(
     existingTowerTypes,
     1, // monstersInRange
     preferredTypes[0] || 'archer',
+    buildPriorityCells,
   );
 
   if (defenseAction.type !== 'no_action') {

@@ -8,6 +8,7 @@
  * Events do not accumulate internally.
  */
 
+import type { BattlefieldId } from '@chaos-td/game-data';
 import type { Phase, PlayerSlot, MonsterSource } from './canonical';
 
 export type DomainEvent =
@@ -25,6 +26,7 @@ export type DomainEvent =
   | MonsterLeakedEvent
   | AttackFiredEvent
   | DamageAppliedEvent
+  | DamageResolvedEvent
   | ShieldBrokenEvent
   | SlowAppliedEvent
   | WaveStartedEvent
@@ -119,6 +121,8 @@ export interface MonsterDiedEvent {
   defenderId: PlayerSlot;
   monsterEntityId: number;
   killerPlayerId: PlayerSlot | null;
+  /** Present when a tower dealt the killing damage. */
+  killerTowerEntityId?: number;
 }
 
 export interface MonsterLeakedEvent {
@@ -146,6 +150,21 @@ export interface DamageAppliedEvent {
   newHp: number;
 }
 
+/** Complete combat resolution for analytics; does not alter canonical simulation state. */
+export interface DamageResolvedEvent {
+  type: 'damage_resolved';
+  tick: number;
+  towerEntityId: number;
+  monsterEntityId: number;
+  rawDamage: number;
+  bonusDamage: number;
+  resistanceReduction: number;
+  armorReduction: number;
+  shieldDamage: number;
+  hpDamage: number;
+  isSplash: boolean;
+}
+
 export interface ShieldBrokenEvent {
   type: 'shield_broken';
   tick: number;
@@ -155,6 +174,7 @@ export interface ShieldBrokenEvent {
 export interface SlowAppliedEvent {
   type: 'slow_applied';
   tick: number;
+  towerEntityId?: number;
   monsterEntityId: number;
   slowPermille: number;
   durationTicks: number;
@@ -181,7 +201,7 @@ export interface WaveMonsterSpawnedEvent {
   waveNumber: number;
   monsterEntityId: number;
   monsterType: string;
-  battlefieldId: PlayerSlot;
+  battlefieldId: BattlefieldId;
 }
 
 /**
@@ -192,7 +212,7 @@ export interface WaveEndedEvent {
   type: 'wave_ended';
   tick: number;
   waveNumber: number;
-  battlefieldId: PlayerSlot;
+  battlefieldId: BattlefieldId;
   /** Always true: this event means all configured groups finished spawning. */
   spawningCompleted: true;
 }

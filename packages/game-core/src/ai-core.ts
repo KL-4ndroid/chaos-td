@@ -289,6 +289,7 @@ export function decideDefense(
   existingTowerTypes: string[],
   _monstersInRange: number,
   preferredTower: string = 'archer',
+  buildPriorityCells: readonly { cellX: number; cellY: number }[] = AI_BUILD_PRIORITY_CELLS,
 ): DefenseAction {
   // Don't spend if gold is below reserve
   if (availableGold <= defenseReserve) {
@@ -298,7 +299,7 @@ export function decideDefense(
   switch (threat) {
     case 'critical': {
       // Must build/upgrade - find affordable action
-      const affordableTowers = AI_BUILD_PRIORITY_CELLS.filter(
+      const affordableTowers = buildPriorityCells.filter(
         (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
       );
 
@@ -319,7 +320,7 @@ export function decideDefense(
       // Build if we have extra gold
       const extraGold = availableGold - defenseReserve;
       if (extraGold > gold * 0.3) {
-        const affordableTowers = AI_BUILD_PRIORITY_CELLS.filter(
+        const affordableTowers = buildPriorityCells.filter(
           (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
         );
 
@@ -342,7 +343,7 @@ export function decideDefense(
     default: {
       // Don't build unless we have lots of extra gold
       if (availableGold > defenseReserve + gold * 0.5) {
-        const affordableTowers = AI_BUILD_PRIORITY_CELLS.filter(
+        const affordableTowers = buildPriorityCells.filter(
           (cell) => !existingTowerTypes.includes(`${cell.cellX},${cell.cellY}`),
         );
 

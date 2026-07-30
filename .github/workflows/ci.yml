@@ -43,3 +43,6 @@ jobs:
 
       - name: Tests
         run: npm run test
+
+      - name: Balance simulation smoke check
+        run: npm run balance:check
