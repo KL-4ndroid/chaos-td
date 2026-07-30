@@ -10,3 +10,13 @@ export {
   type StrategyValidationError,
   type StrategyValidationResult,
 } from './strategy.js';
+export {
+  extractAIFeatures,
+  generateLegalActions,
+  scoreAIAction,
+  selectAIAction,
+  toGameCommand,
+  type AIFeatures,
+  type LegalAIAction,
+  type ScoredAIAction,
+} from './policy.js';
