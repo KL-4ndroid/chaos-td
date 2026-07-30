@@ -20,3 +20,10 @@ export {
   type LegalAIAction,
   type ScoredAIAction,
 } from './policy.js';
+export {
+  ADAPTIVE_OPENING_BOOKS,
+  applyOpeningBookPreferences,
+  validateAIOpeningBook,
+  type AIOpeningBook,
+  type AIOpeningPreference,
+} from './opening-book.js';
