@@ -4,12 +4,14 @@
 
 - **Branch**: `autonomous/ai-self-play-v2`
 - **Milestone**: P1.6 v2: AI Observation Contract — Self-play Integrity
-- **Task**: P1.6-010B DONE (Draft PR #6, not merged)
-- **Main baseline**: `327ed02`
+- **Task**: P1.6-010B DONE
+- **Main baseline**: `327ed02f0e14f0a21709f1c364885a4199e78dd0`
 - **P1.6-010A**: DONE (PR #5 merged)
-- **P1.6-010B rebased commit**: `HEAD` (current PR #6 head; rebased from `1700922` onto `327ed02`)
-- **PR #6**: OPEN / DRAFT
-- **Remote CI**: PASSED (PR #6 run `30563034616`)
+- **P1.6-010B commit**: `6012816159b4956471fad75ff76a614fffcfc5e4`
+- **PR #6**: OPEN / DRAFT / MERGEABLE
+- **Final CI Run**: `30564835228`
+- **CI conclusion**: SUCCESS
+- **Branch relationship**: ahead 1 / behind 0
 
 ## Completed Tasks
 
@@ -26,9 +28,9 @@
 | P1.6-010 (obs) | 2e69e9c | 22 passed | Yes (PR #5 — merged) |
 | P1.6-010 (compat) | c562f85 | 5 passed | Yes (PR #5 — merged) |
 | P1.6-010A (cleanup) | 327ed02 | DONE | Yes (PR #5 — merged) |
-| P1.6-010B (integrity) | fa24285 | 28 lane/leak tests + existing suite | Pending force-with-lease push |
+| P1.6-010B (integrity) | 6012816159b4956471fad75ff76a614fffcfc5e4 | 28 lane/leak tests + existing suite | Yes (PR #6 — Draft) |
 
-## P1.6-010B Acceptance Criteria (IN PROGRESS)
+## P1.6-010B Acceptance Criteria (COMPLETE)
 
 ### 1. Formal Self-play Lane — FIXED
 - `createSelfPlayLanes()` exported from `ai-training`
@@ -87,7 +89,7 @@
 | M6 Gate | PASS |
 | P1.6 | PASS (merged) |
 | P1.6-010A | PASS (merged) |
-| P1.6-010B | IN PROGRESS |
+| P1.6-010B | COMPLETE |
 
 ## Phase 1 Summary
 
