@@ -1,6 +1,16 @@
 import { CONFIG_VERSION, GLOBAL_CONFIG, MVP_MIRROR_01, type PlayerSlot } from '@chaos-td/game-data';
 import { createFromString, createPathSegments, calculatePathLength, createSimulation, type GameCommand, type LaneRuntimeState } from '@chaos-td/game-core';
-import { createDefaultAIStrategyGenome, extractAIFeatures, generateLegalActions, scoreAIAction, selectAIAction, toGameCommand, type AIStrategyGenome } from '@chaos-td/ai-strategy';
+import {
+  buildAIObservation,
+  createDefaultAIStrategyGenome,
+  extractAIFeaturesFromObservation,
+  generateLegalActions,
+  scoreAIAction,
+  selectAIAction,
+  toGameCommand,
+  type AIStrategyGenome,
+  type BuildObservationInput,
+} from '@chaos-td/ai-strategy';
 
 export interface TrainingConfig {
   readonly populationSize: number;
@@ -31,59 +41,133 @@ function createLanes(): Record<'lane_p1' | 'lane_p2', LaneRuntimeState> {
     const definition = MVP_MIRROR_01.lanes.find((lane) => lane.id === laneId);
     if (!definition) throw new Error(`Missing lane ${laneId}`);
     return {
-      laneId, battlefieldId: laneId, defenderId: definition.defenderPlayerId, attackerId: definition.attackerPlayerId,
-      waypoints: definition.waypoints, spawnPosition: definition.spawnPosition, endPosition: definition.endPosition,
-      segments: createPathSegments(definition.waypoints), totalPathLength: calculatePathLength(definition.waypoints),
-      spawnQueue: [], monsters: [], pendingLeaks: [], spawnCooldownTicks: 0,
+      laneId,
+      battlefieldId: laneId,
+      defenderId: definition.defenderPlayerId,
+      attackerId: definition.attackerPlayerId,
+      waypoints: definition.waypoints,
+      spawnPosition: definition.spawnPosition,
+      endPosition: definition.endPosition,
+      segments: createPathSegments(definition.waypoints),
+      totalPathLength: calculatePathLength(definition.waypoints),
+      spawnQueue: [],
+      monsters: [],
+      pendingLeaks: [],
+      spawnCooldownTicks: 0,
     };
   };
   return { lane_p1: createLane('lane_p1'), lane_p2: createLane('lane_p2') };
 }
 
+function buildTowerEntityMap(towers: readonly { entityId: number; towerTypeId: string; cellX: number; cellY: number; ownerId: PlayerSlot }[]): ReadonlyMap<string, number> {
+  const map = new Map<string, number>();
+  for (const tower of towers) {
+    map.set(`${tower.towerTypeId}:${tower.cellX}:${tower.cellY}`, tower.entityId);
+  }
+  return map;
+}
+
 function commandKey(command: GameCommand): string {
-  const detail = command.type === 'build_tower' ? `${command.towerTypeId}:${command.cellX}:${command.cellY}`
-    : command.type === 'queue_monster' ? `${command.monsterTypeId}:${command.quantity}`
-      : `${command.towerEntityId}`;
+  const detail =
+    command.type === 'build_tower'
+      ? `${command.towerTypeId}:${command.cellX}:${command.cellY}`
+      : command.type === 'queue_monster'
+        ? `${command.monsterTypeId}:${command.quantity}`
+        : `${command.towerEntityId}`;
   return `${command.type}:${detail}:${command.playerId}`;
 }
 
-function decideCommand(state: Parameters<typeof extractAIFeatures>[0], playerId: PlayerSlot, genome: AIStrategyGenome, policyRngSeed: string): GameCommand | null {
-  const features = extractAIFeatures(state, playerId);
-  const scored = generateLegalActions(state, playerId).map((action) => scoreAIAction(features, action, genome));
+function decideCommand(
+  state: {
+    readonly players: Record<PlayerSlot, { hp: number; gold: number; income: number; totalInvested: number }>;
+    readonly lanes: Record<'lane_p1' | 'lane_p2', {
+      monsters: readonly { hp: number; shield: number; leakDamage: number; pathProgressMilliTiles: number; movementType: string; tags: readonly string[] }[];
+      spawnQueue: readonly unknown[];
+    }>;
+    readonly towers: readonly { entityId: number; towerTypeId: string; cellX: number; cellY: number; ownerId: PlayerSlot; level: number }[];
+    readonly tick: number;
+    readonly phase: 'countdown' | 'running' | 'result';
+  },
+  playerId: PlayerSlot,
+  genome: AIStrategyGenome,
+  policyRngSeed: string,
+): GameCommand | null {
+  const obsInput: BuildObservationInput = {
+    players: state.players,
+    lanes: state.lanes as BuildObservationInput['lanes'],
+    towers: state.towers as BuildObservationInput['towers'],
+    tick: state.tick,
+    phase: state.phase,
+  };
+  const obs = buildAIObservation(playerId, obsInput);
+  const towerMap = buildTowerEntityMap(state.towers);
+  const features = extractAIFeaturesFromObservation(obs);
+  const scored = generateLegalActions(obs, towerMap).map((action) => scoreAIAction(features, action, genome));
   const action = selectAIAction(scored, createFromString(`${policyRngSeed}:${state.tick}`));
   return toGameCommand(action, playerId, state.tick, 0);
 }
 
-export function runSelfPlayMatch(seed: string, p1Strategy: AIStrategyGenome, p2Strategy: AIStrategyGenome, maxTicks = GLOBAL_CONFIG.maxRunningTicks + GLOBAL_CONFIG.countdownTicks + GLOBAL_CONFIG.maxResolvingTicks): SelfPlayMatchSummary {
+export function runSelfPlayMatch(
+  seed: string,
+  p1Strategy: AIStrategyGenome,
+  p2Strategy: AIStrategyGenome,
+  maxTicks = GLOBAL_CONFIG.maxRunningTicks + GLOBAL_CONFIG.countdownTicks + GLOBAL_CONFIG.maxResolvingTicks,
+): SelfPlayMatchSummary {
   const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createLanes());
   let acceptedCommands = 0;
   let rejectedCommands = 0;
   simulation.start();
+
   while (simulation.state.phase !== 'result' && simulation.state.tick < maxTicks) {
-    const stateSnapshot = simulation.state;
+    const state = simulation.state;
+    const stateForDecide = {
+      players: state.players,
+      lanes: state.lanes,
+      towers: state.towers,
+      tick: state.tick,
+      phase: state.phase as 'countdown' | 'running' | 'result',
+    };
+
     const commands = [
-      decideCommand(stateSnapshot, 'p1', p1Strategy, `${seed}:p1:${p1Strategy.strategyId}`),
-      decideCommand(stateSnapshot, 'p2', p2Strategy, `${seed}:p2:${p2Strategy.strategyId}`),
-    ].filter((command): command is GameCommand => command !== null).sort((left, right) => commandKey(left).localeCompare(commandKey(right)));
+      decideCommand(stateForDecide, 'p1', p1Strategy, `${seed}:p1:${p1Strategy.strategyId}`),
+      decideCommand(stateForDecide, 'p2', p2Strategy, `${seed}:p2:${p2Strategy.strategyId}`),
+    ].filter((command): command is GameCommand => command !== null)
+      .sort((left, right) => commandKey(left).localeCompare(commandKey(right)));
+
     for (const command of commands) simulation.submitCommand(command);
     const events = simulation.step().events;
-    acceptedCommands += events.filter((event) => event.type === 'command_accepted').length;
-    rejectedCommands += events.filter((event) => event.type === 'command_rejected').length;
+    acceptedCommands += events.filter((e) => e.type === 'command_accepted').length;
+    rejectedCommands += events.filter((e) => e.type === 'command_rejected').length;
   }
+
   const result = simulation.state.phase === 'result' ? simulation.getCanonicalState().result : null;
   return {
-    seed, p1StrategyId: p1Strategy.strategyId, p2StrategyId: p2Strategy.strategyId,
-    finalTick: simulation.state.tick, winnerId: result?.winnerPlayerId ?? null,
-    outcome: result?.outcome ?? 'draw', completion: result ? 'result' : 'tick_guard',
-    acceptedCommands, rejectedCommands, finalStateHash: simulation.state.stateHash,
+    seed,
+    p1StrategyId: p1Strategy.strategyId,
+    p2StrategyId: p2Strategy.strategyId,
+    finalTick: simulation.state.tick,
+    winnerId: result?.winnerPlayerId ?? null,
+    outcome: result?.outcome ?? 'draw',
+    completion: result ? 'result' : 'tick_guard',
+    acceptedCommands,
+    rejectedCommands,
+    finalStateHash: simulation.state.stateHash,
   };
 }
 
 export function createSmokePopulation(size = 16): readonly AIStrategyGenome[] {
-  return Array.from({ length: size }, (_, index) => createDefaultAIStrategyGenome(`smoke-${String(index + 1).padStart(3, '0')}`));
+  return Array.from({ length: size }, (_, index) =>
+    createDefaultAIStrategyGenome(`smoke-${String(index + 1).padStart(3, '0')}`),
+  );
 }
 
 export const AI_TRAINING_SMOKE_CONFIG: TrainingConfig = Object.freeze({
-  populationSize: 16, generations: 2, matchesPerGenome: 1, seedRegistry: Object.freeze(['ai-smoke-001', 'ai-smoke-002', 'ai-smoke-003']),
-  mutationRate: 120, crossoverRate: 500, eliteCount: 2, hallOfFameOpponentCount: 2,
+  populationSize: 16,
+  generations: 2,
+  matchesPerGenome: 1,
+  seedRegistry: Object.freeze(['ai-smoke-001', 'ai-smoke-002', 'ai-smoke-003']),
+  mutationRate: 120,
+  crossoverRate: 500,
+  eliteCount: 2,
+  hallOfFameOpponentCount: 2,
 });

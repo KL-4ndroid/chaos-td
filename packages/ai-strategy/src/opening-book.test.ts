@@ -8,7 +8,7 @@ const features: AIFeatures = {
   towerRoleCoverage: { single_target: 0, splash: 0, slow: 0, heavy_hit: 0 },
   groundCoverage: 0, flyingCoverage: 0, splashCoverage: 0, slowCoverage: 0, bossDefenseCoverage: 0,
   activeMonsterPressure: 0, flyingPressure: 0, bossPressure: 0, leakRisk: 0, sendQueueCount: 0,
-  opponentHp: 20, opponentGold: 600, opponentIncome: 100, opponentGroundCoverage: 0, opponentFlyingCoverage: 0, opponentPressure: 0,
+  opponentHp: 20, opponentGroundCoverage: 0, opponentFlyingCoverage: 0, opponentPressure: 0,
 };
 
 const book: AIOpeningBook = {
