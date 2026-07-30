@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/client",
+    "playtest": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run dev --workspace=@chaos-td/client",
+    "playtest:check": "vitest run apps/client/src/playtest-session.test.ts",
     "dev:assets": "npm run dev --workspace=apps/asset-admin",
     "start:assets": "npm run start --workspace=apps/asset-admin",
     "build": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/balance-sim && npm run build --workspace=@chaos-td/shared && npm run build --workspace=@chaos-td/test-fixtures && npm run build --workspace=@chaos-td/client",

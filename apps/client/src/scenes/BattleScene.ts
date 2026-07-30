@@ -5,19 +5,14 @@ import {
   addCheckpoint,
   addEvent,
   calculateMonsterPosition,
-  createPathSegments,
   createReplayData,
-  createSimulation,
   finalizeReplay,
   type DomainEvent,
-  type LaneRuntimeState,
   type MonsterRuntimeState,
   type Replay,
-  type Simulation,
   type SimulationState,
 } from '@chaos-td/game-core';
 import {
-  CONFIG_VERSION,
   MONSTER_BY_ID,
   MVP_MIRROR_01,
   TOWER_BY_ID,
@@ -26,8 +21,9 @@ import {
   type TowerId,
 } from '@chaos-td/game-data';
 import { FixedStepLoop } from '../simulation-loop';
+import { PlaytestSession, PLAYTEST_CONTROLLERS, PLAYTEST_SEED, createNextPlaytestSeed } from '../playtest-session';
 import { phaserAssetKey } from '../assets';
-import { getTicksUntilNextWave, isDemoWaveTick } from '../wave-schedule';
+import { getTicksUntilNextWave } from '../wave-schedule';
 import { containsPoint, type ScreenRect } from '../ui-hit-test';
 
 export const BATTLE_SCENE_KEY = 'BattleScene';
@@ -53,32 +49,6 @@ interface MonsterVisual {
   currentY: number;
 }
 
-function createLaneRuntime(definition: LaneDefinition): LaneRuntimeState {
-  const segments = createPathSegments(definition.waypoints);
-  return {
-    laneId: definition.id,
-    battlefieldId: definition.id,
-    defenderId: definition.defenderPlayerId,
-    attackerId: definition.attackerPlayerId,
-    waypoints: definition.waypoints,
-    spawnPosition: definition.spawnPosition,
-    endPosition: definition.endPosition,
-    segments,
-    totalPathLength: segments.reduce((total, segment) => total + segment.lengthMilliTiles, 0),
-    spawnQueue: [],
-    monsters: [],
-    pendingLeaks: [],
-    spawnCooldownTicks: 0,
-  };
-}
-
-function createDemoSimulation(): Simulation {
-  const lanes = Object.fromEntries(
-    MVP_MIRROR_01.lanes.map((lane) => [lane.id, createLaneRuntime(lane)]),
-  ) as Record<LaneId, LaneRuntimeState>;
-  return createSimulation({ seed: 'portrait-maze-demo', configVersion: CONFIG_VERSION }, lanes);
-}
-
 function toPixels(laneId: LaneId, xMilliTiles: number, yMilliTiles: number): { x: number; y: number } {
   const isLocal = laneId === 'lane_p1';
   return {
@@ -90,7 +60,7 @@ function toPixels(laneId: LaneId, xMilliTiles: number, yMilliTiles: number): { x
 
 export class BattleScene extends Phaser.Scene {
   private readonly loop = new FixedStepLoop(TICK_DURATION_MS);
-  private readonly simulation = createDemoSimulation();
+  private playtest = new PlaytestSession(PLAYTEST_SEED);
   private readonly monsterVisuals = new Map<number, MonsterVisual>();
   private readonly towerVisuals = new Map<number, Phaser.GameObjects.Container>();
   private readonly pathGraphics = new Map<LaneId, Phaser.GameObjects.Graphics>();
@@ -103,9 +73,12 @@ export class BattleScene extends Phaser.Scene {
   private actionMenu?: Phaser.GameObjects.Container;
   private actionMenuBounds?: ScreenRect;
   private selectedCell?: { cellX: number; cellY: number };
-  private opponentDefenseSubmitted = false;
   private selectedTowerEntityId?: number;
-  private replay: Replay = createReplayData('portrait-maze-demo', CONFIG_VERSION, this.simulation.state.stateHash);
+  private debugPanel?: Phaser.GameObjects.Container;
+  private debugText?: Phaser.GameObjects.Text;
+  private resultOverlay?: Phaser.GameObjects.Container;
+  private resultText?: Phaser.GameObjects.Text;
+  private replay: Replay = createReplayData(PLAYTEST_SEED, this.playtest.simulation.state.config.configVersion, this.playtest.simulation.state.stateHash);
 
   constructor() {
     super({ key: BATTLE_SCENE_KEY });
@@ -116,9 +89,10 @@ export class BattleScene extends Phaser.Scene {
     this.drawArena();
     this.createOverlay();
     this.createSendControls();
+    this.createDebugPanel();
+    this.createResultOverlay();
     this.createInputBindings();
-    this.syncTowerVisuals(this.simulation.state);
-    this.simulation.start();
+    this.syncTowerVisuals(this.playtest.simulation.state);
 
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.handleHidden, this);
     this.game.events.on(Phaser.Core.Events.VISIBLE, this.handleVisible, this);
@@ -130,44 +104,26 @@ export class BattleScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.loop.advance(delta, () => this.stepSimulation());
-    this.renderMonsters(this.simulation.state, this.loop.interpolationAlpha);
+    this.renderMonsters(this.playtest.simulation.state, this.loop.interpolationAlpha);
     this.updateOverlay();
+    this.refreshDebugPanel();
   }
 
   private stepSimulation(): void {
-    const state = this.simulation.state;
-    if (state.phase === 'running' && !this.opponentDefenseSubmitted) {
-      const cells = [{ cellX: 4, cellY: 6 }, { cellX: 3, cellY: 4 }, { cellX: 4, cellY: 2 }];
-      cells.forEach((cell, index) => {
-        this.simulation.submitCommand({
-          type: 'build_tower',
-          commandId: this.simulation.getNextCommandId('p2'),
-          playerId: 'p2',
-          towerTypeId: index === 1 ? 'frost' : 'archer',
-          ...cell,
-        });
-      });
-      this.opponentDefenseSubmitted = true;
+    const state = this.playtest.simulation.state;
+    const { events } = this.playtest.step();
+    this.replay = events.reduce((replay, event) => addEvent(replay, event), this.replay);
+    this.replay = addCheckpoint(this.replay, state.tick + 1, state.stateHash);
+    if (this.playtest.simulation.state.phase === 'result') {
+      this.replay = finalizeReplay(this.replay, this.playtest.simulation.state.stateHash, state.tick + 1);
     }
-    if (isDemoWaveTick(state.phase, state.tick + 1, state.runningStartedAtTick)) {
-      this.simulation.submitCommand({
-        type: 'queue_monster',
-        commandId: this.simulation.getNextCommandId('p2'),
-        playerId: 'p2',
-        monsterTypeId: 'sheep',
-        quantity: 1,
-      });
+    this.captureMonsterPositions(this.playtest.simulation.state);
+    this.renderEvents(events);
+    this.removeInactiveMonsterVisuals(this.playtest.simulation.state);
+    this.syncTowerVisuals(this.playtest.simulation.state);
+    if (this.playtest.simulation.state.phase === 'result') {
+      this.showResultOverlay();
     }
-    const result = this.simulation.step();
-    this.replay = result.events.reduce((replay, event) => addEvent(replay, event), this.replay);
-    this.replay = addCheckpoint(this.replay, result.state.tick, result.state.stateHash);
-    if (result.state.phase === 'result') {
-      this.replay = finalizeReplay(this.replay, result.state.stateHash, result.state.tick);
-    }
-    this.captureMonsterPositions(result.state);
-    this.renderEvents(result.events);
-    this.removeInactiveMonsterVisuals(result.state);
-    this.syncTowerVisuals(result.state);
   }
 
   private drawArena(): void {
@@ -208,7 +164,7 @@ export class BattleScene extends Phaser.Scene {
   private drawPath(laneId?: LaneId): void {
     const laneIds: readonly LaneId[] = laneId ? [laneId] : ['lane_p1', 'lane_p2'];
     for (const currentLaneId of laneIds) {
-      const lane = this.simulation.state.lanes[currentLaneId];
+      const lane = this.playtest.simulation.state.lanes[currentLaneId];
       const graphics = this.pathGraphics.get(currentLaneId);
       if (!graphics) continue;
       graphics.clear();
@@ -284,7 +240,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private snapMonsterVisualsToLane(laneId: LaneId): void {
-    const lane = this.simulation.state.lanes[laneId];
+    const lane = this.playtest.simulation.state.lanes[laneId];
     for (const monster of lane.monsters) {
       if (monster.hp <= 0) continue;
       const visual = this.monsterVisuals.get(monster.entityId);
@@ -304,8 +260,12 @@ export class BattleScene extends Phaser.Scene {
       ? this.add.image(x, y, textureKey).setDisplaySize(25, 25).setOrigin(0.5, 0.72)
       : this.add.rectangle(x, y, 18, 15, 0xd99578).setStrokeStyle(1, 0xffeadb, 0.9);
     body.setDepth(20);
-    const marker = this.add.text(x, y, this.textures.exists(textureKey) ? '' : 'S', {
-      color: '#241611', fontFamily: 'Arial, sans-serif', fontSize: '9px', fontStyle: 'bold',
+    const sourceLabel = monster.source.type === 'wave' ? 'W' : 'P';
+    const movementLabel = monster.movementType === 'flying' ? 'F' : 'G';
+    const tagLabel = monster.tags.includes('boss') ? 'B' : monster.tags.includes('siege') ? 'S' : monster.tags.includes('physical_resist') ? 'PR' : monster.tags.includes('magic_resist') ? 'MR' : '';
+    const shieldLabel = monster.shield > 0 ? `+${monster.shield}` : '';
+    const marker = this.add.text(x, y - 15, `${sourceLabel}${movementLabel}${tagLabel} ${monster.hp}${shieldLabel}`, {
+      color: monster.source.type === 'wave' ? '#f0cf83' : '#d8c98f', fontFamily: 'Arial, sans-serif', fontSize: '8px', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(21);
     return { body, marker, previousX: x, previousY: y, currentX: x, currentY: y };
   }
@@ -348,11 +308,35 @@ export class BattleScene extends Phaser.Scene {
           invalid_cell: 'Build inside your arena',
           insufficient_gold: 'Not enough gold',
           cell_occupied: 'Cell occupied',
+          tower_max_level: 'Tower is already at maximum level',
+          queue_full: 'Send queue is full',
+          monster_locked: 'Monster is not unlocked yet',
         };
-        this.feedbackText?.setText(messages[event.reason] ?? event.reason).setColor('#f1a38f');
+        this.feedbackText?.setText(`REJECTED: ${messages[event.reason] ?? event.reason}`).setColor('#f1a38f');
       }
       if (event.type === 'command_accepted' && event.playerId === 'p1') {
         this.feedbackText?.setText('Command accepted').setColor('#9ed8b5');
+      }
+      if (event.type === 'wave_started') {
+        this.feedbackText?.setText(`Wave ${event.waveNumber} started on both battlefields`).setColor('#f0cf83');
+      }
+      if (event.type === 'wave_ended') {
+        this.feedbackText?.setText(`Wave ${event.waveNumber} spawning complete: ${event.battlefieldId}`).setColor('#d8c98f');
+      }
+      if (event.type === 'wave_monster_spawned') {
+        const definition = MONSTER_BY_ID.get(event.monsterType);
+        if (definition?.tags.includes('boss')) this.feedbackText?.setText('Boss deployed by system wave').setColor('#f0cf83');
+        else if (definition?.tags.includes('siege')) this.feedbackText?.setText('Siege monster deployed by system wave').setColor('#f0cf83');
+        else if (definition?.movementType === 'flying') this.feedbackText?.setText('Flying monster deployed by system wave').setColor('#f0cf83');
+      }
+      if (event.type === 'monster_spawned' && event.source.type === 'player') {
+        this.feedbackText?.setText(`Player send entered ${event.source.playerId === 'p1' ? 'rival' : 'your'} battlefield`).setColor('#d8c98f');
+      }
+      if (event.type === 'monster_leaked') {
+        this.feedbackText?.setText(`Leak: ${event.leakDamage} damage to ${event.defenderId.toUpperCase()}`).setColor('#f1a38f');
+      }
+      if (event.type === 'match_ended') {
+        this.feedbackText?.setText(`Match ended: ${event.outcome} (${event.reason})`).setColor('#f0cf83');
       }
     }
   }
@@ -383,10 +367,10 @@ export class BattleScene extends Phaser.Scene {
     this.economyText = this.add.text(462, 49, '', {
       color: '#d8c98f', fontFamily: 'Arial, sans-serif', fontSize: '14px', align: 'right',
     }).setOrigin(1, 0).setDepth(51);
-    this.add.text(BOARD_X, 82, 'RIVAL DEFENSE', {
+    this.add.text(BOARD_X, 82, 'RIVAL DEFENSE  |  P2 NORMAL AI', {
       color: '#c7a4a8', fontFamily: 'Arial, sans-serif', fontSize: '11px', fontStyle: 'bold',
     }).setDepth(51);
-    this.add.text(BOARD_X, 448, 'YOUR DEFENSE', {
+    this.add.text(BOARD_X, 448, 'YOUR DEFENSE  |  P1 HUMAN', {
       color: '#9fc4ae', fontFamily: 'Arial, sans-serif', fontSize: '11px', fontStyle: 'bold',
     }).setDepth(51);
     this.waveText = this.add.text(462, 82, '', {
@@ -412,6 +396,7 @@ export class BattleScene extends Phaser.Scene {
         this.submitMonster(monsterId);
       });
     });
+    this.createButton(354, 928, 46, 42, 'DBG', () => this.toggleDebugPanel());
     this.createButton(414, 928, 46, 42, 'II', () => {
       if (this.loop.isPaused) this.handleVisible();
       else this.handleHidden();
@@ -452,13 +437,13 @@ export class BattleScene extends Phaser.Scene {
       if (this.actionMenuBounds && containsPoint(this.actionMenuBounds, pointer.x, pointer.y)) return;
       const insideLocalBoard = pointer.x >= BOARD_X && pointer.x < BOARD_X + BOARD_WIDTH &&
         pointer.y >= BOTTOM_BOARD_Y && pointer.y < BOTTOM_BOARD_Y + BOARD_HEIGHT;
-      if (!insideLocalBoard || this.simulation.state.phase !== 'running') {
+      if (!insideLocalBoard || this.playtest.simulation.state.phase !== 'running') {
         this.closeActionMenu();
         return;
       }
       const cellX = Math.floor((pointer.x - BOARD_X) / TILE_PIXELS);
       const cellY = Math.floor((pointer.y - BOTTOM_BOARD_Y) / TILE_PIXELS) + LOCAL_LANE_MIN_ROW;
-      const existingTower = this.simulation.state.towers.find(
+      const existingTower = this.playtest.simulation.state.towers.find(
         (tower) => tower.ownerId === 'p1' && tower.cellX === cellX && tower.cellY === cellY,
       );
       if (existingTower) {
@@ -478,6 +463,7 @@ export class BattleScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-S', () => this.submitMonster('sheep'));
     this.input.keyboard?.on('keydown-U', () => this.submitUpgrade());
     this.input.keyboard?.on('keydown-X', () => this.submitSell());
+    this.input.keyboard?.on('keydown-F3', () => this.toggleDebugPanel());
   }
 
   private openBuildMenu(cellX: number, cellY: number, pointerX: number, pointerY: number): void {
@@ -513,7 +499,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private openTowerMenu(towerEntityId: number, pointerX: number, pointerY: number): void {
-    const tower = this.simulation.state.towers.find((candidate) => candidate.entityId === towerEntityId && candidate.ownerId === 'p1');
+    const tower = this.playtest.simulation.state.towers.find((candidate) => candidate.entityId === towerEntityId && candidate.ownerId === 'p1');
     if (!tower) return;
     this.closeActionMenu();
     this.selectedTowerEntityId = towerEntityId;
@@ -594,24 +580,11 @@ export class BattleScene extends Phaser.Scene {
   private submitBuild(towerTypeId: TowerId): void {
     if (!this.selectedCell) return;
     const { cellX, cellY } = this.selectedCell;
-    this.simulation.submitCommand({
-      type: 'build_tower',
-      commandId: this.simulation.getNextCommandId('p1'),
-      playerId: 'p1',
-      towerTypeId,
-      cellX,
-      cellY,
-    });
+    this.playtest.buildHumanTower(towerTypeId, cellX, cellY);
   }
 
   private submitMonster(monsterTypeId: string): void {
-    this.simulation.submitCommand({
-      type: 'queue_monster',
-      commandId: this.simulation.getNextCommandId('p1'),
-      playerId: 'p1',
-      monsterTypeId,
-      quantity: 1,
-    });
+    this.playtest.queueHumanMonster(monsterTypeId);
   }
 
   private submitUpgrade(): void {
@@ -619,9 +592,9 @@ export class BattleScene extends Phaser.Scene {
       this.feedbackText?.setText('Select a tower first').setColor('#f1a38f');
       return;
     }
-    this.simulation.submitCommand({
+    this.playtest.submitHuman({
       type: 'upgrade_tower',
-      commandId: this.simulation.getNextCommandId('p1'),
+      commandId: this.playtest.simulation.getNextCommandId('p1'),
       playerId: 'p1',
       towerEntityId: this.selectedTowerEntityId,
     });
@@ -632,9 +605,9 @@ export class BattleScene extends Phaser.Scene {
       this.feedbackText?.setText('Select a tower first').setColor('#f1a38f');
       return;
     }
-    this.simulation.submitCommand({
+    this.playtest.submitHuman({
       type: 'sell_tower',
-      commandId: this.simulation.getNextCommandId('p1'),
+      commandId: this.playtest.simulation.getNextCommandId('p1'),
       playerId: 'p1',
       towerEntityId: this.selectedTowerEntityId,
     });
@@ -642,13 +615,90 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private updateOverlay(): void {
-    const state = this.simulation.state;
-    this.hpText?.setText(`YOU ${Math.max(0, state.players.p1.hp)} HP   RIVAL ${Math.max(0, state.players.p2.hp)} HP`);
-    this.economyText?.setText(`${state.players.p1.gold}G   +${state.players.p1.income}`);
-    this.phaseText?.setText(`${state.phase.toUpperCase()}  ${Math.floor(state.tick / 20)}s`);
+    const state = this.playtest.simulation.state;
+    const p1Towers = state.towers.filter((tower) => tower.ownerId === 'p1').length;
+    const p2Towers = state.towers.filter((tower) => tower.ownerId === 'p2').length;
+    const view = this.playtest.getViewModel();
+    this.hpText?.setText(`YOU ${Math.max(0, state.players.p1.hp)} HP  ${state.players.p1.gold}G +${state.players.p1.income}  T${p1Towers} Q${view.sendQueueCounts.p1}\nRIVAL ${Math.max(0, state.players.p2.hp)} HP  ${state.players.p2.gold}G +${state.players.p2.income}  T${p2Towers} Q${view.sendQueueCounts.p2}`);
+    this.economyText?.setText(`SEED ${view.seed}\n${PLAYTEST_CONTROLLERS.p1.toUpperCase()} VS ${PLAYTEST_CONTROLLERS.p2.toUpperCase()}`);
+    this.phaseText?.setText(`${state.phase.toUpperCase()}  ${Math.floor(state.tick / 20)}s  T${state.tick}`);
     const ticksUntilWave = getTicksUntilNextWave(state.phase, state.tick, state.runningStartedAtTick);
     const secondsUntilWave = Math.ceil(ticksUntilWave / 20);
-    this.waveText?.setText(state.phase === 'running' ? `NEXT WAVE  ${secondsUntilWave}s` : 'NEXT WAVE  --');
+    this.waveText?.setText(state.phase === 'running' ? `WAVE ${view.currentWave || 1}  NEXT ${secondsUntilWave}s` : `WAVE ${view.currentWave || 1}`);
+  }
+
+  private createDebugPanel(): void {
+    const background = this.add.rectangle(8, 108, 300, 220, 0x0b0f12, 0.96).setOrigin(0).setStrokeStyle(1, 0xf0cf83, 0.65);
+    this.debugText = this.add.text(18, 118, '', { color: '#dce9e0', fontFamily: 'monospace', fontSize: '10px', lineSpacing: 2 }).setOrigin(0);
+    this.debugPanel = this.add.container(0, 0, [background, this.debugText]).setDepth(120).setVisible(false);
+  }
+
+  private toggleDebugPanel(): void {
+    if (!this.debugPanel) return;
+    this.debugPanel.setVisible(!this.debugPanel.visible);
+  }
+
+  private refreshDebugPanel(): void {
+    if (!this.debugPanel?.visible || !this.debugText) return;
+    const view = this.playtest.getViewModel();
+    const events = view.lastEvents.map((event) => `${event.tick} ${event.type}`).join('\n');
+    const p1Outcome = view.lastCommandOutcomes.p1;
+    const p2Outcome = view.lastCommandOutcomes.p2;
+    this.debugText.setText([
+      'PLAYTEST DEBUG (read-only)',
+      `tick ${view.tick} | ${view.phase} | wave ${view.currentWave}`,
+      `seed ${view.seed}`,
+      `hash ${view.stateHash}`,
+      `p1 active ${view.activeMonsters.p1} wave ${view.waveMonsters.p1} send ${view.playerSentMonsters.p1}`,
+      `p2 active ${view.activeMonsters.p2} wave ${view.waveMonsters.p2} send ${view.playerSentMonsters.p2}`,
+      `normal AI last ${view.normalAiState.lastDecisionTick} reserve ${view.normalAiState.defenseReserve} budget ${view.normalAiState.offenseBudgetRatioPermille}`,
+      `p1 command ${p1Outcome ? `${p1Outcome.type}:${'reason' in p1Outcome ? p1Outcome.reason : 'accepted'}` : '--'}`,
+      `p2 command ${p2Outcome ? `${p2Outcome.type}:${'reason' in p2Outcome ? p2Outcome.reason : 'accepted'}` : '--'}`,
+      'events:',
+      events || '--',
+    ].join('\n'));
+  }
+
+  private createResultOverlay(): void {
+    const background = this.add.rectangle(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 424, 350, 0x0b0f12, 0.98).setStrokeStyle(2, 0xf0cf83, 0.8);
+    this.resultText = this.add.text(VIEW_WIDTH / 2, 350, '', { color: '#edf1ee', fontFamily: 'Arial, sans-serif', fontSize: '15px', align: 'center', lineSpacing: 5 }).setOrigin(0.5);
+    const sameSeed = this.createResultButton(126, 650, 'RESTART SAME SEED', () => this.restartPlaytest(this.playtest.seed));
+    const nextSeed = this.createResultButton(274, 650, 'RESTART NEW SEED', () => this.restartPlaytest(createNextPlaytestSeed(this.playtest.seed)));
+    this.resultOverlay = this.add.container(0, 0, [background, this.resultText, sameSeed, nextSeed]).setDepth(150).setVisible(false);
+  }
+
+  private createResultButton(x: number, y: number, label: string, action: () => void): Phaser.GameObjects.Container {
+    const background = this.add.rectangle(0, 0, 136, 46, 0x2c3a40).setStrokeStyle(1, 0xf0cf83, 0.65).setInteractive({ useHandCursor: true });
+    const text = this.add.text(0, 0, label, { color: '#edf1ee', fontFamily: 'Arial, sans-serif', fontSize: '10px', align: 'center' }).setOrigin(0.5);
+    background.on(Phaser.Input.Events.POINTER_DOWN, (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => { event.stopPropagation(); action(); });
+    return this.add.container(x, y, [background, text]);
+  }
+
+  private showResultOverlay(): void {
+    if (!this.resultOverlay || !this.resultText || this.resultOverlay.visible) return;
+    const state = this.playtest.simulation.state;
+    const ending = [...this.playtest.getViewModel().lastEvents].reverse().find((event) => event.type === 'match_ended');
+    const winner = ending?.type === 'match_ended' ? (ending.winnerId ? `${ending.winnerId.toUpperCase()} WINS` : 'DRAW') : 'RESULT';
+    const reason = ending?.type === 'match_ended' ? ending.reason : 'result';
+    const view = this.playtest.getViewModel();
+    const p1 = view.playerStats.p1;
+    const p2 = view.playerStats.p2;
+    this.resultText.setText(`${winner}\n${reason}\n\nTick ${state.tick}  Wave ${state.waveScheduler.currentWaveNumber}\nP1 HP ${Math.max(0, state.players.p1.hp)}  Gold ${state.players.p1.gold}  Income ${state.players.p1.income}\nP1 Builds ${p1.towerBuildCount}  Sends ${p1.playerSentMonsterCount}  Wave leaks ${p1.waveLeakDamage}  Send leaks ${p1.opponentSendLeakDamage}\nP2 HP ${Math.max(0, state.players.p2.hp)}  Gold ${state.players.p2.gold}  Income ${state.players.p2.income}\nP2 Builds ${p2.towerBuildCount}  Sends ${p2.playerSentMonsterCount}  Wave leaks ${p2.waveLeakDamage}  Send leaks ${p2.opponentSendLeakDamage}\n\nFinal hash\n${state.stateHash}`);
+    this.resultOverlay.setVisible(true);
+    this.loop.pause();
+  }
+
+  private restartPlaytest(seed: string): void {
+    this.playtest = new PlaytestSession(seed);
+    this.replay = createReplayData(seed, this.playtest.simulation.state.config.configVersion, this.playtest.simulation.state.stateHash);
+    this.monsterVisuals.forEach((visual) => { visual.body.destroy(); visual.marker.destroy(); });
+    this.monsterVisuals.clear();
+    this.towerVisuals.forEach((visual) => visual.destroy(true));
+    this.towerVisuals.clear();
+    this.drawPath();
+    this.resultOverlay?.setVisible(false);
+    this.closeActionMenu();
+    this.handleVisible();
   }
 
   private handleHidden(): void {
