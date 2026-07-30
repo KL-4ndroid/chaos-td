@@ -3,10 +3,13 @@
 ## Current
 
 - **Branch**: `autonomous/ai-self-play-v2`
-- **Milestone**: P1.6 v2: AI Observation Contract — Acceptance Cleanup
-- **Task**: P1.6-010A IN PROGRESS (Draft PR, NOT merged; CI requires all acceptance tests)
-- **Baseline**: `fb95b66` (P1.6 v2 merged)
-- **Test status**: CI running; do not merge until all acceptance criteria pass
+- **Milestone**: P1.6 v2: AI Observation Contract — Self-play Integrity
+- **Task**: P1.6-010B DONE (Draft PR #6, not merged)
+- **Main baseline**: `327ed02`
+- **P1.6-010A**: DONE (PR #5 merged)
+- **P1.6-010B rebased commit**: `HEAD` (current PR #6 head; rebased from `1700922` onto `327ed02`)
+- **PR #6**: OPEN / DRAFT
+- **Remote CI**: PASSED (PR #6 run `30563034616`)
 
 ## Completed Tasks
 
@@ -22,73 +25,54 @@
 | P1.6-008/009 | bfc976c | 2 passed | Yes (PR #4) |
 | P1.6-010 (obs) | 2e69e9c | 22 passed | Yes (PR #5 — merged) |
 | P1.6-010 (compat) | c562f85 | 5 passed | Yes (PR #5 — merged) |
-| P1.6-010A (cleanup) | — | IN PROGRESS | Pending |
+| P1.6-010A (cleanup) | 327ed02 | DONE | Yes (PR #5 — merged) |
+| P1.6-010B (integrity) | fa24285 | 28 lane/leak tests + existing suite | Pending force-with-lease push |
 
-## P1.6-010A Acceptance Criteria (IN PROGRESS)
+## P1.6-010B Acceptance Criteria (IN PROGRESS)
 
-### 1. Opponent Queue Leakage — FIXED
-- `BattlefieldObservation.sendQueueLength` renamed to `outboundQueueLength` (self-only)
-- `PublicOpponentObservation.opponentSendQueueLength` **removed entirely**
-- Opponent spawn queue is invisible to policy layer
-- Own outbound queue remains observable to self
+### 1. Formal Self-play Lane — FIXED
+- `createSelfPlayLanes()` exported from `ai-training`
+- Uses `MVP_MIRROR_01.lanes` full definitions: waypoints, spawnPosition, endPosition
+- `segments` built via `createPathSegments(definition.waypoints)`
+- `totalPathLength` computed via `calculatePathLength(definition.waypoints)`
+- No zero-length placeholder lanes
+- Tests: waypoint parity, segments non-empty, totalPathLength > 0, deterministic self-play, real monster movement
 
-### 2. BuildAIObservationInput Type Isolation — FIXED
-- New `BuildAIObservationInput` interface replaces `BuildObservationInput`
-- `publicOpponent.hp` is the only opponent field exposed
-- Opponent gold/income **cannot exist** at the type level
-- Opponent outbound queue **cannot exist** at the type level
-- `@ts-expect-error` compile fixtures validate the contract
+### 2. Queue Contract — FIXED
+- `BattlefieldObservation.outboundQueueLength` **removed** entirely
+- Queue length is **only** on `SelfAIObservation.outboundQueueLength`
+- `generateLegalActions` uses `obs.self.outboundQueueLength` and `GLOBAL_CONFIG.sendQueueLimit` (no magic 30)
+- Tests: own queue below limit → queue_monster available; own queue at limit → blocked; opponent queue hidden → no leakage; limit reads from GLOBAL_CONFIG
 
-### 3. Canonical Wave Number — FIXED
-- `waveNumber` passed as `input.waveNumber` from `waveScheduler.currentWaveNumber`
-- `Math.floor(tick / 400) + 1` removed from builder
-- Regression test: same tick, different waveNumber → different observation
+### 3. Tower Ownership Mapping — FIXED
+- `buildTowerEntityMap(towers, ownerId)` filters by owner
+- Per-player tower maps: `p1TowerMap` and `p2TowerMap` are independent
+- p1 cannot reference p2 tower entity IDs (and vice versa)
+- Tests: same-cell dual-tower maps differ; p1 upgrade ignores p2; slot swap mirror symmetric
 
-### 4. Public Event Boundary — NOT IMPLEMENTED
-- `observationFromDomainEvents()` **removed** (was a stub returning null)
-- ADR-011 documents: "Public event-history reconstruction is NOT IMPLEMENTED."
-- Future task may implement event accumulation if needed by balance sim
+### 4. Leakage Integration Tests — STRENGTHENED
+- Adapter-level tests using authoritative simulation state
+- Opponent economy (gold/income) variations → observations, actions, decisions all identical
+- Opponent outbound queue variations → invisible
+- Own outbound queue → visible, affects queue actions
+- Pending commands documented as outside observation contract
+- Two-authoritative-state setup to verify adapter isolation
 
-### 5. Deterministic Observation — FIXED
-- `visibleTowers` canonical sort: `towerTypeId → cellX → cellY → level`
-- `same towers, different order → identical observation` test passes
+### 5. Type Contract Tests — FIXED
+- Uses `satisfies BuildAIObservationInput` with complete valid fixture
+- Compile-negative fixtures for `publicOpponent.gold`, `publicOpponent.income`, `opponentBattlefield.outboundQueue`
+- `@ts-expect-error` directives target exactly the forbidden fields
 
-### 6. Honest Caller Labels — FIXED
-- Self-play (`decideStrategyCommand`): **INTEGRATED** — uses `BuildAIObservationInput`
-- Balance sim: **NOT_INTEGRATED** — needs its own adapter
-- Client: **NOT_INTEGRATED** — no Playtest adapter yet
+### 6. Caller Labels — UNCHANGED
+- Self-play: **INTEGRATED** (uses `decideStrategyCommand` adapter)
+- Balance sim: **NOT_INTEGRATED** (needs its own adapter)
+- Client: **NOT_INTEGRATED** (no Playtest adapter yet)
+- Balance Data Changes: **NONE**
 
-### 7. Leakage Tests — COMPLETE
-All 15 named tests present:
-- hidden opponent gold does not change observation
-- hidden opponent gold does not change decision
-- hidden opponent income does not change observation
-- hidden opponent income does not change decision
-- opponent pending send queue is invisible
-- opponent unsubmitted command is invisible
-- spawned opponent monster becomes visible
-- public tower build changes observation
-- canonical wave number is used
-- tower ordering does not change observation
-- policy entry point accepts AIObservation only
-- self-play passes sanitized observation to policy
-- observation is deterministic
-- slot-swapped observation is mirror symmetric
-- type contract compile fixtures
-
-### 8. ai:check Coverage — FIXED
-`ai:check` now runs:
-- `packages/ai-strategy/src/policy.test.ts`
-- `packages/ai-strategy/src/leak-prevention.test.ts`
-- `packages/ai-training/src/league.test.ts`
-- `packages/ai-training/src/compat.test.ts`
-
-### 9. CI AI Smoke Check — ADDED
-GitHub Actions CI now includes:
-```yaml
-- name: AI smoke check
-  run: npm run ai:check
-```
+### 7. Public Event Boundary — NOT IMPLEMENTED
+- `observationFromDomainEvents()` removed
+- ADR-011 documents this as NOT IMPLEMENTED
+- Public Event Reconstruction: **NOT_IMPLEMENTED**
 
 ## Phase 1 Gate Results
 
@@ -102,6 +86,8 @@ GitHub Actions CI now includes:
 | M5 Gate | PASS |
 | M6 Gate | PASS |
 | P1.6 | PASS (merged) |
+| P1.6-010A | PASS (merged) |
+| P1.6-010B | IN PROGRESS |
 
 ## Phase 1 Summary
 

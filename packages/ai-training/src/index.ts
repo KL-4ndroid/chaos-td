@@ -1,5 +1,6 @@
 export {
   AI_TRAINING_SMOKE_CONFIG,
+  createSelfPlayLanes,
   createSmokePopulation,
   decideStrategyCommand,
   runSelfPlayMatch,

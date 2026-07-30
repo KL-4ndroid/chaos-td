@@ -1,5 +1,12 @@
 import { CONFIG_VERSION, MVP_MIRROR_01, type PlayerSlot } from '@chaos-td/game-data';
-import { createFromString, createSimulation, type GameCommand, type LaneRuntimeState } from '@chaos-td/game-core';
+import {
+  createFromString,
+  createPathSegments,
+  calculatePathLength,
+  createSimulation,
+  type GameCommand,
+  type LaneRuntimeState,
+} from '@chaos-td/game-core';
 import {
   buildAIObservation,
   createDefaultAIStrategyGenome,
@@ -37,7 +44,14 @@ export interface SelfPlayMatchSummary {
   readonly finalStateHash: string;
 }
 
-function createLanes(): Record<'lane_p1' | 'lane_p2', LaneRuntimeState> {
+/**
+ * Creates lanes using full MVP_MIRROR_01 lane definitions.
+ * Uses official waypoints, spawn/end positions, and path segments.
+ * Self-play must use real battlefield geometry — not empty placeholders.
+ *
+ * Exported for tests to verify lane integrity.
+ */
+export function createSelfPlayLanes(): Record<'lane_p1' | 'lane_p2', LaneRuntimeState> {
   const createLane = (laneId: 'lane_p1' | 'lane_p2'): LaneRuntimeState => {
     const definition = MVP_MIRROR_01.lanes.find((lane) => lane.id === laneId);
     if (!definition) throw new Error(`Missing lane ${laneId}`);
@@ -46,11 +60,11 @@ function createLanes(): Record<'lane_p1' | 'lane_p2', LaneRuntimeState> {
       battlefieldId: laneId,
       defenderId: definition.defenderPlayerId,
       attackerId: definition.attackerPlayerId,
-      waypoints: [],
-      spawnPosition: { xMilliTiles: 0, yMilliTiles: 0 },
-      endPosition: { xMilliTiles: 0, yMilliTiles: 0 },
-      segments: [],
-      totalPathLength: 0,
+      waypoints: definition.waypoints,
+      spawnPosition: definition.spawnPosition,
+      endPosition: definition.endPosition,
+      segments: createPathSegments(definition.waypoints),
+      totalPathLength: calculatePathLength(definition.waypoints),
       spawnQueue: [],
       monsters: [],
       pendingLeaks: [],
@@ -60,10 +74,19 @@ function createLanes(): Record<'lane_p1' | 'lane_p2', LaneRuntimeState> {
   return { lane_p1: createLane('lane_p1'), lane_p2: createLane('lane_p2') };
 }
 
-function buildTowerEntityMap(towers: readonly { entityId: number; towerTypeId: string; cellX: number; cellY: number; ownerId: PlayerSlot }[]): ReadonlyMap<string, number> {
+/**
+ * Builds a tower entity map filtered by owner.
+ * Each player gets their own map — p1 cannot reference p2 towers and vice versa.
+ */
+function buildTowerEntityMap(
+  towers: readonly { entityId: number; towerTypeId: string; cellX: number; cellY: number; ownerId: PlayerSlot }[],
+  ownerId: PlayerSlot,
+): ReadonlyMap<string, number> {
   const map = new Map<string, number>();
   for (const tower of towers) {
-    map.set(`${tower.towerTypeId}:${tower.cellX}:${tower.cellY}`, tower.entityId);
+    if (tower.ownerId === ownerId) {
+      map.set(`${tower.towerTypeId}:${tower.cellX}:${tower.cellY}`, tower.entityId);
+    }
   }
   return map;
 }
@@ -79,12 +102,11 @@ function commandKey(command: GameCommand): string {
 }
 
 /**
- * Builds a sanitized observation input from simulation state.
+ * Official self-play runtime adapter.
  *
- * INTEGRATED: Self-play (this module) is the sole official runtime adapter.
- * The caller (league self-play) is trusted to construct the input from
- * authoritative simulation state. The type system prevents opponent gold/income
- * from reaching the builder.
+ * INTEGRATED: Self-play is the sole official consumer of this adapter.
+ * The adapter constructs BuildAIObservationInput from authoritative simulation state,
+ * isolating opponent.gold/income from the policy layer.
  *
  * Balance sim: NOT_INTEGRATED — must construct its own adapter.
  * Client: NOT_INTEGRATED — no Playtest adapter yet.
@@ -102,8 +124,13 @@ export function decideStrategyCommand(
 }
 
 /**
- * Self-play only: constructs BuildAIObservationInput from the authoritative simulation state.
- * Exposes self gold/income and opponent HP only.
+ * Constructs BuildAIObservationInput from authoritative simulation state.
+ * - Self: gold, income, hp, outbound send queue
+ * - Opponent: hp only (gold/income hidden)
+ * - Own battlefield: wave monsters on own lane + own outbound queue
+ * - Opponent battlefield: wave monsters on opponent's lane (no opponent queue)
+ *
+ * Pending commands are not part of this contract — they are simulation-internal.
  */
 function buildObsInput(
   state: {
@@ -120,16 +147,11 @@ function buildObsInput(
   playerId: PlayerSlot,
 ): BuildAIObservationInput {
   const oppId: PlayerSlot = playerId === 'p1' ? 'p2' : 'p1';
-
-  // p1 attacks lane_p2 (defended by p2), p2 attacks lane_p1 (defended by p1)
-  // ownBattlefield = lane this player is defending (wave monsters on own side)
-  // opponentBattlefield = lane opponent is defending (wave monsters on opponent's side)
   const ownLaneId: 'lane_p1' | 'lane_p2' = playerId === 'p1' ? 'lane_p1' : 'lane_p2';
   const oppLaneId: 'lane_p1' | 'lane_p2' = playerId === 'p1' ? 'lane_p2' : 'lane_p1';
 
-  // Own outbound queue is the queue in the lane this player attacks (opponent's lane)
+  // Own outbound queue lives in the lane the opponent defends (the lane this player attacks).
   const ownOutboundLaneId: 'lane_p1' | 'lane_p2' = oppLaneId;
-  // Opponent outbound queue is the queue in the lane the opponent attacks (own lane) — hidden
 
   const ownTowers = state.towers
     .filter((t) => t.ownerId === playerId)
@@ -170,7 +192,7 @@ export function runSelfPlayMatch(
   p2Strategy: AIStrategyGenome,
   maxTicks = 10000,
 ): SelfPlayMatchSummary {
-  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createLanes());
+  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createSelfPlayLanes());
   let acceptedCommands = 0;
   let rejectedCommands = 0;
   simulation.start();
@@ -178,7 +200,7 @@ export function runSelfPlayMatch(
   while (simulation.state.phase !== 'result' && simulation.state.tick < maxTicks) {
     const state = simulation.state;
 
-    const stateForP1 = {
+    const stateSnapshot = {
       players: state.players,
       lanes: state.lanes,
       towers: state.towers,
@@ -187,16 +209,22 @@ export function runSelfPlayMatch(
       waveScheduler: state.waveScheduler,
     };
 
-    const p1Input = buildObsInput(stateForP1, 'p1');
-    const p2Input = buildObsInput(stateForP1, 'p2');
+    const p1Input = buildObsInput(stateSnapshot, 'p1');
+    const p2Input = buildObsInput(stateSnapshot, 'p2');
 
     const p1Obs = buildAIObservation('p1', p1Input);
     const p2Obs = buildAIObservation('p2', p2Input);
 
-    const towerMap = buildTowerEntityMap(state.towers);
+    // Each player has their own tower map — no cross-slot collision
+    const p1TowerMap = buildTowerEntityMap(state.towers, 'p1');
+    const p2TowerMap = buildTowerEntityMap(state.towers, 'p2');
 
-    const p1Cmd = decideStrategyCommand(p1Obs, p1Strategy, `${seed}:p1:${p1Strategy.strategyId}:${state.tick}`, towerMap);
-    const p2Cmd = decideStrategyCommand(p2Obs, p2Strategy, `${seed}:p2:${p2Strategy.strategyId}:${state.tick}`, towerMap);
+    const p1Cmd = decideStrategyCommand(
+      p1Obs, p1Strategy, `${seed}:p1:${p1Strategy.strategyId}:${state.tick}`, p1TowerMap,
+    );
+    const p2Cmd = decideStrategyCommand(
+      p2Obs, p2Strategy, `${seed}:p2:${p2Strategy.strategyId}:${state.tick}`, p2TowerMap,
+    );
 
     const commands = [p1Cmd, p2Cmd].filter((command): command is GameCommand => command !== null)
       .sort((left, right) => commandKey(left).localeCompare(commandKey(right)));

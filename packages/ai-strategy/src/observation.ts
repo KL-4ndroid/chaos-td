@@ -28,7 +28,7 @@ export interface VisibleTower {
 
 /**
  * Battlefield-level aggregates for the public battlefield state.
- * Does NOT include opponent send queue — queued monsters are not yet spawned.
+ * Does NOT include outbound queue — queues are private to the owning player.
  */
 export interface BattlefieldObservation {
   readonly activeMonsterCount: number;
@@ -37,8 +37,6 @@ export interface BattlefieldObservation {
   readonly flyingMonsterCount: number;
   readonly flyingMonsterHp: number;
   readonly bossMonsterCount: number;
-  /** Self-only: outbound queue length for the owning AI's own decisions. */
-  readonly outboundQueueLength: number;
   readonly visibleTowers: readonly VisibleTower[];
   readonly groundCoverage: number;
   readonly flyingCoverage: number;
@@ -177,8 +175,6 @@ function monsterPressure(
 function battlefieldObservation(
   lane: {
     monsters: readonly { hp: number; shield: number; leakDamage: number; pathProgressMilliTiles: number; movementType: string; tags: readonly MonsterTag[] }[];
-    /** Outbound spawn queue for the battlefield owner. */
-    outboundQueue: readonly unknown[];
   },
   towers: readonly { towerTypeId: string; level: number; cellX: number; cellY: number }[],
 ): BattlefieldObservation {
@@ -193,7 +189,6 @@ function battlefieldObservation(
     flyingMonsterCount: flying.length,
     flyingMonsterHp: flying.reduce((sum, m) => sum + m.hp, 0),
     bossMonsterCount: boss.length,
-    outboundQueueLength: lane.outboundQueue.length,
     visibleTowers: visibleSorted,
     groundCoverage: groundCoverage(towers),
     flyingCoverage: flyingCoverage(towers),
@@ -306,11 +301,11 @@ export function buildAIObservation(
   };
 
   const ownBattlefield = battlefieldObservation(
-    { monsters: input.ownBattlefield.monsters, outboundQueue: input.ownBattlefield.outboundQueue },
+    { monsters: input.ownBattlefield.monsters },
     input.ownTowers,
   );
   const oppBattlefield = battlefieldObservation(
-    { monsters: input.opponentBattlefield.monsters, outboundQueue: [] },
+    { monsters: input.opponentBattlefield.monsters },
     input.opponentTowers,
   );
 
