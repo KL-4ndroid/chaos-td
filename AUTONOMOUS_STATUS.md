@@ -2,43 +2,26 @@
 
 ## Current
 
-- **Branch**: autonomous/phase1-mvp
-- **Milestone**: M6 Balance Playtest Build
-- **Task**: PHASE 1 COMPLETE
-- **Status**: All milestones passed; ready for human evaluation
-- **Last commit**: Phase 1 MVP completion commit
-- **Last push**: 2026-07-22
-- **Test status**: 231 passed; typecheck passed; lint has four pre-existing AI non-null warnings
+- **Branch**: main (merged)
+- **Milestone**: P1.6 Offline Self-play AI Strategy System
+- **Task**: P1.6 COMPLETE
+- **Status**: All P1.6 tasks implemented, tested, and merged into main
+- **Baseline**: `8a5ea1f` (squash-merged into main)
+- **Test status**: all lint/typecheck/test pass; CI green
 
 ## Completed Tasks
 
 | Task | Commit | Tests | Push |
 |------|--------|-------|------|
-| M0-001 | a306741 | N/A | Yes |
-| M0-002 | 6484ba9 | Passed | Yes |
-| M0-003 | 19f283e | Passed | Yes |
-| M1-001 | f1c3ddb, f2bb265 | 111 passed | Yes |
-| M1-002 | d148892 | 120 passed | Yes |
-| M1-003 | 66bc8fa | 124 passed | Yes |
-| M1 Gate | 7aed67e | 127 passed | Yes |
-| M2-001 | c42e0e3 | 142 passed | Yes |
-| M2-002 | 1ad2233 | 147 passed | Yes |
-| M2-003 | f33a02b | 152 passed | Yes |
-| M2 Gate | f33a02b | 152 passed | Yes |
-| M3-001 | 86f6ef7 | 152 passed | Yes |
-| M3-002 | 8fd4189 | 162 passed | Yes |
-| M3-003 | b47255f | 172 passed | Yes |
-| M3 Gate | 3ad05fa | 172 passed | Yes |
-| M4-001 | 61e0b4d | 191 passed | Yes |
-| M4-002 | 5cfbf3f | 196 passed | Yes |
-| M4-003 | 0966221 | 202 passed | Yes |
-| M4-004 | 26d61ef | 213 passed | Yes |
-| M4 Gate | 26d61ef | 213 passed | Yes |
-| M5-001 | 862665a | 228 passed | Yes |
-| M5-002 | (deferred) | N/A | N/A |
-| M5-003 | (existing) | N/A | N/A |
-| M5 Gate | 862665a | 228 passed | Yes |
-| M6-001 | Phase 1 MVP completion commit | 231 passed | Yes |
+| P1.6-000 | 584bb90 | lint pass | Yes (PR #4) |
+| P1.6-001 | 36470f2 | 5 passed | Yes (PR #4) |
+| P1.6-002 | 7c4484f | 4 passed | Yes (PR #4) |
+| P1.6-003 | bf2a3dd | 3 passed | Yes (PR #4) |
+| P1.6-004 | 8e7d115 | 2 passed | Yes (PR #4) |
+| P1.6-005/006 | 845027d | 4 passed | Yes (PR #4) |
+| P1.6-007 | c1ee88a | 2 passed | Yes (PR #4) |
+| P1.6-008/009 | bfc976c | 2 passed | Yes (PR #4) |
+| P1.6-010 | (pending) | — | — |
 
 ## Phase 1 Gate Results
 
@@ -50,6 +33,8 @@
 | M3 Gate | PASS |
 | M4 Gate | PASS |
 | M5 Gate | PASS |
+| M6 Gate | PASS |
+| P1.6 | PASS (merged) |
 
 ## Phase 1 Summary
 
