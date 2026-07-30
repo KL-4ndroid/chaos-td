@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "mvp-0.1.0",
+  "strategies": [
+    {
+      "id": "smoke-001",
+      "displayName": "Smoke Baseline 001",
+      "schemaVersion": 1,
+      "contentVersion": "mvp-0.1.0",
+      "skillRating": 1200,
+      "tier": "Normal",
+      "archetype": "adaptive",
+      "genome": {
+        "schemaVersion": 1,
+        "strategyId": "smoke-001",
+        "strategyVersion": 1,
+        "compatibleContentVersion": "mvp-0.1.0",
+        "economyWeight": 500,
+        "defenseWeight": 550,
+        "aggressionWeight": 450,
+        "buildThreshold": 450,
+        "upgradeThreshold": 600,
+        "sellThreshold": 250,
+        "emergencyDefenseThreshold": 700,
+        "reserveGoldRatio": 350,
+        "incomeInvestmentRatio": 400,
+        "sendInvestmentRatio": 450,
+        "antiAirPriority": 600,
+        "splashPriority": 500,
+        "slowPriority": 450,
+        "antiBossPriority": 650,
+        "pressureTimingWeight": 500,
+        "counterOpponentWeight": 550,
+        "diversityPreference": 350
+      },
+      "behaviorFingerprint": "fingerprint-placeholder-v1",
+      "trainingRunId": "smoke-run-v1",
+      "evaluationSummary": { "elo": 1200, "winRate": 0.5, "invalidCommandRate": 0 },
+      "finalValidationHash": "smoke-v1"
+    }
+  ]
+}

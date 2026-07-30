@@ -1,0 +1,1 @@
+{ "seed": "ai-smoke-001", "p1StrategyId": "smoke-001", "p2StrategyId": "smoke-001", "finalTick": 300, "winnerId": null, "outcome": "draw", "completion": "tick_guard", "acceptedCommands": 8, "rejectedCommands": 0, "finalStateHash": "placeholder" }

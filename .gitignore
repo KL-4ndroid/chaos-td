@@ -38,3 +38,7 @@ npm-debug.log*
 # Generated runtime balance reports
 reports/balance/latest/
 reports/balance/runs/
+
+# AI training artifacts (never commit training checkpoints or raw runs)
+reports/ai/runs/
+data/ai/training/checkpoints/

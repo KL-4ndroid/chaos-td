@@ -1,6 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "outDir": "./dist", "rootDir": "./src", "composite": true },
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "../..",
+    "paths": {
+      "@chaos-td/ai-strategy": ["packages/ai-strategy/src/index.ts"],
+      "@chaos-td/game-data": ["packages/game-data/src/index.ts"],
+      "@chaos-td/game-core": ["packages/game-core/src/index.ts"]
+    }
+  },
   "references": [
     { "path": "../game-data" },
     { "path": "../game-core" },

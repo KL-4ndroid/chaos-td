@@ -26,3 +26,10 @@ export {
   type HallOfFameCandidate,
   type HallOfFameEntry,
 } from './hall-of-fame.js';
+export {
+  checkPoolCompatibility,
+  checkStrategyCompatibility,
+  type CompatibilityCheck,
+  type CompatibilityResult,
+  type PoolCompatibilityReport,
+} from './compat.js';
