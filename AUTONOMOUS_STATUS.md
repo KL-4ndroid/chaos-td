@@ -2,12 +2,11 @@
 
 ## Current
 
-- **Branch**: main (merged)
-- **Milestone**: P1.6 Offline Self-play AI Strategy System
-- **Task**: P1.6 COMPLETE
-- **Status**: All P1.6 tasks implemented, tested, and merged into main
-- **Baseline**: `8a5ea1f` (squash-merged into main)
-- **Test status**: all lint/typecheck/test pass; CI green
+- **Branch**: `autonomous/ai-self-play-v2`
+- **Milestone**: P1.6 v2: AI Observation Contract
+- **Task**: P1.6-010 COMPLETE; Draft PR #5 awaiting merge
+- **Baseline**: `c562f85` (observation contract, leak tests, compat checks)
+- **Test status**: 442 tests pass; CI green on PR #5
 
 ## Completed Tasks
 
@@ -21,7 +20,32 @@
 | P1.6-005/006 | 845027d | 4 passed | Yes (PR #4) |
 | P1.6-007 | c1ee88a | 2 passed | Yes (PR #4) |
 | P1.6-008/009 | bfc976c | 2 passed | Yes (PR #4) |
-| P1.6-010 | (pending) | — | — |
+| P1.6-010 (obs) | 2e69e9c | 22 passed | Yes (PR #5) |
+| P1.6-010 (compat) | c562f85 | 5 passed | Yes (PR #5) |
+
+## P1.6 v2 Key Changes
+
+### Observation Contract
+- `AIObservation` interface: `self` (HP, Gold, Income, towers, role coverage) + `opponent` (HP, visible towers, coverage, pressure) — no exact opponent Gold/Income
+- `OpponentEconomyEstimate`: all fields zero / `hasEstimate: false` (reserved for future)
+- `buildAIObservation(playerId, BuildObservationInput)`: single shared builder for all consumers
+- Policy functions (`scoreAIAction`, `selectAIAction`, `generateLegalActions`) accept `AIObservation`, never `SimulationState`
+
+### Leak-Prevention Tests
+- Opponent Gold changes do not affect observation or decision
+- Opponent Income changes do not affect observation or decision
+- Economy fields always zero/absent regardless of actual values
+- `toGameCommand` is the only command output path
+
+### Content Compatibility
+- `checkStrategyCompatibility(genome)`: detects new tower roles, damage types, movement types, tags
+- `checkPoolCompatibility(pool)`: batch check for frozen strategy pools
+- Result levels: `compatible`, `requires_reevaluation`, `requires_retraining`, `unsupported`
+
+### Smoke Baseline
+- `data/ai/frozen/strategy-pool-smoke-v1.json`: 1 initial frozen strategy
+- `reports/ai/latest/match-summary.jsonl`: smoke match record
+- `npm run ai:check`: runs league + compat tests
 
 ## Phase 1 Gate Results
 
