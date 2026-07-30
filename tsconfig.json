@@ -6,6 +6,7 @@
     { "path": "./packages/game-data" },
     { "path": "./packages/shared" },
     { "path": "./packages/test-fixtures" },
-    { "path": "./packages/ai-strategy" }
+    { "path": "./packages/ai-strategy" },
+    { "path": "./packages/ai-training" }
   ]
 }
