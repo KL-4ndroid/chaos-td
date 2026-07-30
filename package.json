@@ -11,7 +11,7 @@
     "dev": "npm run dev --workspace=apps/client",
     "dev:assets": "npm run dev --workspace=apps/asset-admin",
     "start:assets": "npm run start --workspace=apps/asset-admin",
-    "build": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/balance-sim && npm run build --workspace=@chaos-td/shared && npm run build --workspace=@chaos-td/test-fixtures && npm run build --workspace=@chaos-td/client",
+    "build": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && npm run build --workspace=@chaos-td/balance-sim && npm run build --workspace=@chaos-td/shared && npm run build --workspace=@chaos-td/test-fixtures && npm run build --workspace=@chaos-td/client",
     "lint": "eslint .",
     "typecheck": "tsc --project tsconfig.production.json --pretty false",
     "typecheck:test": "tsc --project tsconfig.test.json --pretty false",
