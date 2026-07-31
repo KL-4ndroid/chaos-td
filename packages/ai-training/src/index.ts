@@ -30,6 +30,19 @@ export {
   type HallOfFameEntry,
 } from './hall-of-fame.js';
 export {
+  createInitialPopulation,
+  getInitialPopulationArchetypes,
+  AI_TRAINING_CONTENT_VERSION,
+  type EvolutionArchetype,
+  type InitialPopulationConfig,
+} from './population.js';
+export {
+  createGenerationSchedule,
+  participantPolicySeed,
+  type EvolutionMatch,
+  type GenerationScheduleConfig,
+} from './schedule.js';
+export {
   checkPoolCompatibility,
   checkStrategyCompatibility,
   type CompatibilityCheck,
