@@ -38,6 +38,8 @@ export interface AIFeatures {
   readonly opponentGroundCoverage: number;
   readonly opponentFlyingCoverage: number;
   readonly opponentPressure: number;
+  readonly incomeGrowthOpportunity?: number;
+  readonly reserveGold?: number;
 }
 
 export type LegalAIAction =
@@ -75,6 +77,8 @@ export function extractAIFeaturesFromObservation(obs: AIObservation): AIFeatures
     opponentGroundCoverage: obs.opponentGroundCoverage,
     opponentFlyingCoverage: obs.opponentFlyingCoverage,
     opponentPressure: obs.opponentActiveMonsterPressure,
+    incomeGrowthOpportunity: Math.max(0, 1000 - obs.self.income),
+    reserveGold: Math.floor((obs.self.gold * 350) / 1000),
   };
 }
 
@@ -129,7 +133,13 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
   if (action.type === 'build_tower') {
     const definition = TOWER_DEFINITIONS.find((candidate) => candidate.id === action.towerTypeId);
     if (!definition) return { action, score: Number.MIN_SAFE_INTEGER };
-    score = genome.defenseWeight + features.leakRisk + Math.floor((features.activeMonsterPressure * genome.pressureTimingWeight) / 1000);
+    const pressure = features.leakRisk + Math.floor((features.activeMonsterPressure * genome.pressureTimingWeight) / 1000);
+    const emergency = features.leakRisk >= genome.emergencyDefenseThreshold || features.activeMonsterPressure >= genome.emergencyDefenseThreshold;
+    const reserve = emergency ? 0 : Math.floor((features.gold * genome.reserveGoldRatio) / 1000);
+    const growthOpportunity = features.incomeGrowthOpportunity ?? Math.max(0, 1000 - features.income);
+    const investment = Math.floor((growthOpportunity * genome.incomeInvestmentRatio) / 1000);
+    score = genome.defenseWeight + pressure + investment - reserve - genome.buildThreshold;
+    if (emergency) score += genome.emergencyDefenseThreshold;
     if (definition.attackTargets.includes('flying')) score += Math.floor((features.flyingPressure * genome.antiAirPriority) / 1000);
     if (definition.role === 'splash') score += Math.floor((features.activeMonsterPressure * genome.splashPriority) / 1000);
     if (definition.role === 'slow') score += Math.floor((features.activeMonsterPressure * genome.slowPriority) / 1000);
@@ -142,7 +152,12 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
   if (action.type === 'queue_monster') {
     const definition = MONSTER_DEFINITIONS.find((candidate) => candidate.id === action.monsterTypeId);
     if (!definition) return { action, score: Number.MIN_SAFE_INTEGER };
-    score = genome.aggressionWeight + Math.floor((features.opponentPressure * genome.counterOpponentWeight) / 1000);
+    const availableGold = Math.max(0, features.gold - Math.floor((features.gold * genome.reserveGoldRatio) / 1000));
+    const attackBudget = Math.floor((availableGold * genome.sendInvestmentRatio) / 1000);
+    const incomeValue = Math.floor((definition.incomeGain * genome.economyWeight) / 10);
+    score = genome.aggressionWeight + Math.floor((features.opponentPressure * genome.counterOpponentWeight) / 1000) + incomeValue;
+    if (definition.sendCost > attackBudget) score -= genome.sendInvestmentRatio;
+    else score += genome.sendInvestmentRatio;
     if (definition.movementType === 'flying') {
       score += Math.max(0, features.opponentGroundCoverage - features.opponentFlyingCoverage) * genome.antiAirPriority;
     }

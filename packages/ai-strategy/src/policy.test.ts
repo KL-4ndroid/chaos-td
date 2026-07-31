@@ -90,6 +90,30 @@ describe('feature-driven policy', () => {
     expect(scoreAIAction({ ...base, bossPressure: 5000 }, bossAction, genome).score).toBeGreaterThan(scoreAIAction(base, bossAction, genome).score);
   });
 
+  it('changes candidate scores when each newly active control changes', () => {
+    const simulation = runningSimulation();
+    const obs = buildAIObservation('p1', buildObsInput(simulation, 'p1'));
+    const features = {
+      ...extractAIFeaturesFromObservation(obs),
+      gold: 800,
+      income: 100,
+      incomeGrowthOpportunity: 900,
+      leakRisk: 800,
+      activeMonsterPressure: 800,
+      opponentPressure: 800,
+    };
+    const base = createDefaultAIStrategyGenome('sensitivity');
+    const build = { type: 'build_tower' as const, towerTypeId: 'archer', cellX: 3, cellY: 12 };
+    const send = { type: 'queue_monster' as const, monsterTypeId: 'sheep', quantity: 1 };
+    expect(scoreAIAction(features, build, { ...base, buildThreshold: 0 }).score).not.toBe(scoreAIAction(features, build, { ...base, buildThreshold: 1000 }).score);
+    expect(scoreAIAction(features, build, { ...base, emergencyDefenseThreshold: 0 }).score).not.toBe(scoreAIAction(features, build, { ...base, emergencyDefenseThreshold: 1000 }).score);
+    const normalFeatures = { ...features, leakRisk: 0, activeMonsterPressure: 0 };
+    expect(scoreAIAction(normalFeatures, build, { ...base, reserveGoldRatio: 0 }).score).not.toBe(scoreAIAction(normalFeatures, build, { ...base, reserveGoldRatio: 1000 }).score);
+    expect(scoreAIAction(normalFeatures, build, { ...base, incomeInvestmentRatio: 0 }).score).not.toBe(scoreAIAction(normalFeatures, build, { ...base, incomeInvestmentRatio: 1000 }).score);
+    expect(scoreAIAction(features, send, { ...base, economyWeight: 0 }).score).not.toBe(scoreAIAction(features, send, { ...base, economyWeight: 1000 }).score);
+    expect(scoreAIAction(features, send, { ...base, sendInvestmentRatio: 0 }).score).not.toBe(scoreAIAction(features, send, { ...base, sendInvestmentRatio: 1000 }).score);
+  });
+
   it('does not generate unaffordable actions and routes a selected command through core', () => {
     const simulation = runningSimulation();
     const poorObs = buildAIObservation('p1', {

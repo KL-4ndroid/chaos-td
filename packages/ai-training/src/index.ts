@@ -17,6 +17,7 @@ export {
 export {
   classifyArchetype,
   crossoverGenomes,
+  MUTABLE_FIELDS,
   detectDuplicateStrategies,
   genomeDistance,
   mutateGenome,

@@ -1,11 +1,25 @@
 import { createFromString, nextInt } from '@chaos-td/game-core';
 import { assertValidAIStrategyGenome, canonicalSerializeAIStrategyGenome, type AIStrategyGenome } from '@chaos-td/ai-strategy';
 
-const MUTABLE_FIELDS = [
-  'economyWeight', 'defenseWeight', 'aggressionWeight', 'buildThreshold', 'upgradeThreshold', 'sellThreshold',
-  'emergencyDefenseThreshold', 'reserveGoldRatio', 'incomeInvestmentRatio', 'sendInvestmentRatio', 'antiAirPriority',
-  'splashPriority', 'slowPriority', 'antiBossPriority', 'pressureTimingWeight', 'counterOpponentWeight', 'diversityPreference',
-] as const;
+export const MUTABLE_FIELDS = Object.freeze([
+  'economyWeight',
+  'defenseWeight',
+  'aggressionWeight',
+  'buildThreshold',
+  'upgradeThreshold',
+  'sellThreshold',
+  'emergencyDefenseThreshold',
+  'reserveGoldRatio',
+  'incomeInvestmentRatio',
+  'sendInvestmentRatio',
+  'antiAirPriority',
+  'splashPriority',
+  'slowPriority',
+  'antiBossPriority',
+  'pressureTimingWeight',
+  'counterOpponentWeight',
+  'diversityPreference',
+] as const);
 
 type MutableField = typeof MUTABLE_FIELDS[number];
 
@@ -13,11 +27,11 @@ function clamp(value: number): number {
   return Math.max(0, Math.min(1000, value));
 }
 
-export function mutateGenome(genome: AIStrategyGenome, seed: string, mutationRate: number): AIStrategyGenome {
+export function mutateGenome(genome: AIStrategyGenome, seed: string, mutationRatePermille: number): AIStrategyGenome {
   const rng = createFromString(seed);
   const mutated: Record<MutableField, number> = {} as Record<MutableField, number>;
   for (const field of MUTABLE_FIELDS) {
-    const shouldMutate = nextInt(rng, 0, 999).value < mutationRate;
+    const shouldMutate = nextInt(rng, 0, 999).value < mutationRatePermille;
     const delta = shouldMutate ? nextInt(rng, -100, 100).value : 0;
     mutated[field] = clamp(genome[field] + delta);
   }
