@@ -23,7 +23,16 @@
     "balance:simulate": "node scripts/run-balance-full.mjs",
     "balance:report": "npm run balance:simulate",
     "ai:check": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && npx vitest run packages/ai-strategy/src/policy.test.ts packages/ai-strategy/src/leak-prevention.test.ts packages/ai-training/src/league.test.ts packages/ai-training/src/compat.test.ts",
-    "ai:train": "npx vitest run packages/ai-training/src/league.test.ts packages/ai-training/src/fitness.test.ts packages/ai-training/src/hall-of-fame.test.ts",
+    "ai:train": "npm run ai:train:full",
+    "ai:train:smoke": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && node --loader ./scripts/ai-training-loader.mjs scripts/run-ai-evolution.mjs train smoke",
+    "ai:train:local": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && node --loader ./scripts/ai-training-loader.mjs scripts/run-ai-evolution.mjs train local",
+    "ai:train:full": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && node --loader ./scripts/ai-training-loader.mjs scripts/run-ai-evolution.mjs train full",
+    "ai:evaluate": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && node --loader ./scripts/ai-training-loader.mjs scripts/run-ai-evolution.mjs evaluate smoke",
+    "ai:resume": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/game-core && npm run build --workspace=@chaos-td/ai-strategy && npm run build --workspace=@chaos-td/ai-training && node --loader ./scripts/ai-training-loader.mjs scripts/run-ai-evolution.mjs resume smoke",
+    "ai:train:e2e": "npx vitest run packages/ai-training/src/trainer.test.ts packages/ai-training/src/checkpoint.test.ts packages/ai-training/src/report.test.ts packages/ai-training/src/telemetry.test.ts packages/ai-training/src/evaluator.test.ts",
+    "ai:trainer-run": "npm run ai:train:smoke",
+    "ai:smoke": "npm run ai:check",
+    "ai:validate": "npm run ai:check",
     "ai:compatibility-check": "npm run build --workspace=@chaos-td/game-data && npm run build --workspace=@chaos-td/ai-strategy && npx vitest run packages/ai-training/src/compat.test.ts"
   },
   "devDependencies": {
