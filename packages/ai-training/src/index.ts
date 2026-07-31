@@ -49,3 +49,54 @@ export {
   type CompatibilityResult,
   type PoolCompatibilityReport,
 } from './compat.js';
+export {
+  collectLeagueTelemetry,
+  runSelfPlayWithTelemetry,
+  serializeTelemetryRecord,
+  type LeagueTelemetryRecord,
+  TELEMETRY_CORRECTNESS_FLAGS,
+} from './telemetry.js';
+export {
+  evaluateGenome,
+  populationBehaviorDiversity,
+  updateEloFromGenomes,
+  type EvaluatedGenome,
+  type GenomeAggregateInput,
+  type MatchRecord,
+} from './evaluator.js';
+export {
+  runEvolutionTraining,
+  type TrainerConfig,
+  type GenerationRecord,
+  type TrainingRunReport,
+} from './trainer.js';
+export {
+  validateTrainingRunReport,
+  validateTrainingSnapshot,
+  hashTrainingRunReport,
+  createTrainingSnapshot,
+  type TrainingSnapshot,
+  type ValidationIssue,
+} from './validation.js';
+export {
+  buildCheckpoint,
+  parseTrainingReport,
+  readCheckpoint,
+  resumeTraining,
+  serializeTrainingReport,
+  verifyCheckpoint,
+  writeCheckpoint,
+  type CheckpointPaths,
+  type CheckpointWrite,
+} from './checkpoint.js';
+export {
+  aggregateTelemetryForRun,
+  renderHallOfFameJson,
+  renderTrainingSummaryMarkdown,
+  summarizeGeneration,
+  summarizeHallOfFame,
+  summarizeTrainingRun,
+  type HallOfFameSummaryEntry,
+  type ReportSummary,
+  type TelemetryAggregate,
+} from './report.js';

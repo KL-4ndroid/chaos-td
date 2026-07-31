@@ -5,6 +5,7 @@
     "rootDir": "./src",
     "composite": true,
     "ignoreDeprecations": "6.0",
+    "types": ["node"],
     "baseUrl": "../..",
     "paths": {
       "@chaos-td/ai-strategy": ["packages/ai-strategy/src/index.ts"],
