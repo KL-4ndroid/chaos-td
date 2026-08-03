@@ -181,6 +181,8 @@ export interface TrainingSnapshot {
   readonly hallOfFame: TrainingRunReport['hallOfFame'];
   readonly completedGenerations: readonly GenerationRecord[];
   readonly canonicalHash: string;
+  readonly currentPopulation: readonly AIStrategyGenome[];
+  readonly ratings: Readonly<Record<string, number>>;
 }
 
 /**
@@ -190,6 +192,8 @@ export interface TrainingSnapshot {
 export function createTrainingSnapshot(
   report: TrainingRunReport,
   completedGenerations: readonly GenerationRecord[],
+  currentPopulation: readonly AIStrategyGenome[],
+  ratings: Readonly<Record<string, number>>,
 ): TrainingSnapshot {
   return {
     schemaVersion: 1,
@@ -201,6 +205,8 @@ export function createTrainingSnapshot(
     hallOfFame: report.hallOfFame,
     completedGenerations,
     canonicalHash: report.finalCanonicalHash,
+    currentPopulation,
+    ratings,
   };
 }
 

@@ -11,7 +11,7 @@ describe('fitness and evolution', () => {
 
   it('penalizes invalid commands and tick guards in reliability', () => {
     const evaluation = calculateEvaluation({ elo: 1200, wins: 2, losses: 1, draws: 1, mirroredWins: 1, mirroredLosses: 1, acceptedCommands: 90, rejectedCommands: 10, tickGuardCount: 1, matchCount: 4, behaviorDiversity: 600 });
-    expect(evaluation).toMatchObject({ winRate: 0.5, drawRate: 0.25, invalidCommandRate: 0.1, reliabilityScore: 700 });
+    expect(evaluation).toMatchObject({ winRate: 0.5, drawRate: 0.25, invalidCommandRate: 0.1, reliabilityScore: 650 });
   });
 
   it('mutates deterministically within bounds, preserving an elite by direct reuse', () => {

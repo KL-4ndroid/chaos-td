@@ -16,6 +16,7 @@ import {
   type HallOfFameEntry,
 } from './hall-of-fame.js';
 import {
+  computeHeadToHeadRatings,
   evaluateGenome,
   populationBehaviorDiversity,
   type EvaluatedGenome,
@@ -59,6 +60,7 @@ export interface TrainingRunReport {
   readonly matchCount: number;
   readonly duplicateStrategyIds: readonly string[];
   readonly startedAtTick: number;
+  readonly currentPopulation: readonly AIStrategyGenome[];
 }
 
 interface PopulationState {
@@ -67,12 +69,23 @@ interface PopulationState {
   readonly generations: GenerationRecord[];
   readonly matchCount: number;
 }
+ 
+ /**
+  * Complete trainer state for checkpointing and resume.
+  * Captures everything needed to continue evolution deterministically.
+  */
+ export interface EvolutionTrainerState {
+   readonly nextGeneration: number;
+   readonly currentPopulation: readonly AIStrategyGenome[];
+   readonly ratings: Readonly<Record<string, number>>;
+   readonly hallOfFame: readonly HallOfFameEntry[];
+   readonly completedGenerations: readonly GenerationRecord[];
+   readonly previousGenerationHash: string | null;
+   readonly trainingHash: string;
+   readonly trainerVersion: number;
+ }
 
-function clamp(value: number): number {
-  return Math.max(0, Math.min(1000, Math.round(value)));
-}
-
-function tournamentSelect(
+export function tournamentSelect(
   evaluations: readonly EvaluatedGenome[],
   rngSeed: string,
   pickCount: number,
@@ -88,7 +101,7 @@ function tournamentSelect(
     for (let turn = 0; turn < tournamentSize; turn += 1) {
       const candidate = sortedById[nextInt(rng, 0, sortedById.length - 1).value];
       if (!candidate) continue;
-      if (best === null || candidate.evaluation.elo > best.evaluation.elo) best = candidate;
+      if (best === null || candidate.evaluation.totalScore > best.evaluation.totalScore) best = candidate;
     }
     if (best && !used.has(best.strategyId)) {
       picks.push(best);
@@ -121,9 +134,9 @@ function reproduceParents(
   const rng = createFromString(rngSeed);
   const children: AIStrategyGenome[] = [];
   for (let index = 0; index < childCount; index += 1) {
-    const leftEval = picked[index];
-    const rightEval = picked[(index + 1) % picked.length];
-    if (!leftEval || !rightEval) continue;
+    const leftEval = picked[nextInt(rng, 0, picked.length - 1).value];
+    const rightEval = picked[nextInt(rng, 0, picked.length - 1).value];
+    if (!leftEval || !rightEval) throw new Error('Parent selection returned no genome');
     const left = populationLookup.get(leftEval.strategyId);
     const right = populationLookup.get(rightEval.strategyId);
     if (!left || !right) continue;
@@ -147,6 +160,7 @@ function playMatches(
   evaluationSeeds: readonly string[],
   trainingSeed: string,
   maxTicksPerMatch: number,
+  matchesPerGenome: number,
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   if (population.length < 2) return { records: [], telemetry: [] };
   const schedule = createGenerationSchedule({
@@ -154,7 +168,7 @@ function playMatches(
     generation,
     trainingSeed,
     evaluationSeeds,
-    matchesPerGenome: 1,
+    matchesPerGenome: Math.max(1, matchesPerGenome),
   });
   return executeSchedule(generation, population, schedule, maxTicksPerMatch);
 }
@@ -180,7 +194,11 @@ function executeSchedule(
       p1StrategyId: p1.strategyId,
       p2StrategyId: p2.strategyId,
       mirrored: match.mirrored,
+      participantAId: match.participantAId,
+      participantBId: match.participantBId,
+      canonicalMatchKey: `${match.generation}:${match.pairId}:${match.seed}:${match.mirrored ? '1' : '0'}`,
       summary,
+      telemetry: fullTelemetry,
     });
     telemetry.push(fullTelemetry);
   }
@@ -194,17 +212,23 @@ function evaluatePopulation(
   trainingSeed: string,
 ): EvaluatedGenome[] {
   const behaviorDiversity = populationBehaviorDiversity(population);
-  return population.map((genome) => evaluateGenome(
-    genome,
-    {
-      strategyId: genome.strategyId,
-      generation,
-      records,
-      behaviorDiversity,
-      initialElo: clamp(1500 + (genome.strategyVersion - 1) * 5),
-    },
-    `${trainingSeed}:eval`,
-  ));
+  const initialElo = 1000;
+  const ratings = computeHeadToHeadRatings(population, records, initialElo);
+  return population.map((genome) => {
+    const elo = ratings.get(genome.strategyId) ?? initialElo;
+    return evaluateGenome(
+      genome,
+      {
+        strategyId: genome.strategyId,
+        generation,
+        records,
+        behaviorDiversity,
+        elo,
+        initialElo,
+      },
+      `${trainingSeed}:eval`,
+    );
+  });
 }
 
 function candidateFromEvaluated(
@@ -317,7 +341,7 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
   if (config.populationSize < 2) throw new Error('populationSize must be at least 2');
   if (config.generations < 0) throw new Error('generations must be >= 0');
   if (config.evaluationSeeds.length === 0) throw new Error('evaluationSeeds required');
-
+ 
   const initial = createInitialPopulation({
     size: Math.max(5, config.populationSize),
     seed: `${config.trainingSeed}:default`,
@@ -326,20 +350,51 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
   const fallback = initial[0];
   if (!fallback) throw new Error('createInitialPopulation returned no genomes');
   const defaultGenome: AIStrategyGenome = fallback;
-
-  let population: readonly AIStrategyGenome[] = createInitialPopulation({
+ 
+  const initialPopulation = createInitialPopulation({
     size: config.populationSize,
     seed: `${config.trainingSeed}:pop`,
     contentVersion: config.contentVersion,
   });
-
-  let hallOfFame: readonly HallOfFameEntry[] = [];
-  const generations: GenerationRecord[] = [];
-  let matchCount = 0;
-
-  for (let generation = 0; generation < config.generations; generation += 1) {
+  const initialState: EvolutionTrainerState = {
+    nextGeneration: 0,
+    currentPopulation: initialPopulation,
+    ratings: {},
+    hallOfFame: [],
+    completedGenerations: [],
+    previousGenerationHash: null,
+    trainingHash: '',
+    trainerVersion: 1,
+  };
+  return continueEvolution(config, initialState);
+}
+ 
+/**
+ * Continue evolution from a given trainer state. Runs generations from
+ * `state.nextGeneration` up to `config.generations`. Returns the completed
+ * `TrainingRunReport`.
+ */
+export function continueEvolution(
+  config: TrainerConfig,
+  state: EvolutionTrainerState,
+): TrainingRunReport {
+  const initial = createInitialPopulation({
+    size: Math.max(5, config.populationSize),
+    seed: `${config.trainingSeed}:default`,
+    contentVersion: config.contentVersion,
+  });
+  const fallback = initial[0];
+  if (!fallback) throw new Error('createInitialPopulation returned no genomes');
+  const defaultGenome: AIStrategyGenome = fallback;
+ 
+  let population = state.currentPopulation;
+  let hallOfFame = state.hallOfFame;
+  const generations = [...state.completedGenerations] as GenerationRecord[];
+  let matchCount = generations.reduce((sum, gen) => sum + gen.matchRecords.length, 0);
+ 
+  for (let generation = state.nextGeneration; generation < config.generations; generation += 1) {
     const scheduleTrainingSeed = `${config.trainingSeed}:gen-${generation}`;
-    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, config.maxTicksPerMatch);
+    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, config.maxTicksPerMatch, config.matchesPerGenome);
     matchCount += played.records.length;
     const primaryEval = evaluatePopulation(population, generation, played.records, scheduleTrainingSeed);
 
@@ -359,6 +414,7 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
         config.evaluationSeeds,
         opponentScheduleTrainingSeed,
         config.maxTicksPerMatch,
+        config.matchesPerGenome,
       );
       opponentRecords = opponentPlayed.records;
       opponentTelemetry = opponentPlayed.telemetry;
@@ -418,7 +474,13 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
     population = [
       ...eliteGenomes,
       ...offspring,
-    ].slice(0, config.populationSize);
+    ];
+    if (population.length !== config.populationSize) {
+      throw new Error(`Evolution population invariant failed: expected ${config.populationSize}, got ${population.length}`);
+    }
+    if (new Set(population.map((genome) => genome.strategyId)).size !== config.populationSize) {
+      throw new Error('Evolution population invariant failed: strategy IDs must be unique');
+    }
   }
 
   const state: PopulationState = { population, hallOfFame, generations, matchCount };
@@ -434,6 +496,7 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
     matchCount,
     duplicateStrategyIds: detectDuplicates(state.generations),
     startedAtTick: 0,
+    currentPopulation: population,
   };
 }
 

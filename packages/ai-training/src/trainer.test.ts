@@ -46,6 +46,16 @@ describe('deterministic evolutionary AI trainer', () => {
     }
   });
 
+  it('keeps exact population and evaluated counts for every generation', () => {
+    const report = runEvolutionTraining(baseConfig({ populationSize: 16, eliteCount: 2, generations: 2 }));
+    expect(report.generations).toHaveLength(2);
+    for (const generation of report.generations) {
+      expect(generation.populationFingerprints).toHaveLength(16);
+      expect(generation.evaluated).toHaveLength(16);
+      expect(new Set(generation.populationFingerprints).size).toBe(16);
+    }
+  });
+
   it('reports a stable final canonical hash that survives re-serialization', () => {
     const report = runEvolutionTraining(baseConfig());
     const recomputed = hashTrainingRunReport(report);
@@ -67,8 +77,45 @@ describe('deterministic evolutionary AI trainer', () => {
     expect(summary.bestEloGeneration).toBeGreaterThanOrEqual(0);
   });
 
-  it('does not execute a generation when generations is zero', () => {
+ it('does not execute a generation when generations is zero', () => {
     const report = runEvolutionTraining(baseConfig({ generations: 0 }));
     expect(report.generations).toHaveLength(0);
+  });
+
+  it('regression: populationSize=16 eliteCount=2 yields 16 genomes in every generation', () => {
+    const config = baseConfig({ populationSize: 16, eliteCount: 2, generations: 2 });
+    const report = runEvolutionTraining(config);
+    expect(report.generations).toHaveLength(2);
+    for (const gen of report.generations) {
+      expect(gen.evaluated).toHaveLength(16);
+      expect(gen.populationFingerprints).toHaveLength(16);
+    }
+  });
+
+  it('regression: each generation has unique strategyId across all evaluated genomes', () => {
+    const config = baseConfig({ populationSize: 16, eliteCount: 2, generations: 2 });
+    const report = runEvolutionTraining(config);
+    for (const gen of report.generations) {
+      const ids = gen.evaluated.map((e) => e.strategyId);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
+  it('regression: elite genomes carry forward their rating into next generation', () => {
+    const config = baseConfig({ populationSize: 8, eliteCount: 2, generations: 2 });
+    const report = runEvolutionTraining(config);
+    const gen0 = report.generations[0];
+    const gen1 = report.generations[1];
+    if (!gen0 || !gen1) throw new Error('expected two generations');
+    const gen1Ids = new Set(gen1.evaluated.map((e) => e.strategyId));
+    const survivingElites = gen0.evaluated
+      .sort((a, b) => b.evaluation.elo - a.evaluation.elo)
+      .slice(0, 2)
+      .filter((elite) => gen1Ids.has(elite.strategyId));
+    expect(survivingElites.length).toBeGreaterThan(0);
+    for (const elite of survivingElites) {
+      const gen1Elite = gen1.evaluated.find((e) => e.strategyId === elite.strategyId);
+      if (gen1Elite) expect(gen1Elite.evaluation.elo).toBeGreaterThanOrEqual(elite.evaluation.elo);
+    }
   });
 });

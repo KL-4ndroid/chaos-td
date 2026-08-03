@@ -20,24 +20,50 @@ export interface GenerationScheduleConfig {
 }
 
 function matchKey(match: EvolutionMatch): string {
-  return `${match.pairId}:${match.seed}:${match.mirrored ? '1' : '0'}`;
+  return `${match.pairId}:${match.seed}:${match.participantAId}:${match.participantBId}:${match.mirrored ? '1' : '0'}`;
 }
 
 export function createGenerationSchedule(config: GenerationScheduleConfig): readonly EvolutionMatch[] {
   if (config.population.length < 2) throw new Error('Generation schedule requires at least two genomes');
   if (config.evaluationSeeds.length === 0) throw new Error('Generation schedule requires evaluation seeds');
+  if (config.matchesPerGenome < 1) throw new Error('matchesPerGenome must be at least one');
+
+  const ids = [...new Set(config.population.map((genome) => genome.strategyId))].sort((left, right) => left.localeCompare(right));
+  if (ids.length !== config.population.length) throw new Error('Generation schedule requires unique strategy IDs');
+  const roundsNeeded = config.matchesPerGenome;
+  const rounds: string[][] = [];
+  const circle = [...ids];
+  if (circle.length % 2 === 1) circle.push('__bye__');
+  const half = circle.length / 2;
+  for (let round = 0; round < roundsNeeded; round += 1) {
+    const pairs: string[] = [];
+    for (let index = 0; index < half; index += 1) {
+      const left = circle[index];
+      const right = circle[circle.length - 1 - index];
+      if (left && right && left !== '__bye__' && right !== '__bye__') {
+        pairs.push(left < right ? `${left}\u0000${right}` : `${right}\u0000${left}`);
+      }
+    }
+    rounds.push(pairs);
+    if (circle.length > 2) {
+      const fixed = circle[0];
+      const rotated = circle.slice(1);
+      const last = rotated.pop();
+      if (fixed && last) circle.splice(0, circle.length, fixed, last, ...rotated);
+    }
+  }
+
   const matches: EvolutionMatch[] = [];
-  const target = Math.max(1, config.matchesPerGenome);
   let pairIndex = 0;
-  for (let left = 0; left < config.population.length; left += 1) {
-    for (let right = left + 1; right < config.population.length && pairIndex < config.population.length * target; right += 1) {
-      const a = config.population[left];
-      const b = config.population[right];
-      if (!a || !b) continue;
+  for (const round of rounds) {
+    for (const pair of round.sort((left, right) => left.localeCompare(right))) {
+      const [left, right] = pair.split('\u0000');
+      if (!left || !right) continue;
       const pairId = `g${config.generation}:pair-${String(pairIndex).padStart(4, '0')}`;
-      const seed = config.evaluationSeeds[pairIndex % config.evaluationSeeds.length] ?? config.trainingSeed;
-      matches.push({ generation: config.generation, pairId, seed: `${config.trainingSeed}:${seed}`, participantAId: a.strategyId, participantBId: b.strategyId, p1StrategyId: a.strategyId, p2StrategyId: b.strategyId, mirrored: false });
-      matches.push({ generation: config.generation, pairId, seed: `${config.trainingSeed}:${seed}`, participantAId: a.strategyId, participantBId: b.strategyId, p1StrategyId: b.strategyId, p2StrategyId: a.strategyId, mirrored: true });
+      const seedName = config.evaluationSeeds[pairIndex % config.evaluationSeeds.length] ?? config.trainingSeed;
+      const seed = `${config.trainingSeed}:${seedName}:r${String(pairIndex)}`;
+      matches.push({ generation: config.generation, pairId, seed, participantAId: left, participantBId: right, p1StrategyId: left, p2StrategyId: right, mirrored: false });
+      matches.push({ generation: config.generation, pairId, seed, participantAId: left, participantBId: right, p1StrategyId: right, p2StrategyId: left, mirrored: true });
       pairIndex += 1;
     }
   }

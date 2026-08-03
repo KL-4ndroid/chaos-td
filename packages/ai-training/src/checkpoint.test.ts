@@ -92,4 +92,26 @@ describe('training checkpoint and resume', () => {
     expect(hashTrainingRunReport(resumed)).toBe(resumed.finalCanonicalHash);
     expect(validateTrainingRunReport(resumed)).toEqual([]);
   });
+
+  it('regression: resume final population must equal continuous run final population', () => {
+    const fullConfig = config({ generations: 2, trainingSeed: 'resume-equality-seed' });
+    const fullReport = runEvolutionTraining(fullConfig);
+    const halfConfig = config({ generations: 1, trainingSeed: 'resume-equality-seed' });
+    const halfReport = runEvolutionTraining(halfConfig);
+    const built = buildCheckpoint(halfReport);
+    const resumed = resumeTraining(fullConfig, built.snapshot);
+    // Final generation should have the same population fingerprints
+    const fullLastGen = fullReport.generations[fullReport.generations.length - 1];
+    const resumedLastGen = resumed.generations[resumed.generations.length - 1];
+    if (!fullLastGen || !resumedLastGen) throw new Error('expected last generation');
+    expect(fullLastGen.populationFingerprints.sort()).toEqual(resumedLastGen.populationFingerprints.sort());
+    // Hall of Fame should have same entries
+    expect(fullReport.hallOfFame.length).toBe(resumed.hallOfFame.length);
+    // Rating table should be equivalent
+    const fullRatings = new Map(fullLastGen.evaluated.map((e) => [e.strategyId, e.evaluation.elo]));
+    const resumedRatings = new Map(resumedLastGen.evaluated.map((e) => [e.strategyId, e.evaluation.elo]));
+    for (const [id, elo] of fullRatings) {
+      expect(resumedRatings.get(id)).toBe(elo);
+    }
+  });
 });

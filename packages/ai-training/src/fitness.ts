@@ -1,4 +1,15 @@
+export const EVOLUTION_FITNESS_VERSION = '1.0.0';
+export const EVOLUTION_FITNESS_WEIGHTS = Object.freeze({
+  elo: 400,
+  winRate: 250,
+  slotFairness: 100,
+  reliability: 150,
+  invalidCommands: 50,
+  tickGuard: 50,
+} as const);
+
 export interface GenomeEvaluation {
+  readonly version: string;
   readonly elo: number;
   readonly winRate: number;
   readonly drawRate: number;
@@ -6,6 +17,8 @@ export interface GenomeEvaluation {
   readonly reliabilityScore: number;
   readonly diversityScore: number;
   readonly invalidCommandRate: number;
+  readonly tickGuardPenalty: number;
+  readonly totalScore: number;
 }
 
 export interface EloUpdate {
@@ -42,6 +55,15 @@ export function calculateEvaluation(input: {
   const slotAdjustedScore = resolved === 0 ? 0 : (input.wins + input.mirroredWins - input.losses - input.mirroredLosses) / (resolved * 2);
   const commandTotal = input.acceptedCommands + input.rejectedCommands;
   const invalidCommandRate = commandTotal === 0 ? 0 : input.rejectedCommands / commandTotal;
-  const reliabilityScore = Math.max(0, 1000 - input.tickGuardCount * 200 - Math.round(invalidCommandRate * 1000));
-  return { elo: input.elo, winRate, drawRate, slotAdjustedScore, reliabilityScore, diversityScore: input.behaviorDiversity, invalidCommandRate };
+  const tickGuardPenalty = input.matchCount === 0 ? 0 : Math.min(1000, Math.round((input.tickGuardCount / input.matchCount) * 1000));
+  const reliabilityScore = Math.max(0, 1000 - tickGuardPenalty - Math.round(invalidCommandRate * 1000));
+  const totalScore = Math.round(
+    (input.elo / 2000) * EVOLUTION_FITNESS_WEIGHTS.elo
+      + winRate * EVOLUTION_FITNESS_WEIGHTS.winRate
+      + ((slotAdjustedScore + 1) / 2) * EVOLUTION_FITNESS_WEIGHTS.slotFairness
+      + (reliabilityScore / 1000) * EVOLUTION_FITNESS_WEIGHTS.reliability
+      - invalidCommandRate * EVOLUTION_FITNESS_WEIGHTS.invalidCommands
+      - (tickGuardPenalty / 1000) * EVOLUTION_FITNESS_WEIGHTS.tickGuard,
+  );
+  return { version: EVOLUTION_FITNESS_VERSION, elo: input.elo, winRate, drawRate, slotAdjustedScore, reliabilityScore, diversityScore: input.behaviorDiversity, invalidCommandRate, tickGuardPenalty, totalScore };
 }
