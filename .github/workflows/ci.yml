@@ -49,3 +49,6 @@ jobs:
 
       - name: AI smoke check
         run: npm run ai:check
+
+      - name: AI evolution smoke training
+        run: npm run ai:train:smoke

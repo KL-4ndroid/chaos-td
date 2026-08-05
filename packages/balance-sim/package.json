@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
+    "@chaos-td/ai-strategy": "*",
     "@chaos-td/game-core": "*",
     "@chaos-td/game-data": "*"
   },
