@@ -1,4 +1,4 @@
-import { addCheckpoint, addEvent, createFromString, createCommandId, createReplayData, finalizeReplay } from '@chaos-td/game-core';
+import { addCheckpoint, addEvent, addReplayCommand, createFromString, createCommandId, createReplayData, finalizeReplay } from '@chaos-td/game-core';
 import type { DomainEvent, Phase, SimulationState } from '@chaos-td/game-core';
 import { CONFIG_VERSION, type PlayerSlot } from '@chaos-td/game-data';
 import {
@@ -256,7 +256,9 @@ function playSelfPlayWithTelemetry(
 
     for (const command of commands) {
       const id = createCommandId(command.playerId, state.tick, sequence++);
-      simulation.submitCommand({ ...command, commandId: id } as GameCommand);
+      const submitted = { ...command, commandId: id } as GameCommand;
+      replay = addReplayCommand(replay, state.tick, submitted);
+      simulation.submitCommand(submitted);
     }
     const events = simulation.step().events;
     replay = events.reduce((current, event) => addEvent(current, event), replay);

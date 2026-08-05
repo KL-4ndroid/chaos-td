@@ -138,6 +138,7 @@ export {
   createReplayData,
   addCheckpoint,
   addEvent,
+  addReplayCommand,
   finalizeReplay,
   serializeReplay,
   deserializeReplay,

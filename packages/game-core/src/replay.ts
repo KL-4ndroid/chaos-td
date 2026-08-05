@@ -6,6 +6,7 @@
  */
 
 import type { DomainEvent } from './events';
+import type { GameCommand } from './commands';
 
 /**
  * Replay data structure
@@ -22,6 +23,8 @@ export interface Replay {
   checkpoints: readonly { tick: number; hash: string }[];
   /** All events in order */
   events: readonly DomainEvent[];
+  /** Commands submitted to the authoritative simulation, grouped by tick. */
+  commands: readonly { tick: number; command: GameCommand }[];
   /** Final state hash */
   finalHash: string;
   /** Replay duration in ticks */
@@ -48,9 +51,14 @@ export function createReplayData(
     initialState: initialStateHash,
     checkpoints: [],
     events: [],
+    commands: [],
     finalHash: initialStateHash,
     durationTicks: 0,
   };
+}
+
+export function addReplayCommand(replay: Replay, tick: number, command: GameCommand): Replay {
+  return { ...replay, commands: [...replay.commands, { tick, command }] };
 }
 
 /**
@@ -124,6 +132,7 @@ export function deserializeReplay(json: string): Replay {
   if (!Array.isArray(parsed.events)) {
     throw new Error('Invalid replay: missing or invalid events');
   }
+  if (!Array.isArray(parsed.commands)) throw new Error('Invalid replay: missing commands');
 
   return parsed;
 }
