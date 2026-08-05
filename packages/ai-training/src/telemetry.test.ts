@@ -7,15 +7,31 @@ import {
   serializeTelemetryRecord,
   TELEMETRY_CORRECTNESS_FLAGS,
 } from './telemetry';
+import type { EvolutionMatch } from './schedule';
+
+function match(seed: string, p1StrategyId: string, p2StrategyId: string, mirrored = false): EvolutionMatch {
+  const participantAId = mirrored ? p2StrategyId : p1StrategyId;
+  const participantBId = mirrored ? p1StrategyId : p2StrategyId;
+  return {
+    generation: 0,
+    pairId: `pair:${seed}`,
+    seed,
+    participantAId,
+    participantBId,
+    p1StrategyId,
+    p2StrategyId,
+    mirrored,
+  };
+}
 
 describe('league telemetry from domain events', () => {
   it('produces deterministic, chronological, slot-symmetric telemetry for the same seed', () => {
     const p1 = createDefaultAIStrategyGenome('alpha', CONFIG_VERSION);
     const p2 = createDefaultAIStrategyGenome('beta', CONFIG_VERSION);
-    const first = collectLeagueTelemetry('seed-1', p1, p2, p1, 240, {
+    const first = collectLeagueTelemetry(match('seed-1', p1.strategyId, p2.strategyId), p1, p2, p1, 240, {
       seed: 'seed-1', p1StrategyId: p1.strategyId, p2StrategyId: p2.strategyId, finalTick: 0, winnerId: null, outcome: 'draw', completion: 'tick_guard', acceptedCommands: 0, rejectedCommands: 0, finalStateHash: 'placeholder',
     });
-    const second = collectLeagueTelemetry('seed-1', p1, p2, p1, 240, {
+    const second = collectLeagueTelemetry(match('seed-1', p1.strategyId, p2.strategyId), p1, p2, p1, 240, {
       seed: 'seed-1', p1StrategyId: p1.strategyId, p2StrategyId: p2.strategyId, finalTick: 0, winnerId: null, outcome: 'draw', completion: 'tick_guard', acceptedCommands: 0, rejectedCommands: 0, finalStateHash: 'placeholder',
     });
     expect(first).toEqual(second);
@@ -28,7 +44,7 @@ describe('league telemetry from domain events', () => {
   it('runs through the public self-play path and returns baseline + telemetry', () => {
     const p1 = createDefaultAIStrategyGenome('alpha', CONFIG_VERSION);
     const p2 = createDefaultAIStrategyGenome('beta', CONFIG_VERSION);
-    const { summary, telemetry } = runSelfPlayWithTelemetry('seed-2', p1, p2, 200);
+    const { summary, telemetry } = runSelfPlayWithTelemetry(match('seed-2', p1.strategyId, p2.strategyId), p1, p2, 200);
     expect(summary.p1StrategyId).toBe('alpha');
     expect(summary.p2StrategyId).toBe('beta');
     expect(telemetry.commandAcceptedPerPlayer.p1).toBeGreaterThanOrEqual(0);
@@ -39,7 +55,7 @@ describe('league telemetry from domain events', () => {
   it('serializes telemetry to a canonical stable JSON string', () => {
     const p1 = createDefaultAIStrategyGenome('alpha');
     const p2 = createDefaultAIStrategyGenome('beta');
-    const first = collectLeagueTelemetry('seed-3', p1, p2, p1, 120, {
+    const first = collectLeagueTelemetry(match('seed-3', p1.strategyId, p2.strategyId), p1, p2, p1, 120, {
       seed: 'seed-3', p1StrategyId: p1.strategyId, p2StrategyId: p2.strategyId, finalTick: 0, winnerId: null, outcome: 'draw', completion: 'tick_guard', acceptedCommands: 0, rejectedCommands: 0, finalStateHash: 'placeholder',
     });
     const serialized = serializeTelemetryRecord(first);

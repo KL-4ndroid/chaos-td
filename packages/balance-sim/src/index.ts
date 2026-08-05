@@ -1,4 +1,5 @@
 export { runBalanceSimulation } from './runner.js';
+export { decideBalanceStrategyCommand } from './strategy-adapter.js';
 export { detectFirstMirrorDivergence } from './fairness.js';
 export type { FirstDivergence } from './fairness.js';
 export { NORMAL_AI, NO_COMMANDS, BALANCE_SCENARIOS, BALANCE_SEEDS } from './profiles.js';

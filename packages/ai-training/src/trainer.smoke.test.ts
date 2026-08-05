@@ -91,6 +91,8 @@ describe('AI trainer end-to-end smoke', () => {
       hallOfFame: report.hallOfFame,
       completedGenerations: report.generations,
       canonicalHash: report.finalCanonicalHash,
+      currentPopulation: report.currentPopulation,
+      ratings: {},
     })));
     expect(verifyResult.valid).toBe(true);
 

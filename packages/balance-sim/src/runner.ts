@@ -20,6 +20,7 @@ import {
   TOWER_BY_ID,
   type TowerId,
 } from '@chaos-td/game-data';
+import { decideBalanceStrategyCommand } from './strategy-adapter.js';
 import type {
   BalanceSimulationOptions,
   BalanceSimulationResult,
@@ -284,6 +285,14 @@ export function runBalanceSimulation(options: BalanceSimulationOptions): Balance
   while (simulation.state.phase !== 'result' && simulation.state.tick < maximumTicks) {
     for (const [playerId, profile] of [['p1', options.p1Controller], ['p2', options.p2Controller]] as const) {
       if (profile.kind === 'none' || simulation.state.phase !== 'running') continue;
+      if (profile.kind === 'strategy_ai') {
+        const command = decideBalanceStrategyCommand(simulation.state, playerId, profile.genome);
+        if (command) {
+          simulation.submitCommand(command);
+          commandLog.push(JSON.stringify(command));
+        }
+        continue;
+      }
       const battlefieldId = playerId === 'p1' ? 'lane_p1' : 'lane_p2';
       const lane = simulation.state.lanes[battlefieldId];
       const monstersAtRisk = lane.monsters.filter((monster) => monster.pathProgressMilliTiles * 4 >= lane.totalPathLength * 3).length;

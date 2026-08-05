@@ -17,6 +17,7 @@ import {
   createSelfPlayLanes,
   type SelfPlayMatchSummary,
 } from './league.js';
+import { participantPolicySeed, type EvolutionMatch } from './schedule.js';
 
 /**
  * League-level telemetry derived from authoritative domain events and the
@@ -213,19 +214,17 @@ function snapshotForDecide(state: {
  * the simulation is stepped exactly once and all events observed in flight.
  */
 function playSelfPlayWithTelemetry(
-  seed: string,
+  match: EvolutionMatch,
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
   maxTicks: number,
 ): { summary: SelfPlayMatchSummary; telemetry: LeagueTelemetryRecord } {
+  const seed = match.seed;
   const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createSelfPlayLanes());
-  const mirrorSimulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createSelfPlayLanes());
   simulation.start();
-  mirrorSimulation.start();
   const acc = freshAccumulator();
   let postResultCommandCount = 0;
   let sequence = 0;
-  let mirrorFinalTick: number | null = null;
 
   while (simulation.state.phase !== 'result' && simulation.state.tick < maxTicks) {
     const state = simulation.state;
@@ -245,10 +244,10 @@ function playSelfPlayWithTelemetry(
     const p2TowerMap = buildTowerEntityMap(state.towers, 'p2');
 
     const p1Cmd = decideStrategyCommand(
-      p1Obs, p1Strategy, `${seed}:p1:${p1Strategy.strategyId}:${state.tick}`, p1TowerMap,
+      p1Obs, p1Strategy, participantPolicySeed(match, p1Strategy.strategyId, state.tick), p1TowerMap,
     );
     const p2Cmd = decideStrategyCommand(
-      p2Obs, p2Strategy, `${seed}:p2:${p2Strategy.strategyId}:${state.tick}`, p2TowerMap,
+      p2Obs, p2Strategy, participantPolicySeed(match, p2Strategy.strategyId, state.tick), p2TowerMap,
     );
 
     const commands = [p1Cmd, p2Cmd].filter((command): command is GameCommand => command !== null)
@@ -261,14 +260,6 @@ function playSelfPlayWithTelemetry(
     const events = simulation.step().events;
     ingestEvents(simulation.state, events, acc);
 
-    if (mirrorSimulation.state.phase !== 'result' && mirrorSimulation.state.tick < maxTicks) {
-      mirrorSimulation.step();
-      const mirrorPhase: Phase = mirrorSimulation.state.phase as Phase;
-      if (mirrorPhase === 'result') mirrorFinalTick = mirrorSimulation.state.tick;
-    } else {
-      const mirrorPhase: Phase = mirrorSimulation.state.phase as Phase;
-      if (mirrorPhase === 'result' && mirrorFinalTick === null) mirrorFinalTick = mirrorSimulation.state.tick;
-    }
 
     const phase: Phase = simulation.state.phase as Phase;
     if (phase === 'result') {
@@ -288,10 +279,6 @@ function playSelfPlayWithTelemetry(
 
   acc.p1FinalHp = simulation.state.players.p1.hp;
   acc.p2FinalHp = simulation.state.players.p2.hp;
-  if (mirrorFinalTick === null) {
-    const phase: Phase = mirrorSimulation.state.phase;
-    if (phase === 'result') mirrorFinalTick = mirrorSimulation.state.tick;
-  }
 
   const result = simulation.state.phase === 'result' ? simulation.getCanonicalState().result : null;
   const summary: SelfPlayMatchSummary = {
@@ -311,8 +298,7 @@ function playSelfPlayWithTelemetry(
     eventsChronological: acc.chronological,
     noPlayerCommandsAfterResult: postResultCommandCount === 0,
     commandPlayerMatchesEventPlayer: acc.commandPlayerMatchesEventPlayer,
-    mirroredMatchAgreesOnDeterministicFields:
-      mirrorFinalTick !== null && mirrorFinalTick === simulation.state.tick,
+    mirroredMatchAgreesOnDeterministicFields: false,
     leakDefenderEqualsLaneDefender: acc.leakDefenderConsistent,
   };
 
@@ -335,8 +321,8 @@ function playSelfPlayWithTelemetry(
     monsterQueuedByPlayer: { ...acc.monsterQueuedByPlayer },
     monstersSpawnedBySourcePlayer: { ...acc.monstersSpawnedBySourcePlayer },
     monstersDiedByKiller: { ...acc.monstersDiedByKiller },
-    matchesMirrorResult: mirrorFinalTick !== null && mirrorFinalTick === simulation.state.tick,
-    p1MirroredFinalTick: mirrorFinalTick,
+    matchesMirrorResult: false,
+    p1MirroredFinalTick: null,
     p1FinalHp: acc.p1FinalHp,
     p2FinalHp: acc.p2FinalHp,
     finalStateHash: summary.finalStateHash,
@@ -352,12 +338,12 @@ function playSelfPlayWithTelemetry(
  * domain-event telemetry. Use this in trainer / report code paths.
  */
 export function runSelfPlayWithTelemetry(
-  seed: string,
+  match: EvolutionMatch,
   p1: AIStrategyGenome,
   p2: AIStrategyGenome,
   maxTicks = 10000,
 ): { readonly summary: SelfPlayMatchSummary; readonly telemetry: LeagueTelemetryRecord } {
-  return playSelfPlayWithTelemetry(seed, p1, p2, maxTicks);
+  return playSelfPlayWithTelemetry(match, p1, p2, maxTicks);
 }
 
 /**
@@ -367,7 +353,7 @@ export function runSelfPlayWithTelemetry(
  * parameter is accepted for API symmetry but unused.
  */
 export function collectLeagueTelemetry(
-  seed: string,
+  match: EvolutionMatch,
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
   mirroredOpponent: AIStrategyGenome,
@@ -375,7 +361,7 @@ export function collectLeagueTelemetry(
   _baseline: SelfPlayMatchSummary,
 ): LeagueTelemetryRecord {
   void mirroredOpponent;
-  return playSelfPlayWithTelemetry(seed, p1Strategy, p2Strategy, maxTicks).telemetry;
+  return playSelfPlayWithTelemetry(match, p1Strategy, p2Strategy, maxTicks).telemetry;
 }
 
 function ingestEvents(state: SimulationState, events: readonly DomainEvent[], acc: MutableTelemetryAccumulator): void {

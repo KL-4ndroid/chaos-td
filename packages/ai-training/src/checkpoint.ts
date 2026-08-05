@@ -1,13 +1,11 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import {
-  createInitialPopulation,
-} from './population.js';
 import type { AIStrategyGenome } from '@chaos-td/ai-strategy';
 import type { GenerationRecord } from './trainer.js';
 import {
-  runEvolutionTraining,
+  continueEvolution,
   type TrainerConfig,
   type TrainingRunReport,
+  type EvolutionTrainerState,
 } from './trainer.js';
 import {
   createTrainingSnapshot,
@@ -55,7 +53,7 @@ function deterministicReplacer(_key: string, value: unknown): unknown {
  * Build a checkpoint snapshot and re-validate. Pure (no FS).
  */
 export function buildCheckpoint(report: TrainingRunReport): CheckpointWrite {
-  const snapshot = createTrainingSnapshot(report, report.generations);
+  const snapshot = createTrainingSnapshot(report, report.generations, report.currentPopulation, {});
   const issues = [...validateTrainingSnapshot(snapshot)];
   return { snapshot, report, issues };
 }
@@ -82,7 +80,7 @@ export function readCheckpoint(files: { readonly reportFile?: string; readonly s
   }
   if (files.reportFile && existsSync(files.reportFile)) {
     const report = parseTrainingReport(readFileSync(files.reportFile, 'utf8'));
-    return createTrainingSnapshot(report, report.generations);
+    return createTrainingSnapshot(report, report.generations, report.currentPopulation, {});
   }
   throw new Error('No checkpoint files found');
 }
@@ -97,45 +95,29 @@ export function resumeTraining(
   snapshot: TrainingSnapshot,
 ): TrainingRunReport {
   const completedCount = snapshot.completedGenerations.length;
-  // The trainer runs an inclusive loop producing `config.generations + 1`
-  // entries; fullConfig.generations=2 → generations.length=3.
-  const totalTarget = config.generations + 1;
+  // `generations` is the number of evaluated generations. A snapshot records
+  // completed generations and the population produced for the next one.
+  const totalTarget = config.generations;
   if (completedCount > totalTarget) {
     throw new Error('Snapshot has already exceeded target generations');
   }
   if (completedCount >= totalTarget) {
     return snapshotToReport(snapshot, config);
   }
-  const initialPopulation = createInitialPopulation({
-    size: config.populationSize,
-    seed: `${config.trainingSeed}:pop`,
-    contentVersion: config.contentVersion,
-  });
-  // Continue evolving from the snapshot's last-known population. We run the
-  // trainer with a `generations` budget that covers only the remaining
-  // generations, but the trainer restarts determinism from `trainingSeed`,
-  // so the resumed run is reproducible.
-  void initialPopulation;
-  const remainingSlots = totalTarget - completedCount;
-  const remainingConfig: TrainerConfig = {
-    ...config,
-    generations: remainingSlots - 1,
+  const state: EvolutionTrainerState = {
+    nextGeneration: completedCount,
+    currentPopulation: snapshot.currentPopulation,
+    ratings: snapshot.ratings,
+    hallOfFame: snapshot.hallOfFame,
+    completedGenerations: snapshot.completedGenerations,
+    previousGenerationHash: null,
+    trainingHash: '',
+    trainerVersion: 1,
   };
-  const next = runEvolutionTraining(remainingConfig);
-  const resumedSkeleton: Omit<TrainingRunReport, 'finalCanonicalHash'> = {
-    config,
-    contentVersion: config.contentVersion,
-    trainingRunId: snapshot.trainingRunId,
-    generations: [
-      ...snapshot.completedGenerations,
-      ...next.generations.map((gen) => ({ ...gen, generation: gen.generation + completedCount })),
-    ],
-    hallOfFame: mergeHallOfFame(snapshot.hallOfFame, next.hallOfFame),
-    matchCount: snapshot.completedGenerations.reduce((sum, gen) => sum + gen.matchRecords.length, 0) + next.matchCount,
-    duplicateStrategyIds: next.duplicateStrategyIds,
-    startedAtTick: 0,
-  };
-  return { ...resumedSkeleton, finalCanonicalHash: hashTrainingRunReport(resumedSkeleton as TrainingRunReport) };
+  // continueEvolution retains completed generations in `state`; it must use
+  // the original full configuration so generation-specific seeds and the
+  // reproduction sequence remain identical to an uninterrupted run.
+  return continueEvolution(config, state);
 }
 
 function snapshotToReport(snapshot: TrainingSnapshot, config: TrainerConfig): TrainingRunReport {
@@ -148,23 +130,9 @@ function snapshotToReport(snapshot: TrainingSnapshot, config: TrainerConfig): Tr
     matchCount: snapshot.completedGenerations.reduce((sum, gen) => sum + gen.matchRecords.length, 0),
     duplicateStrategyIds: [],
     startedAtTick: 0,
+    currentPopulation: snapshot.currentPopulation,
   };
   return { ...skeleton, finalCanonicalHash: hashTrainingRunReport(skeleton as TrainingRunReport) };
-}
-
-function mergeHallOfFame(
-  existing: TrainingRunReport['hallOfFame'],
-  additions: TrainingRunReport['hallOfFame'],
-): TrainingRunReport['hallOfFame'] {
-  const seen = new Set(existing.map((entry) => entry.behaviorFingerprint));
-  const result: TrainingRunReport['hallOfFame'][number][] = [...existing];
-  for (const entry of additions) {
-    if (!seen.has(entry.behaviorFingerprint)) {
-      result.push(entry);
-      seen.add(entry.behaviorFingerprint);
-    }
-  }
-  return result as TrainingRunReport['hallOfFame'];
 }
 
 /**

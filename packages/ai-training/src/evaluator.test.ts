@@ -11,6 +11,7 @@ function fakeRecord(args: {
   readonly summary: Partial<MatchRecord['summary']> & { readonly p1StrategyId: string; readonly p2StrategyId: string };
   readonly mirrored?: boolean;
   readonly generation?: number;
+  readonly telemetry?: NonNullable<MatchRecord['telemetry']>;
 }): MatchRecord {
   const baseSummary = {
     seed: 'fake',
@@ -33,6 +34,7 @@ function fakeRecord(args: {
     mirrored: args.mirrored ?? false,
     canonicalMatchKey: `pair:${args.summary.p1StrategyId}:${args.summary.p2StrategyId}`,
     summary: { ...baseSummary, ...args.summary } as MatchRecord['summary'],
+    telemetry: args.telemetry,
   };
 }
 
@@ -128,12 +130,16 @@ describe('deterministic evaluator', () => {
     const records: MatchRecord[] = [
       fakeRecord({
         summary: { p1StrategyId: 'genome-G', p2StrategyId: 'genome-H', outcome: 'win', winnerId: 'p1', acceptedCommands: 20, rejectedCommands: 5 },
+        telemetry: {
+          commandAcceptedPerPlayer: { p1: 20, p2: 0 },
+          commandRejectedPerPlayer: { p1: 5, p2: 0 },
+        } as NonNullable<MatchRecord['telemetry']>,
       }),
     ];
-    const eval = evaluateGenome(genome, { strategyId: genome.strategyId, generation: 0, records, behaviorDiversity: 0, elo: 1000, initialElo: 1000 }, 'seed-g');
+    const evaluation = evaluateGenome(genome, { strategyId: genome.strategyId, generation: 0, records, behaviorDiversity: 0, elo: 1000, initialElo: 1000 }, 'seed-g');
     // Genome-G is p1, so it should see 20 accepted and 5 rejected commands
-    expect(eval.acceptedCommands).toBe(20);
-    expect(eval.rejectedCommands).toBe(5);
+    expect(evaluation.acceptedCommands).toBe(20);
+    expect(evaluation.rejectedCommands).toBe(5);
   });
 
   it('regression: mirror match p2 genome must also be correctly counted', () => {
@@ -145,8 +151,8 @@ describe('deterministic evaluator', () => {
         summary: { p1StrategyId: 'opponent', p2StrategyId: 'genome-P2', outcome: 'win', winnerId: 'p2', acceptedCommands: 15, rejectedCommands: 2 },
       }),
     ];
-    const eval = evaluateGenome(genome, { strategyId: genome.strategyId, generation: 0, records, behaviorDiversity: 0, elo: 1000, initialElo: 1000 }, 'seed-p2');
-    expect(eval.wins).toBe(1);
-    expect(eval.mirroredWins).toBe(1);
+    const evaluation = evaluateGenome(genome, { strategyId: genome.strategyId, generation: 0, records, behaviorDiversity: 0, elo: 1000, initialElo: 1000 }, 'seed-p2');
+    expect(evaluation.wins).toBe(1);
+    expect(evaluation.mirroredWins).toBe(1);
   });
 });

@@ -1,4 +1,5 @@
 import type { BattlefieldId, PlayerSlot } from '@chaos-td/game-core';
+import type { AIStrategyGenome } from '@chaos-td/ai-strategy';
 
 export type ControllerProfile =
   | {
@@ -8,6 +9,11 @@ export type ControllerProfile =
   | {
       readonly id: 'normal-ai';
       readonly kind: 'normal_ai';
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'strategy_ai';
+      readonly genome: AIStrategyGenome;
     };
 
 export interface BalanceSimulationOptions {

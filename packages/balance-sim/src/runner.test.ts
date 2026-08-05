@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE_SCENARIOS, NO_COMMANDS, NORMAL_AI, runBalanceSimulation } from './index.js';
+import { createDefaultAIStrategyGenome } from '@chaos-td/ai-strategy';
+import { CONFIG_VERSION } from '@chaos-td/game-data';
 
 describe('balance simulation', () => {
   const options = {
@@ -38,5 +40,15 @@ describe('balance simulation', () => {
     expect(scenario.p1Controller).toBe(NORMAL_AI);
     expect(result.match.commandLog.length).toBeGreaterThan(0);
     expect(result.match.commandLog.every((command) => command.includes('"type"'))).toBe(true);
+  });
+
+  it('runs the shared strategy policy deterministically through a sanitized balance adapter', () => {
+    const strategy = { id: 'strategy-test', kind: 'strategy_ai' as const, genome: createDefaultAIStrategyGenome('balance-policy', CONFIG_VERSION) };
+    const first = runBalanceSimulation({ ...options, p1Controller: strategy, p2Controller: strategy });
+    const second = runBalanceSimulation({ ...options, p1Controller: strategy, p2Controller: strategy });
+
+    expect(first.finalStateHash).toBe(second.finalStateHash);
+    expect(first.match.commandLog).toEqual(second.match.commandLog);
+    expect(first.match.commandLog.length).toBeGreaterThan(0);
   });
 });

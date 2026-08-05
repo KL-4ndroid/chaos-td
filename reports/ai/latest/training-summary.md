@@ -1,7 +1,7 @@
 # AI Training Run trainer-smoke:smoke-trainer-seed
 
 - Content version: `mvp-0.1.0`
-- Final canonical hash: `d5e9160645f213c4`
+- Final canonical hash: `b553830454faba3e`
 - Generations completed: 1
 - Total matches played: 6
 - Hall of fame entries: 0

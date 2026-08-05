@@ -4,7 +4,9 @@ import {
   validateAIStrategyGenome,
   type AIStrategyGenome,
 } from '@chaos-td/ai-strategy';
+import { CONFIG_VERSION } from '@chaos-td/game-data';
 import { canonicalizeForHash, type GenerationRecord, type TrainerConfig, type TrainingRunReport } from './trainer.js';
+import { behaviorFingerprint } from './hall-of-fame.js';
 
 const NUMERIC_FIELDS: readonly (keyof AIStrategyGenome)[] = [
   'economyWeight',
@@ -36,20 +38,34 @@ function fingerprintEqual(left: AIStrategyGenome, right: AIStrategyGenome): bool
  * checkpoint verifiers and the tests can produce the same hash independently.
  */
 export function hashTrainingRunReport(report: TrainingRunReport): string {
+  const champion = (() => {
+    const last = report.generations[report.generations.length - 1];
+    if (!last) return null;
+    const best = [...last.evaluated].sort((left, right) => right.evaluation.elo - left.evaluation.elo)[0];
+    return best ? { strategyId: best.strategyId, elo: best.evaluation.elo, generation: last.generation } : null;
+  })();
   const payload = {
     canonicalTag: report.config.canonicalTag,
     contentVersion: report.contentVersion,
     trainingSeed: report.config.trainingSeed,
     populationSize: report.config.populationSize,
     generations: report.config.generations,
+    trainerVersion: 1,
+    gameDataVersion: CONFIG_VERSION,
+    champion,
+    finalPopulationFingerprints: report.currentPopulation.map(behaviorFingerprint).sort((left, right) => left.localeCompare(right)),
     finalHallOfFameFingerprints: report.hallOfFame
       .map((entry) => entry.behaviorFingerprint)
       .sort((left, right) => left.localeCompare(right)),
-    perGenerationMatchCounts: report.generations.map((gen) => ({ generation: gen.generation, matches: gen.matchRecords.length })),
-    perGenerationTopElo: report.generations.map((gen) => {
-      const best = [...gen.evaluated].sort((left, right) => right.evaluation.elo - left.evaluation.elo)[0];
-      return best ? { generation: gen.generation, strategyId: best.strategyId, elo: best.evaluation.elo } : { generation: gen.generation, strategyId: '', elo: 0 };
-    }),
+    perGeneration: report.generations.map((gen) => ({
+      generation: gen.generation,
+      matches: gen.matchRecords.length,
+      bestElo: (() => {
+        const best = [...gen.evaluated].sort((left, right) => right.evaluation.elo - left.evaluation.elo)[0];
+        return best ? best.evaluation.elo : 0;
+      })(),
+      populationFingerprints: gen.populationFingerprints,
+    })),
   };
   const canonical = canonicalizeForHash(payload);
   let hash = 0xcbf29ce484222325n;

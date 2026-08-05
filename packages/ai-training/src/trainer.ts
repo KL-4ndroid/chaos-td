@@ -3,6 +3,7 @@ import {
   assertValidAIStrategyGenome,
   type AIStrategyGenome,
 } from '@chaos-td/ai-strategy';
+import { CONFIG_VERSION } from '@chaos-td/game-data';
 import {
   createGenerationSchedule,
   type EvolutionMatch,
@@ -108,7 +109,7 @@ export function tournamentSelect(
       used.add(best.strategyId);
     }
   }
-  // Fill if not enough unique elites — fall back to sorted-by-elo pick.
+  // Fill if not enough unique elites ??fall back to sorted-by-elo pick.
   if (picks.length < pickCount) {
     const sorted = [...evaluations].sort((a, b) => b.evaluation.elo - a.evaluation.elo || a.strategyId.localeCompare(b.strategyId));
     for (const slot of sorted) {
@@ -186,7 +187,7 @@ function executeSchedule(
     const p1 = lookup.get(match.p1StrategyId);
     const p2 = lookup.get(match.p2StrategyId);
     if (!p1 || !p2) continue;
-    const { summary, telemetry: fullTelemetry } = runSelfPlayWithTelemetry(match.seed, p1, p2, maxTicksPerMatch);
+    const { summary, telemetry: fullTelemetry } = runSelfPlayWithTelemetry(match, p1, p2, maxTicksPerMatch);
     records.push({
       generation,
       pairId: match.pairId,
@@ -277,20 +278,34 @@ function pruneHallOfFame(
 }
 
 function hashTrainingRun(state: PopulationState, config: TrainerConfig): string {
+  const champion = (() => {
+    const last = state.generations[state.generations.length - 1];
+    if (!last) return null;
+    const best = [...last.evaluated].sort((left, right) => right.evaluation.elo - left.evaluation.elo)[0];
+    return best ? { strategyId: best.strategyId, elo: best.evaluation.elo, generation: last.generation } : null;
+  })();
   const payload = {
     canonicalTag: config.canonicalTag,
     contentVersion: config.contentVersion,
     trainingSeed: config.trainingSeed,
     populationSize: config.populationSize,
     generations: config.generations,
+    trainerVersion: 1,
+    gameDataVersion: CONFIG_VERSION,
+    champion,
+    finalPopulationFingerprints: state.population.map(behaviorFingerprint).sort((left, right) => left.localeCompare(right)),
     finalHallOfFameFingerprints: state.hallOfFame
       .map((entry) => entry.behaviorFingerprint)
       .sort((left, right) => left.localeCompare(right)),
-    perGenerationMatchCounts: state.generations.map((gen) => ({ generation: gen.generation, matches: gen.matchRecords.length })),
-    perGenerationTopElo: state.generations.map((gen) => {
-      const best = [...gen.evaluated].sort((left, right) => right.evaluation.elo - left.evaluation.elo)[0];
-      return best ? { generation: gen.generation, strategyId: best.strategyId, elo: best.evaluation.elo } : { generation: gen.generation, strategyId: '', elo: 0 };
-    }),
+    perGeneration: state.generations.map((gen) => ({
+      generation: gen.generation,
+      matches: gen.matchRecords.length,
+      bestElo: (() => {
+        const best = [...gen.evaluated].sort((left, right) => right.evaluation.elo - left.evaluation.elo)[0];
+        return best ? best.evaluation.elo : 0;
+      })(),
+      populationFingerprints: gen.populationFingerprints,
+    })),
   };
   return fnv1a64(canonicalize(payload));
 }
@@ -342,14 +357,6 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
   if (config.generations < 0) throw new Error('generations must be >= 0');
   if (config.evaluationSeeds.length === 0) throw new Error('evaluationSeeds required');
  
-  const initial = createInitialPopulation({
-    size: Math.max(5, config.populationSize),
-    seed: `${config.trainingSeed}:default`,
-    contentVersion: config.contentVersion,
-  });
-  const fallback = initial[0];
-  if (!fallback) throw new Error('createInitialPopulation returned no genomes');
-  const defaultGenome: AIStrategyGenome = fallback;
  
   const initialPopulation = createInitialPopulation({
     size: config.populationSize,
@@ -483,8 +490,8 @@ export function continueEvolution(
     }
   }
 
-  const state: PopulationState = { population, hallOfFame, generations, matchCount };
-  const finalCanonicalHash = hashTrainingRun(state, config);
+  const popState: PopulationState = { population, hallOfFame, generations, matchCount };
+  const finalCanonicalHash = hashTrainingRun(popState, config);
 
   return {
     config,
@@ -494,7 +501,7 @@ export function continueEvolution(
     hallOfFame,
     finalCanonicalHash,
     matchCount,
-    duplicateStrategyIds: detectDuplicates(state.generations),
+    duplicateStrategyIds: detectDuplicates(popState.generations),
     startedAtTick: 0,
     currentPopulation: population,
   };

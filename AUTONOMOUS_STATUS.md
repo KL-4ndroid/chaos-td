@@ -14,8 +14,8 @@
 - **Squash merge SHA**: `96228276e165c3392bd3013d9d5e48ab49b2c3d0`
 - **Final PR CI Run**: `30566031200`
 - **CI conclusion**: SUCCESS
-- **Next planned task**: P1.6-011 Deterministic Evolutionary AI Trainer
-- **P1.6-011**: NOT_STARTED
+- **Next planned task**: P1.6-012 Balance Sim Strategy Adapter
+- **P1.6-011**: DONE / verified
 
 ## Completed Tasks
 
@@ -131,8 +131,19 @@
 
 ## Next Planned Task
 
-- **P1.6-011**: Deterministic Evolutionary AI Trainer
-- **Status**: NOT_STARTED
+- **P1.6-012**: Balance Sim Strategy Adapter
+- **Status**: IN PROGRESS
+
+## P1.6-011 Completion
+
+- Deterministic evolutionary training supports canonical reports, checkpoints,
+  resume, telemetry, and frozen-pool candidate generation.
+- Resume uses the original full configuration and generation index, producing
+  the same final population as uninterrupted training.
+- Smoke training, evaluation, and resume completed with canonical hash
+  `cf772294378482ef`.
+- Verification: `ai:train:e2e` (31 tests), `ai:check` (38 tests), production
+  typecheck, lint, and the full suite (502 Vitest + 2 asset-admin tests) pass.
 
 ## Phase 2 Gate Assessment
 
