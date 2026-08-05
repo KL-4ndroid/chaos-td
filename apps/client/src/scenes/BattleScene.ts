@@ -72,11 +72,11 @@ function createLaneRuntime(definition: LaneDefinition): LaneRuntimeState {
   };
 }
 
-function createDemoSimulation(): Simulation {
+function createDemoSimulation(seed = 'portrait-maze-demo', configVersion: typeof CONFIG_VERSION = CONFIG_VERSION): Simulation {
   const lanes = Object.fromEntries(
     MVP_MIRROR_01.lanes.map((lane) => [lane.id, createLaneRuntime(lane)]),
   ) as Record<LaneId, LaneRuntimeState>;
-  return createSimulation({ seed: 'portrait-maze-demo', configVersion: CONFIG_VERSION }, lanes);
+  return createSimulation({ seed, configVersion }, lanes);
 }
 
 function toPixels(laneId: LaneId, xMilliTiles: number, yMilliTiles: number): { x: number; y: number } {
@@ -90,7 +90,9 @@ function toPixels(laneId: LaneId, xMilliTiles: number, yMilliTiles: number): { x
 
 export class BattleScene extends Phaser.Scene {
   private readonly loop = new FixedStepLoop(TICK_DURATION_MS);
-  private readonly simulation = createDemoSimulation();
+  private simulation = createDemoSimulation();
+  private trainingReplay?: Replay;
+  private replaySpeed = 1;
   private readonly monsterVisuals = new Map<number, MonsterVisual>();
   private readonly towerVisuals = new Map<number, Phaser.GameObjects.Container>();
   private readonly pathGraphics = new Map<LaneId, Phaser.GameObjects.Graphics>();
@@ -112,6 +114,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(): void {
+    const trainingReplay = this.registry.get('trainingReplay') as Replay | undefined;
+    if (trainingReplay) {
+      this.trainingReplay = trainingReplay;
+      this.simulation = createDemoSimulation(trainingReplay.seed, trainingReplay.configVersion as typeof CONFIG_VERSION);
+    }
     this.cameras.main.setBackgroundColor('#101418');
     this.drawArena();
     this.createOverlay();
@@ -120,23 +127,31 @@ export class BattleScene extends Phaser.Scene {
     this.syncTowerVisuals(this.simulation.state);
     this.simulation.start();
 
+    this.game.events.on('replay-toggle', this.toggleReplayPause, this);
+    this.game.events.on('replay-speed', this.setReplaySpeed, this);
+
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.handleHidden, this);
     this.game.events.on(Phaser.Core.Events.VISIBLE, this.handleVisible, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(Phaser.Core.Events.HIDDEN, this.handleHidden, this);
       this.game.events.off(Phaser.Core.Events.VISIBLE, this.handleVisible, this);
+      this.game.events.off('replay-toggle', this.toggleReplayPause, this);
+      this.game.events.off('replay-speed', this.setReplaySpeed, this);
     });
   }
 
   update(_time: number, delta: number): void {
-    this.loop.advance(delta, () => this.stepSimulation());
+    this.loop.advance(delta * this.replaySpeed, () => this.stepSimulation());
     this.renderMonsters(this.simulation.state, this.loop.interpolationAlpha);
     this.updateOverlay();
   }
 
   private stepSimulation(): void {
     const state = this.simulation.state;
-    if (state.phase === 'running' && !this.opponentDefenseSubmitted) {
+    if (this.trainingReplay) {
+      for (const item of this.trainingReplay.commands.filter((entry) => entry.tick === state.tick)) this.simulation.submitCommand(item.command);
+    }
+    if (!this.trainingReplay && state.phase === 'running' && !this.opponentDefenseSubmitted) {
       const cells = [{ cellX: 4, cellY: 6 }, { cellX: 3, cellY: 4 }, { cellX: 4, cellY: 2 }];
       cells.forEach((cell, index) => {
         this.simulation.submitCommand({
@@ -149,7 +164,7 @@ export class BattleScene extends Phaser.Scene {
       });
       this.opponentDefenseSubmitted = true;
     }
-    if (isDemoWaveTick(state.phase, state.tick + 1, state.runningStartedAtTick)) {
+    if (!this.trainingReplay && isDemoWaveTick(state.phase, state.tick + 1, state.runningStartedAtTick)) {
       this.simulation.submitCommand({
         type: 'queue_monster',
         commandId: this.simulation.getNextCommandId('p2'),
@@ -660,4 +675,7 @@ export class BattleScene extends Phaser.Scene {
     this.loop.resume();
     this.pausedText?.setVisible(false);
   }
+
+  private toggleReplayPause(): void { if (this.loop.isPaused) this.handleVisible(); else this.handleHidden(); }
+  private setReplaySpeed(speed: number): void { this.replaySpeed = [1, 2, 4].includes(speed) ? speed : 1; }
 }

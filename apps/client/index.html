@@ -27,6 +27,11 @@
 </head>
 <body>
   <div id="game-container"></div>
+  <div id="replay-controls">
+    <label>Training replay <input id="replay-file" type="file" accept="application/json,.json"></label>
+    <button id="replay-pause" type="button">Pause</button>
+    <select id="replay-speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+  </div>
   <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
