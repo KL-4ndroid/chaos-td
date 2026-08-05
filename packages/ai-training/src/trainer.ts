@@ -187,7 +187,7 @@ function executeSchedule(
     const p1 = lookup.get(match.p1StrategyId);
     const p2 = lookup.get(match.p2StrategyId);
     if (!p1 || !p2) continue;
-    const { summary, telemetry: fullTelemetry } = runSelfPlayWithTelemetry(match, p1, p2, maxTicksPerMatch);
+    const { summary, telemetry: fullTelemetry, replay } = runSelfPlayWithTelemetry(match, p1, p2, maxTicksPerMatch);
     records.push({
       generation,
       pairId: match.pairId,
@@ -200,6 +200,7 @@ function executeSchedule(
       canonicalMatchKey: `${match.generation}:${match.pairId}:${match.seed}:${match.mirrored ? '1' : '0'}`,
       summary,
       telemetry: fullTelemetry,
+      replay,
     });
     telemetry.push(fullTelemetry);
   }

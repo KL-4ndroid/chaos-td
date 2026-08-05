@@ -11,6 +11,7 @@ import { classifyArchetype } from './evolution.js';
 import type { EvolutionArchetype } from './population.js';
 import type { SelfPlayMatchSummary } from './league.js';
 import type { LeagueTelemetryRecord } from './telemetry.js';
+import type { Replay } from '@chaos-td/game-core';
 
 export interface MatchRecord {
   readonly generation: number;
@@ -24,6 +25,8 @@ export interface MatchRecord {
   readonly canonicalMatchKey: string;
   readonly summary: SelfPlayMatchSummary;
   readonly telemetry?: LeagueTelemetryRecord;
+  /** Deterministic command/event trace suitable for the client replay viewer. */
+  readonly replay?: Replay;
 }
 
 export interface GenomeAggregateInput {

@@ -56,6 +56,10 @@ const telemetry = aggregateTelemetryForRun(report);
 writeFileSync(resolve(root, 'training-config.json'), JSON.stringify(config, null, 2));
 writeFileSync(resolve(root, 'generation-summary.jsonl'), report.generations.map((g) => JSON.stringify({ generation: g.generation, matches: g.matchRecords.length, evaluations: g.evaluated })).join('\n') + '\n');
 writeFileSync(resolve(root, 'match-summary.jsonl'), report.generations.flatMap((g) => g.matchRecords).map((m) => JSON.stringify(m.summary)).join('\n') + '\n');
+for (const generation of report.generations) {
+  const representative = generation.matchRecords.find((match) => !match.mirrored && match.replay);
+  if (representative?.replay) writeFileSync(resolve(root, `replay-generation-${generation.generation}.json`), JSON.stringify(representative.replay));
+}
 writeFileSync(resolve(root, 'final-rankings.csv'), 'strategyId,generation,elo,winRate,slotAdjustedScore,invalidCommandRate\n' + report.generations.at(-1).evaluated.slice().sort((a, b) => b.evaluation.elo - a.evaluation.elo).map((e) => `${e.strategyId},${e.generation},${e.evaluation.elo},${e.evaluation.winRate},${e.evaluation.slotAdjustedScore},${e.evaluation.invalidCommandRate}`).join('\n') + '\n');
 writeFileSync(resolve(root, 'hall-of-fame.json'), renderHallOfFameJson(summarizeHallOfFame(report)));
 writeFileSync(resolve(root, 'diversity-report.csv'), 'generation,behaviorDiversity\n' + report.generations.map((g) => `${g.generation},${g.evaluated[0]?.evaluation.diversityScore ?? 0}`).join('\n') + '\n');

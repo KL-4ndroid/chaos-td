@@ -1,4 +1,4 @@
-import { createFromString, createCommandId } from '@chaos-td/game-core';
+import { addCheckpoint, addEvent, createFromString, createCommandId, createReplayData, finalizeReplay } from '@chaos-td/game-core';
 import type { DomainEvent, Phase, SimulationState } from '@chaos-td/game-core';
 import { CONFIG_VERSION, type PlayerSlot } from '@chaos-td/game-data';
 import {
@@ -11,7 +11,7 @@ import {
   type AIStrategyGenome,
   type BuildAIObservationInput,
 } from '@chaos-td/ai-strategy';
-import type { GameCommand, LaneRuntimeState } from '@chaos-td/game-core';
+import type { GameCommand, LaneRuntimeState, Replay } from '@chaos-td/game-core';
 import { createSimulation } from '@chaos-td/game-core';
 import {
   createSelfPlayLanes,
@@ -218,10 +218,11 @@ function playSelfPlayWithTelemetry(
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
   maxTicks: number,
-): { summary: SelfPlayMatchSummary; telemetry: LeagueTelemetryRecord } {
+): { summary: SelfPlayMatchSummary; telemetry: LeagueTelemetryRecord; replay: Replay } {
   const seed = match.seed;
   const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createSelfPlayLanes());
   simulation.start();
+  let replay = createReplayData(seed, CONFIG_VERSION, simulation.state.stateHash);
   const acc = freshAccumulator();
   let postResultCommandCount = 0;
   let sequence = 0;
@@ -258,6 +259,8 @@ function playSelfPlayWithTelemetry(
       simulation.submitCommand({ ...command, commandId: id } as GameCommand);
     }
     const events = simulation.step().events;
+    replay = events.reduce((current, event) => addEvent(current, event), replay);
+    replay = addCheckpoint(replay, simulation.state.tick, simulation.state.stateHash);
     ingestEvents(simulation.state, events, acc);
 
 
@@ -267,6 +270,8 @@ function playSelfPlayWithTelemetry(
       // commands emitted by future logic; the integrated runtime does not
       // emit any, but we record the count for the correctness check.
       const remainingEvents = simulation.step().events;
+      replay = remainingEvents.reduce((current, event) => addEvent(current, event), replay);
+      replay = addCheckpoint(replay, simulation.state.tick, simulation.state.stateHash);
       ingestEvents(simulation.state, remainingEvents, acc);
       for (const event of remainingEvents) {
         if (event.type === 'command_accepted' || event.type === 'command_rejected') {
@@ -329,7 +334,7 @@ function playSelfPlayWithTelemetry(
     domainEventTypes: { ...acc.domainEventTypes },
     correctnessChecks,
   };
-  return { summary, telemetry };
+  return { summary, telemetry, replay: finalizeReplay(replay, simulation.state.stateHash, simulation.state.tick) };
 }
 
 /**
@@ -342,7 +347,7 @@ export function runSelfPlayWithTelemetry(
   p1: AIStrategyGenome,
   p2: AIStrategyGenome,
   maxTicks = 10000,
-): { readonly summary: SelfPlayMatchSummary; readonly telemetry: LeagueTelemetryRecord } {
+): { readonly summary: SelfPlayMatchSummary; readonly telemetry: LeagueTelemetryRecord; readonly replay: Replay } {
   return playSelfPlayWithTelemetry(match, p1, p2, maxTicks);
 }
 
