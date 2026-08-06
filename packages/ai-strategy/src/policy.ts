@@ -136,7 +136,9 @@ function hasTag(tags: readonly MonsterTag[], tag: MonsterTag): boolean {
 
 export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genome: AIStrategyGenome): ScoredAIAction {
   const towerCount = Object.values(features.towerRoleCoverage).reduce((sum, count) => sum + count, 0);
-  const reserveGold = Math.floor((features.gold * genome.reserveGoldRatio) / 1000);
+  // A genome may prefer a reserve, but cannot hoard its entire economy.
+  // The cap keeps at least 55% of gold available for defense or pressure.
+  const reserveGold = Math.floor((features.gold * Math.min(450, genome.reserveGoldRatio)) / 1000);
   // Keep a growing defensive baseline before converting surplus into income
   // and pressure. This is intentionally derived from public observations so
   // evolutionary genomes tune proportions, not basic economic safety.
@@ -171,7 +173,13 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
     if (lane?.aiBuildPriorityCells.some((cell) => cell.col === action.cellX && cell.row === action.cellY)) score += 250;
   }
   if (action.type === 'upgrade_tower') score = genome.defenseWeight + features.activeMonsterPressure - genome.upgradeThreshold;
-  if (action.type === 'sell_tower') score = genome.sellThreshold - features.activeMonsterPressure - features.leakRisk;
+  if (action.type === 'sell_tower') {
+    // Selling below the required defensive baseline causes the build/sell loop
+    // seen in replays and leaves the final board artificially empty.
+    score = towerCount <= desiredTowerCount
+      ? -2_000
+      : genome.sellThreshold - features.activeMonsterPressure - features.leakRisk;
+  }
   if (action.type === 'queue_monster') {
     const definition = MONSTER_DEFINITIONS.find((candidate) => candidate.id === action.monsterTypeId);
     if (!definition) return { action, score: Number.MIN_SAFE_INTEGER };

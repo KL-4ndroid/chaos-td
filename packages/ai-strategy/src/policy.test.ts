@@ -183,4 +183,15 @@ describe('feature-driven policy', () => {
     const scored = generateLegalActions(obs, new Map()).map((action) => scoreAIAction(features, action, genome));
     expect(selectAIAction(scored, createFromString('balanced-opening-seed')).type).toBe('build_tower');
   });
+
+  it('never liquidates towers while the defensive baseline is unmet', () => {
+    const genome = createDefaultAIStrategyGenome('no-liquidation');
+    const features = {
+      playerId: 'p1' as const, tick: 100, hp: 20, gold: 600, income: 100, towerInvestment: 0,
+      towerRoleCoverage: { basic: 3 }, groundCoverage: 0, flyingCoverage: 0, splashCoverage: 0, slowCoverage: 0,
+      bossDefenseCoverage: 0, activeMonsterPressure: 0, flyingPressure: 0, bossPressure: 0, leakRisk: 0,
+      sendQueueCount: 0, opponentHp: 20, opponentGroundCoverage: 0, opponentFlyingCoverage: 0, opponentPressure: 0,
+    };
+    expect(scoreAIAction(features, { type: 'sell_tower', towerEntityId: 1 }, genome).score).toBeLessThan(0);
+  });
 });

@@ -55,6 +55,16 @@ mkdirSync(root, { recursive: true });
 mkdirSync(checkpointRoot, { recursive: true });
 const summary = summarizeTrainingRun(report);
 const telemetry = aggregateTelemetryForRun(report);
+// Replays are emitted as individual viewer files below. Keeping them inside
+// every historical checkpoint makes long-running evolution hit V8's JSON size
+// limit, while the trainer itself only needs records and telemetry to resume.
+const checkpointReport = {
+  ...report,
+  generations: report.generations.map((generation) => ({
+    ...generation,
+    matchRecords: generation.matchRecords.map(({ replay: _replay, ...match }) => match),
+  })),
+};
 writeFileSync(resolve(root, 'training-config.json'), JSON.stringify(config, null, 2));
 writeFileSync(resolve(root, 'generation-summary.jsonl'), report.generations.map((g) => JSON.stringify({ generation: g.generation, matches: g.matchRecords.length, evaluations: g.evaluated })).join('\n') + '\n');
 writeFileSync(resolve(root, 'match-summary.jsonl'), report.generations.flatMap((g) => g.matchRecords).map((m) => JSON.stringify(m.summary)).join('\n') + '\n');
@@ -67,7 +77,7 @@ writeFileSync(resolve(root, 'hall-of-fame.json'), renderHallOfFameJson(summarize
 writeFileSync(resolve(root, 'diversity-report.csv'), 'generation,behaviorDiversity\n' + report.generations.map((g) => `${g.generation},${g.evaluated[0]?.evaluation.diversityScore ?? 0}`).join('\n') + '\n');
 writeFileSync(resolve(root, 'validation-summary.json'), JSON.stringify({ valid: issues.length === 0, issues }, null, 2));
 writeFileSync(resolve(root, 'training-summary.json'), JSON.stringify({ ...summary, telemetry }, null, 2));
-writeCheckpoint({ reportFile: resolve(checkpointRoot, 'training-report.json'), snapshotFile: resolve(checkpointRoot, 'checkpoint.json') }, report);
+writeCheckpoint({ reportFile: resolve(checkpointRoot, 'training-report.json'), snapshotFile: resolve(checkpointRoot, 'checkpoint.json') }, checkpointReport);
 writeFileSync(resolve(process.cwd(), 'docs', 'generated', 'AI_EVOLUTION_TRAINING_REPORT.md'), renderTrainingSummaryMarkdown(summary));
-writeFileSync(resolve(root, 'training-report.json'), serializeTrainingReport(report));
+writeFileSync(resolve(root, 'training-report.json'), serializeTrainingReport(checkpointReport));
 console.log(JSON.stringify({ runId, mode, generations: report.generations.length, matches: report.matchCount, hash: report.finalCanonicalHash, hallOfFame: report.hallOfFame.length }, null, 2));
