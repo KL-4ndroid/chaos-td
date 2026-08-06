@@ -160,4 +160,17 @@ describe('feature-driven policy', () => {
     simulation.submitCommand(command);
     expect(simulation.step().events.some((event) => event.type === 'command_accepted' && event.playerId === 'p1')).toBe(true);
   });
+
+  it('offers affordable multi-monster bursts and favors using surplus gold for further towers', () => {
+    const simulation = runningSimulation();
+    const richInput = buildObsInput(simulation, 'p1');
+    const richObs = buildAIObservation('p1', { ...richInput, selfPlayer: { ...richInput.selfPlayer, gold: 1_000 } });
+    const actions = generateLegalActions(richObs, towerEntityMap(simulation.state.towers));
+    expect(actions.some((action) => action.type === 'queue_monster' && action.quantity === 5)).toBe(true);
+
+    const genome = createDefaultAIStrategyGenome('spend-surplus');
+    const features = { ...extractAIFeaturesFromObservation(richObs), gold: 1_000, towerRoleCoverage: { basic: 4 } };
+    const build = { type: 'build_tower' as const, towerTypeId: 'archer', cellX: 3, cellY: 14 };
+    expect(scoreAIAction(features, build, genome).score).toBeGreaterThan(scoreAIAction({ ...features, gold: 100 }, build, genome).score);
+  });
 });

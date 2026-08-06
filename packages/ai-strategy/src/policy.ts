@@ -114,9 +114,16 @@ export function generateLegalActions(
     actions.push({ type: 'sell_tower', towerEntityId: entityId });
   }
   if (obs.self.outboundQueueLength < GLOBAL_CONFIG.sendQueueLimit) {
+    const queueCapacity = GLOBAL_CONFIG.sendQueueLimit - obs.self.outboundQueueLength;
     for (const definition of MONSTER_DEFINITIONS) {
       if (obs.self.gold >= definition.sendCost && obs.tick >= definition.availableAtRunningTick) {
-        actions.push({ type: 'queue_monster', monsterTypeId: definition.id, quantity: 1 });
+        // A single command may legally send up to five monsters. Exposing the
+        // full affordable burst range lets a high-bankroll strategy convert
+        // surplus gold before the match reaches its tick limit.
+        const maximumQuantity = Math.min(5, queueCapacity, Math.floor(obs.self.gold / definition.sendCost));
+        for (let quantity = 1; quantity <= maximumQuantity; quantity += 1) {
+          actions.push({ type: 'queue_monster', monsterTypeId: definition.id, quantity });
+        }
       }
     }
   }
@@ -136,16 +143,23 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
     const pressure = features.leakRisk + Math.floor((features.activeMonsterPressure * genome.pressureTimingWeight) / 1000);
     const emergency = features.leakRisk >= genome.emergencyDefenseThreshold || features.activeMonsterPressure >= genome.emergencyDefenseThreshold;
     const reserve = emergency ? 0 : Math.floor((features.gold * genome.reserveGoldRatio) / 1000);
+    const surplusGold = Math.max(0, features.gold - reserve);
     const growthOpportunity = features.incomeGrowthOpportunity ?? Math.max(0, 1000 - features.income);
     const investment = Math.floor((growthOpportunity * genome.incomeInvestmentRatio) / 1000);
-    score = genome.defenseWeight + pressure + investment - reserve - genome.buildThreshold;
+    // Surplus gold must remain productive: repeated tower roles are useful
+    // once the economy is comfortably above the chosen reserve.
+    const surplusBuildPressure = Math.min(1200, surplusGold * 2);
+    score = genome.defenseWeight + pressure + investment + surplusBuildPressure - reserve - genome.buildThreshold;
     if (emergency) score += genome.emergencyDefenseThreshold;
     if (definition.attackTargets.includes('flying')) score += Math.floor((features.flyingPressure * genome.antiAirPriority) / 1000);
     if (definition.role === 'splash') score += Math.floor((features.activeMonsterPressure * genome.splashPriority) / 1000);
     if (definition.role === 'slow') score += Math.floor((features.activeMonsterPressure * genome.slowPriority) / 1000);
     if (definition.levels.some((level) => level.bonusDamageTag === 'boss')) score += Math.floor((features.bossPressure * genome.antiBossPriority) / 1000);
     const roleCount = features.towerRoleCoverage[definition.role] ?? 0;
-    score -= roleCount * genome.diversityPreference;
+    const rolePenalty = Math.max(0, roleCount * genome.diversityPreference - surplusBuildPressure);
+    score -= rolePenalty;
+    const lane = MVP_MIRROR_01.lanes.find((candidate) => candidate.defenderPlayerId === features.playerId);
+    if (lane?.aiBuildPriorityCells.some((cell) => cell.col === action.cellX && cell.row === action.cellY)) score += 250;
   }
   if (action.type === 'upgrade_tower') score = genome.defenseWeight + features.activeMonsterPressure - genome.upgradeThreshold;
   if (action.type === 'sell_tower') score = genome.sellThreshold - features.activeMonsterPressure - features.leakRisk;
@@ -156,8 +170,9 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
     const attackBudget = Math.floor((availableGold * genome.sendInvestmentRatio) / 1000);
     const incomeValue = Math.floor((definition.incomeGain * genome.economyWeight) / 10);
     score = genome.aggressionWeight + Math.floor((features.opponentPressure * genome.counterOpponentWeight) / 1000) + incomeValue;
-    if (definition.sendCost > attackBudget) score -= genome.sendInvestmentRatio;
-    else score += genome.sendInvestmentRatio;
+    const burstCost = definition.sendCost * action.quantity;
+    if (burstCost > attackBudget) score -= genome.sendInvestmentRatio;
+    else score += genome.sendInvestmentRatio + (action.quantity - 1) * 100;
     if (definition.movementType === 'flying') {
       score += Math.max(0, features.opponentGroundCoverage - features.opponentFlyingCoverage) * genome.antiAirPriority;
     }
