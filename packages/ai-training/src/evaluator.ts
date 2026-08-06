@@ -36,6 +36,9 @@ export interface GenomeAggregateInput {
   readonly behaviorDiversity: number;
   readonly elo: number;
   readonly initialElo: number;
+  /** Fixed opponents with separately reported W/D/L and score. */
+  readonly benchmarkStrategyIds?: readonly string[];
+  readonly championStrategyIds?: readonly string[];
 }
 
 export interface EvaluatedGenome {
@@ -54,6 +57,17 @@ export interface EvaluatedGenome {
   readonly rejectedCommands: number;
   readonly matches: number;
   readonly finalTicks: readonly number[];
+  readonly benchmark: ReferenceEvaluation;
+  readonly champion: ReferenceEvaluation;
+}
+
+export interface ReferenceEvaluation {
+  readonly wins: number;
+  readonly losses: number;
+  readonly draws: number;
+  readonly netLeakDamage: number;
+  /** W/L outcome plus leak-damage tiebreak, normalized to -1000..1000. */
+  readonly score: number;
 }
 
 interface Tally {
@@ -64,6 +78,7 @@ interface Tally {
   accepted: number;
   rejected: number;
   finalTicks: number[];
+  netLeakDamage: number;
 }
 
 /**
@@ -81,6 +96,7 @@ function tallyRecords(records: readonly MatchRecord[], genomeStrategyId: string,
   let tickGuardCount = 0;
   let accepted = 0; let rejected = 0;
   const finalTicks: number[] = [];
+  let netLeakDamage = 0;
   for (const record of records) {
     if (mirroredOnly && !record.mirrored) continue;
     const slot = record.p1StrategyId === genomeStrategyId ? 'p1' : record.p2StrategyId === genomeStrategyId ? 'p2' : null;
@@ -90,12 +106,17 @@ function tallyRecords(records: readonly MatchRecord[], genomeStrategyId: string,
     finalTicks.push(summary.finalTick);
     accepted += telemetry?.commandAcceptedPerPlayer[slot] ?? 0;
     rejected += telemetry?.commandRejectedPerPlayer[slot] ?? 0;
+    if (telemetry) {
+      const opponent = slot === 'p1' ? 'p2' : 'p1';
+      const leakDamage = telemetry.leakDamageByDefender;
+      if (leakDamage) netLeakDamage += (leakDamage[opponent] ?? 0) - (leakDamage[slot] ?? 0);
+    }
     if (summary.completion === 'tick_guard') tickGuardCount += 1;
     if (summary.outcome === 'draw') draws += 1;
     else if ((summary.winnerId === slot)) wins += 1;
     else losses += 1;
   }
-  return { wins, losses, draws, tickGuardCount, accepted, rejected, finalTicks };
+  return { wins, losses, draws, tickGuardCount, accepted, rejected, finalTicks, netLeakDamage };
 }
 
 function tallyAll(input: GenomeAggregateInput, genomeStrategyId: string): Tally {
@@ -104,6 +125,20 @@ function tallyAll(input: GenomeAggregateInput, genomeStrategyId: string): Tally 
 
 function tallyMirrored(input: GenomeAggregateInput, genomeStrategyId: string): Tally {
   return tallyRecords(input.records, genomeStrategyId, true);
+}
+
+function referenceEvaluation(records: readonly MatchRecord[], genomeStrategyId: string, referenceIds: readonly string[]): ReferenceEvaluation {
+  const referenceSet = new Set(referenceIds);
+  const relevant = records.filter((record) => {
+    const isParticipant = record.p1StrategyId === genomeStrategyId || record.p2StrategyId === genomeStrategyId;
+    const opponent = record.p1StrategyId === genomeStrategyId ? record.p2StrategyId : record.p1StrategyId;
+    return isParticipant && referenceSet.has(opponent);
+  });
+  const tally = tallyRecords(relevant, genomeStrategyId, false);
+  const matches = tally.wins + tally.losses + tally.draws;
+  const outcomeScore = matches === 0 ? 0 : ((tally.wins - tally.losses) / matches) * 1000;
+  const pressureScore = matches === 0 ? 0 : Math.max(-250, Math.min(250, Math.round((tally.netLeakDamage / matches) * 100)));
+  return { wins: tally.wins, losses: tally.losses, draws: tally.draws, netLeakDamage: tally.netLeakDamage, score: Math.round(Math.max(-1000, Math.min(1000, outcomeScore + pressureScore))) };
 }
 
 /**
@@ -117,6 +152,8 @@ export function evaluateGenome(
 ): EvaluatedGenome {
   const all = tallyAll(input, genome.strategyId);
   const mirror = tallyMirrored(input, genome.strategyId);
+  const benchmark = referenceEvaluation(input.records, genome.strategyId, input.benchmarkStrategyIds ?? ['benchmark-v1']);
+  const champion = referenceEvaluation(input.records, genome.strategyId, input.championStrategyIds ?? []);
   const elo = input.elo;
   const evaluation = calculateEvaluation({
     elo,
@@ -130,6 +167,8 @@ export function evaluateGenome(
     tickGuardCount: all.tickGuardCount,
     matchCount: all.finalTicks.length,
     behaviorDiversity: input.behaviorDiversity,
+    netLeakDamage: all.netLeakDamage,
+    benchmarkScore: benchmark.score,
   });
   return {
     strategyId: genome.strategyId,
@@ -147,6 +186,8 @@ export function evaluateGenome(
     rejectedCommands: all.rejected,
     matches: all.finalTicks.length,
     finalTicks: all.finalTicks,
+    benchmark,
+    champion,
   };
 }
 

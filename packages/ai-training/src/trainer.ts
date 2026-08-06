@@ -1,6 +1,7 @@
 import { createFromString, nextInt } from '@chaos-td/game-core';
 import {
   assertValidAIStrategyGenome,
+  createDefaultAIStrategyGenome,
   type AIStrategyGenome,
 } from '@chaos-td/ai-strategy';
 import { CONFIG_VERSION } from '@chaos-td/game-data';
@@ -174,6 +175,24 @@ function playMatches(
   return executeSchedule(generation, population, schedule, maxTicksPerMatch);
 }
 
+function playBenchmarkMatches(
+  generation: number,
+  population: readonly AIStrategyGenome[],
+  trainingSeed: string,
+  maxTicksPerMatch: number,
+): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
+  const benchmark = createDefaultAIStrategyGenome('benchmark-v1', CONFIG_VERSION);
+  const schedule: EvolutionMatch[] = population.flatMap((genome, index) => {
+    const seed = `${trainingSeed}:benchmark:${String(index).padStart(4, '0')}`;
+    const pairId = `g${generation}:benchmark-${String(index).padStart(4, '0')}`;
+    return [
+      { generation, pairId, seed, participantAId: genome.strategyId, participantBId: benchmark.strategyId, p1StrategyId: genome.strategyId, p2StrategyId: benchmark.strategyId, mirrored: false },
+      { generation, pairId, seed, participantAId: genome.strategyId, participantBId: benchmark.strategyId, p1StrategyId: benchmark.strategyId, p2StrategyId: genome.strategyId, mirrored: true },
+    ];
+  });
+  return executeSchedule(generation, [...population, benchmark], schedule, maxTicksPerMatch);
+}
+
 function executeSchedule(
   generation: number,
   population: readonly AIStrategyGenome[],
@@ -212,6 +231,7 @@ function evaluatePopulation(
   generation: number,
   records: readonly MatchRecord[],
   trainingSeed: string,
+  championStrategyIds: readonly string[] = [],
 ): EvaluatedGenome[] {
   const behaviorDiversity = populationBehaviorDiversity(population);
   const initialElo = 1000;
@@ -227,6 +247,8 @@ function evaluatePopulation(
         behaviorDiversity,
         elo,
         initialElo,
+        benchmarkStrategyIds: ['benchmark-v1'],
+        championStrategyIds,
       },
       `${trainingSeed}:eval`,
     );
@@ -260,6 +282,8 @@ function admitToHallOfFame(
     evaluationSeedSetVersion,
     behaviorFingerprint: behaviorFingerprint(candidateFromEvaluated(entry, primaryLookup, secondaryLookup, defaultGenome)),
     tickGuardRate: entry.matches === 0 ? 0 : entry.tickGuardCount / entry.matches,
+    benchmark: entry.benchmark,
+    champion: entry.champion,
   }));
   return [...admitHallOfFameCandidates(existing, candidates)];
 }
@@ -403,8 +427,12 @@ export function continueEvolution(
   for (let generation = state.nextGeneration; generation < config.generations; generation += 1) {
     const scheduleTrainingSeed = `${config.trainingSeed}:gen-${generation}`;
     const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, config.maxTicksPerMatch, config.matchesPerGenome);
+    const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, config.maxTicksPerMatch);
+    played.records.push(...benchmarkPlayed.records);
+    played.telemetry.push(...benchmarkPlayed.telemetry);
     matchCount += played.records.length;
-    const primaryEval = evaluatePopulation(population, generation, played.records, scheduleTrainingSeed);
+    const championStrategyIds = hallOfFame.map((entry) => entry.strategy.strategyId);
+    const primaryEval = evaluatePopulation(population, generation, played.records, scheduleTrainingSeed, championStrategyIds);
 
     // Hall of fame also plays matches against the population for context.
     const hofGenomes = hallOfFame.map((entry) => entry.strategy);
@@ -427,7 +455,7 @@ export function continueEvolution(
       opponentRecords = opponentPlayed.records;
       opponentTelemetry = opponentPlayed.telemetry;
       matchCount += opponentPlayed.records.length;
-      opponentEvaluation = evaluatePopulation(opponentCombined, generation, opponentPlayed.records, opponentScheduleTrainingSeed);
+      opponentEvaluation = evaluatePopulation(opponentCombined, generation, opponentPlayed.records, opponentScheduleTrainingSeed, championStrategyIds);
     }
 
     // Admit primary and opponent evals into HOF (this is the only stage that

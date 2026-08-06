@@ -288,13 +288,22 @@ function playSelfPlayWithTelemetry(
   acc.p2FinalHp = simulation.state.players.p2.hp;
 
   const result = simulation.state.phase === 'result' ? simulation.getCanonicalState().result : null;
+  // A match that reaches the time limit is still decided deterministically.
+  // HP is primary; net leak damage provides a game-relevant secondary tiebreak.
+  const tickGuardWinner = !result
+    ? acc.p1FinalHp !== acc.p2FinalHp
+      ? (acc.p1FinalHp > acc.p2FinalHp ? 'p1' : 'p2')
+      : acc.leakDamageByDefender.p1 !== acc.leakDamageByDefender.p2
+        ? (acc.leakDamageByDefender.p1 < acc.leakDamageByDefender.p2 ? 'p1' : 'p2')
+        : null
+    : null;
   const summary: SelfPlayMatchSummary = {
     seed,
     p1StrategyId: p1Strategy.strategyId,
     p2StrategyId: p2Strategy.strategyId,
     finalTick: simulation.state.tick,
-    winnerId: result?.winnerPlayerId ?? null,
-    outcome: result?.outcome ?? 'draw',
+    winnerId: result?.winnerPlayerId ?? tickGuardWinner,
+    outcome: result?.outcome ?? (tickGuardWinner ? 'win' : 'draw'),
     completion: result ? 'result' : 'tick_guard',
     acceptedCommands: acc.acceptedCommands,
     rejectedCommands: acc.rejectedCommands,

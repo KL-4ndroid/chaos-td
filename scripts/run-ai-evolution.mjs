@@ -23,9 +23,11 @@ const configs = {
   full: { populationSize: 128, generations: 50, evaluationSeeds: Array.from({ length: 30 }, (_, i) => `full-${String(i + 1).padStart(3, '0')}`), maxTicksPerMatch: 12000, eliteCount: 8, hallOfFameOpponentCount: 8, mutationRatePermille: 120, crossoverRatePermille: 500 },
 };
 const base = configs[mode] ?? configs.smoke;
+const generationsOverride = Number.parseInt(process.env.AI_TRAINING_GENERATIONS ?? '', 10);
 const runId = process.env.AI_TRAINING_RUN_ID ?? `p1-6-011-${mode}`;
 const config = {
   ...base,
+  ...(Number.isFinite(generationsOverride) && generationsOverride >= base.generations ? { generations: generationsOverride } : {}),
   matchesPerGenome: 1,
   trainingSeed: process.env.AI_TRAINING_SEED ?? `ai-training-${mode}`,
   contentVersion: CONFIG_VERSION,
@@ -60,7 +62,7 @@ for (const generation of report.generations) {
   const representative = generation.matchRecords.find((match) => !match.mirrored && match.replay);
   if (representative?.replay) writeFileSync(resolve(root, `replay-generation-${generation.generation}.json`), JSON.stringify(representative.replay));
 }
-writeFileSync(resolve(root, 'final-rankings.csv'), 'strategyId,generation,elo,winRate,slotAdjustedScore,invalidCommandRate\n' + report.generations.at(-1).evaluated.slice().sort((a, b) => b.evaluation.elo - a.evaluation.elo).map((e) => `${e.strategyId},${e.generation},${e.evaluation.elo},${e.evaluation.winRate},${e.evaluation.slotAdjustedScore},${e.evaluation.invalidCommandRate}`).join('\n') + '\n');
+writeFileSync(resolve(root, 'final-rankings.csv'), 'strategyId,generation,fitnessScore,pressureScore,benchmarkScore,benchmarkWins,benchmarkLosses,benchmarkDraws,benchmarkNetLeakDamage,championWins,championLosses,elo,winRate,slotAdjustedScore,invalidCommandRate\n' + report.generations.at(-1).evaluated.slice().sort((a, b) => b.evaluation.totalScore - a.evaluation.totalScore || b.evaluation.benchmarkScore - a.evaluation.benchmarkScore || a.strategyId.localeCompare(b.strategyId)).map((e) => `${e.strategyId},${e.generation},${e.evaluation.totalScore},${e.evaluation.pressureScore},${e.evaluation.benchmarkScore},${e.benchmark.wins},${e.benchmark.losses},${e.benchmark.draws},${e.benchmark.netLeakDamage},${e.champion.wins},${e.champion.losses},${e.evaluation.elo},${e.evaluation.winRate},${e.evaluation.slotAdjustedScore},${e.evaluation.invalidCommandRate}`).join('\n') + '\n');
 writeFileSync(resolve(root, 'hall-of-fame.json'), renderHallOfFameJson(summarizeHallOfFame(report)));
 writeFileSync(resolve(root, 'diversity-report.csv'), 'generation,behaviorDiversity\n' + report.generations.map((g) => `${g.generation},${g.evaluated[0]?.evaluation.diversityScore ?? 0}`).join('\n') + '\n');
 writeFileSync(resolve(root, 'validation-summary.json'), JSON.stringify({ valid: issues.length === 0, issues }, null, 2));

@@ -6,6 +6,8 @@ export const EVOLUTION_FITNESS_WEIGHTS = Object.freeze({
   reliability: 150,
   invalidCommands: 50,
   tickGuard: 50,
+  pressure: 200,
+  benchmark: 300,
 } as const);
 
 export interface GenomeEvaluation {
@@ -18,6 +20,9 @@ export interface GenomeEvaluation {
   readonly diversityScore: number;
   readonly invalidCommandRate: number;
   readonly tickGuardPenalty: number;
+  readonly pressureScore: number;
+  /** Score against the fixed benchmark, normalized to -1000..1000. */
+  readonly benchmarkScore: number;
   readonly totalScore: number;
 }
 
@@ -48,6 +53,9 @@ export function calculateEvaluation(input: {
   readonly tickGuardCount: number;
   readonly matchCount: number;
   readonly behaviorDiversity: number;
+  /** Net leak damage dealt to the opponent across matches. */
+  readonly netLeakDamage: number;
+  readonly benchmarkScore?: number;
 }): GenomeEvaluation {
   const resolved = input.wins + input.losses + input.draws;
   const winRate = resolved === 0 ? 0 : input.wins / resolved;
@@ -57,13 +65,16 @@ export function calculateEvaluation(input: {
   const invalidCommandRate = commandTotal === 0 ? 0 : input.rejectedCommands / commandTotal;
   const tickGuardPenalty = input.matchCount === 0 ? 0 : Math.min(1000, Math.round((input.tickGuardCount / input.matchCount) * 1000));
   const reliabilityScore = Math.max(0, 1000 - tickGuardPenalty - Math.round(invalidCommandRate * 1000));
+  const pressureScore = input.matchCount === 0 ? 0 : Math.max(-1000, Math.min(1000, Math.round((input.netLeakDamage / input.matchCount) * 100)));
   const totalScore = Math.round(
     (input.elo / 2000) * EVOLUTION_FITNESS_WEIGHTS.elo
       + winRate * EVOLUTION_FITNESS_WEIGHTS.winRate
       + ((slotAdjustedScore + 1) / 2) * EVOLUTION_FITNESS_WEIGHTS.slotFairness
       + (reliabilityScore / 1000) * EVOLUTION_FITNESS_WEIGHTS.reliability
       - invalidCommandRate * EVOLUTION_FITNESS_WEIGHTS.invalidCommands
-      - (tickGuardPenalty / 1000) * EVOLUTION_FITNESS_WEIGHTS.tickGuard,
+      - (tickGuardPenalty / 1000) * EVOLUTION_FITNESS_WEIGHTS.tickGuard
+      + ((pressureScore + 1000) / 2000) * EVOLUTION_FITNESS_WEIGHTS.pressure
+      + (((input.benchmarkScore ?? 0) + 1000) / 2000) * EVOLUTION_FITNESS_WEIGHTS.benchmark,
   );
-  return { version: EVOLUTION_FITNESS_VERSION, elo: input.elo, winRate, drawRate, slotAdjustedScore, reliabilityScore, diversityScore: input.behaviorDiversity, invalidCommandRate, tickGuardPenalty, totalScore };
+  return { version: EVOLUTION_FITNESS_VERSION, elo: input.elo, winRate, drawRate, slotAdjustedScore, reliabilityScore, diversityScore: input.behaviorDiversity, invalidCommandRate, tickGuardPenalty, pressureScore, benchmarkScore: input.benchmarkScore ?? 0, totalScore };
 }
