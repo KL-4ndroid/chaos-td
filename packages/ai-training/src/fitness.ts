@@ -1,13 +1,16 @@
 export const EVOLUTION_FITNESS_VERSION = '1.0.0';
 export const EVOLUTION_FITNESS_WEIGHTS = Object.freeze({
-  elo: 400,
-  winRate: 250,
-  slotFairness: 100,
-  reliability: 150,
+  // Formal match victory is deliberately the dominant selector: 1,200 of
+  // 1,950 positive points (61.5%). Auxiliary signals may break ties but
+  // cannot outweigh actual wins.
+  elo: 150,
+  winRate: 1200,
+  slotFairness: 50,
+  reliability: 100,
   invalidCommands: 50,
   tickGuard: 50,
-  pressure: 200,
-  benchmark: 300,
+  pressure: 150,
+  benchmark: 200,
 } as const);
 
 export interface GenomeEvaluation {

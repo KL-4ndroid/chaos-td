@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultAIStrategyGenome } from '@chaos-td/ai-strategy';
-import { calculateEvaluation, updateElo } from './fitness';
+import { calculateEvaluation, EVOLUTION_FITNESS_WEIGHTS, updateElo } from './fitness';
 import { classifyArchetype, crossoverGenomes, detectDuplicateStrategies, genomeDistance, mutateGenome } from './evolution';
 
 describe('fitness and evolution', () => {
+  it('assigns more than half of positive fitness weight to formal victories', () => {
+    const totalPositive = EVOLUTION_FITNESS_WEIGHTS.elo
+      + EVOLUTION_FITNESS_WEIGHTS.winRate
+      + EVOLUTION_FITNESS_WEIGHTS.slotFairness
+      + EVOLUTION_FITNESS_WEIGHTS.reliability
+      + EVOLUTION_FITNESS_WEIGHTS.pressure
+      + EVOLUTION_FITNESS_WEIGHTS.benchmark;
+    expect(EVOLUTION_FITNESS_WEIGHTS.winRate / totalPositive).toBeGreaterThan(0.5);
+  });
   it('uses a fixed Elo vector', () => {
     expect(updateElo(1200, 1200, 1)).toEqual({ p1: 1216, p2: 1184 });
     expect(updateElo(1200, 1200, 0.5)).toEqual({ p1: 1200, p2: 1200 });
