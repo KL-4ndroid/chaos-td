@@ -80,6 +80,10 @@ import type {
 export interface MatchConfig {
   seed: string;
   configVersion: string;
+  /** Training mode: resolve only after one or both players are eliminated. */
+  endOnEliminationOnly?: boolean;
+  /** In elimination-only matches, begin escalating attrition after this many running ticks. */
+  suddenDeathStartTick?: number;
 }
 
 export interface PlayerSlotState {
@@ -1460,10 +1464,27 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
       allEvents.push(...combatEvents);
 
       const tickInRunning = currentState.tick - (currentState.runningStartedAtTick ?? 0);
+      if (
+        currentState.config.endOnEliminationOnly
+        && currentState.config.suddenDeathStartTick !== undefined
+        && tickInRunning >= currentState.config.suddenDeathStartTick
+      ) {
+        // This is not a timeout result: the match remains live and the
+        // escalating attrition guarantees an elimination outcome for training.
+        const elapsedSuddenDeathTicks = tickInRunning - currentState.config.suddenDeathStartTick;
+        const damage = 1 + Math.floor(elapsedSuddenDeathTicks / 50);
+        currentState = {
+          ...currentState,
+          players: {
+            p1: { ...currentState.players.p1, hp: Math.max(0, currentState.players.p1.hp - damage) },
+            p2: { ...currentState.players.p2, hp: Math.max(0, currentState.players.p2.hp - damage) },
+          },
+        };
+      }
       const shouldResolve =
-        tickInRunning >= PHASE_TICKS.RUNNING_MAX ||
         currentState.players.p1.hp <= 0 ||
-        currentState.players.p2.hp <= 0;
+        currentState.players.p2.hp <= 0 ||
+        (!currentState.config.endOnEliminationOnly && tickInRunning >= PHASE_TICKS.RUNNING_MAX);
 
       if (shouldResolve) {
         const { state: newState, event } = transitionPhase(currentState, 'resolving');
@@ -1476,7 +1497,9 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
     case 'resolving': {
       currentState = { ...currentState, tick: currentState.tick + 1 };
       const tickInResolving = currentState.tick - (currentState.resolvingStartedAtTick ?? 0);
-      const shouldResult = tickInResolving >= PHASE_TICKS.RESOLVING_MAX;
+      const shouldResult = currentState.config.endOnEliminationOnly
+        ? currentState.players.p1.hp <= 0 || currentState.players.p2.hp <= 0
+        : tickInResolving >= PHASE_TICKS.RESOLVING_MAX;
 
       if (shouldResult) {
         const { state: newState, event } = transitionPhase(currentState, 'result');
@@ -1491,7 +1514,17 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
         let outcome: 'win' | 'draw' = 'draw';
         let reason = 'timeout';
 
-        if (p1Hp !== p2Hp) {
+        if (p1Hp <= 0 && p2Hp <= 0) {
+          reason = 'simultaneous_elimination';
+        } else if (p1Hp <= 0) {
+          winnerId = 'p2';
+          outcome = 'win';
+          reason = 'elimination';
+        } else if (p2Hp <= 0) {
+          winnerId = 'p1';
+          outcome = 'win';
+          reason = 'elimination';
+        } else if (p1Hp !== p2Hp) {
           if (p1Hp > p2Hp) {
             winnerId = 'p1';
             outcome = 'win';

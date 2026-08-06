@@ -192,12 +192,12 @@ export function runSelfPlayMatch(
   p2Strategy: AIStrategyGenome,
   maxTicks = 10000,
 ): SelfPlayMatchSummary {
-  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION }, createSelfPlayLanes());
+  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, suddenDeathStartTick: maxTicks }, createSelfPlayLanes());
   let acceptedCommands = 0;
   let rejectedCommands = 0;
   simulation.start();
 
-  while (simulation.state.phase !== 'result' && simulation.state.tick < maxTicks) {
+  while (simulation.state.phase !== 'result') {
     const state = simulation.state;
 
     const stateSnapshot = {
