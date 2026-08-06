@@ -88,7 +88,9 @@ export interface ValidationIssue {
  * - every evaluated genome's underlying genome is schema-valid;
  * - hall of fame entries are duplicates-free;
  * - canonical hash matches what `hashTrainingRunReport` would compute;
- * - no evaluated genome that was admitted into HOF has `invalidCommandRate > 0`;
+ * - no Hall of Fame entry is admitted with an invalid-command rate (enforced
+ *   by the admission policy); ordinary evolutionary candidates may issue a
+ *   rejected command and are penalized through reliability instead.
  * - all genomes reference the configured content version.
  */
 export function validateTrainingRunReport(report: TrainingRunReport): readonly ValidationIssue[] {
@@ -115,14 +117,6 @@ export function validateTrainingRunReport(report: TrainingRunReport): readonly V
         });
       }
       seen.set(entry.fingerprint, entry.strategyId);
-      if (entry.evaluation.invalidCommandRate > 0) {
-        issues.push({
-          code: 'invalid_command_rate_positive',
-          message: `invalidCommandRate is ${entry.evaluation.invalidCommandRate}`,
-          generation: generation.generation,
-          strategyId: entry.strategyId,
-        });
-      }
       if (entry.evaluation.invalidCommandRate === 0 && entry.matches === 0) {
         issues.push({
           code: 'zero_match_count',
