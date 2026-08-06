@@ -135,6 +135,14 @@ function hasTag(tags: readonly MonsterTag[], tag: MonsterTag): boolean {
 }
 
 export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genome: AIStrategyGenome): ScoredAIAction {
+  const towerCount = Object.values(features.towerRoleCoverage).reduce((sum, count) => sum + count, 0);
+  const reserveGold = Math.floor((features.gold * genome.reserveGoldRatio) / 1000);
+  // Keep a growing defensive baseline before converting surplus into income
+  // and pressure. This is intentionally derived from public observations so
+  // evolutionary genomes tune proportions, not basic economic safety.
+  const desiredTowerCount = Math.min(12, 3 + Math.floor(Math.max(0, features.gold - reserveGold) / 200) + Math.floor(features.income / 300));
+  const towerDeficit = Math.max(0, desiredTowerCount - towerCount);
+  const cheapestTowerCost = Math.min(...TOWER_DEFINITIONS.map((tower) => tower.levels[0]?.cost ?? Number.MAX_SAFE_INTEGER));
   let score = 0;
   if (action.type === 'wait') score = 1;
   if (action.type === 'build_tower') {
@@ -142,7 +150,7 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
     if (!definition) return { action, score: Number.MIN_SAFE_INTEGER };
     const pressure = features.leakRisk + Math.floor((features.activeMonsterPressure * genome.pressureTimingWeight) / 1000);
     const emergency = features.leakRisk >= genome.emergencyDefenseThreshold || features.activeMonsterPressure >= genome.emergencyDefenseThreshold;
-    const reserve = emergency ? 0 : Math.floor((features.gold * genome.reserveGoldRatio) / 1000);
+    const reserve = emergency ? 0 : reserveGold;
     const surplusGold = Math.max(0, features.gold - reserve);
     const growthOpportunity = features.incomeGrowthOpportunity ?? Math.max(0, 1000 - features.income);
     const investment = Math.floor((growthOpportunity * genome.incomeInvestmentRatio) / 1000);
@@ -150,6 +158,7 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
     // once the economy is comfortably above the chosen reserve.
     const surplusBuildPressure = Math.min(1200, surplusGold * 2);
     score = genome.defenseWeight + pressure + investment + surplusBuildPressure - reserve - genome.buildThreshold;
+    score += towerDeficit * 900;
     if (emergency) score += genome.emergencyDefenseThreshold;
     if (definition.attackTargets.includes('flying')) score += Math.floor((features.flyingPressure * genome.antiAirPriority) / 1000);
     if (definition.role === 'splash') score += Math.floor((features.activeMonsterPressure * genome.splashPriority) / 1000);
@@ -166,12 +175,14 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
   if (action.type === 'queue_monster') {
     const definition = MONSTER_DEFINITIONS.find((candidate) => candidate.id === action.monsterTypeId);
     if (!definition) return { action, score: Number.MIN_SAFE_INTEGER };
-    const availableGold = Math.max(0, features.gold - Math.floor((features.gold * genome.reserveGoldRatio) / 1000));
+    const defenseBudget = towerDeficit > 0 ? cheapestTowerCost : 0;
+    const availableGold = Math.max(0, features.gold - reserveGold - defenseBudget);
     const attackBudget = Math.floor((availableGold * genome.sendInvestmentRatio) / 1000);
-    const incomeValue = Math.floor((definition.incomeGain * genome.economyWeight) / 10);
+    const incomeValue = Math.floor((definition.incomeGain * action.quantity * genome.economyWeight) / 10);
     score = genome.aggressionWeight + Math.floor((features.opponentPressure * genome.counterOpponentWeight) / 1000) + incomeValue;
     const burstCost = definition.sendCost * action.quantity;
-    if (burstCost > attackBudget) score -= genome.sendInvestmentRatio;
+    if (towerDeficit > 0) score -= towerDeficit * 1_200;
+    if (burstCost > attackBudget) score -= genome.sendInvestmentRatio * 2;
     else score += genome.sendInvestmentRatio + (action.quantity - 1) * 100;
     if (definition.movementType === 'flying') {
       score += Math.max(0, features.opponentGroundCoverage - features.opponentFlyingCoverage) * genome.antiAirPriority;

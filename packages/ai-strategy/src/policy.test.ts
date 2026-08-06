@@ -173,4 +173,14 @@ describe('feature-driven policy', () => {
     const build = { type: 'build_tower' as const, towerTypeId: 'archer', cellX: 3, cellY: 14 };
     expect(scoreAIAction(features, build, genome).score).toBeGreaterThan(scoreAIAction({ ...features, gold: 100 }, build, genome).score);
   });
+
+  it('builds a defensive baseline before spending surplus on outgoing monsters', () => {
+    const simulation = runningSimulation();
+    const input = buildObsInput(simulation, 'p1');
+    const obs = buildAIObservation('p1', { ...input, selfPlayer: { ...input.selfPlayer, gold: 600, income: 100 }, ownTowers: [] });
+    const genome = createDefaultAIStrategyGenome('balanced-opening');
+    const features = extractAIFeaturesFromObservation(obs);
+    const scored = generateLegalActions(obs, new Map()).map((action) => scoreAIAction(features, action, genome));
+    expect(selectAIAction(scored, createFromString('balanced-opening-seed')).type).toBe('build_tower');
+  });
 });
