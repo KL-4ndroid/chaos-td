@@ -43,7 +43,10 @@ export interface TrainerConfig {
   readonly crossoverRatePermille: number;
   readonly evaluationSeeds: readonly string[];
   readonly trainingSeed: string;
-  readonly maxTicksPerMatch: number;
+  /** Absolute adjudication cap. New training configs must use this field. */
+  readonly absoluteMaxTicks?: number;
+  /** @deprecated Kept only so historical checkpoints remain readable. */
+  readonly maxTicksPerMatch?: number;
   readonly contentVersion: string;
   readonly canonicalTag: string;
 }
@@ -453,8 +456,9 @@ export function continueEvolution(
  
   for (let generation = state.nextGeneration; generation < config.generations; generation += 1) {
     const scheduleTrainingSeed = `${config.trainingSeed}:gen-${generation}`;
-    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, config.maxTicksPerMatch, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1);
-    const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, config.maxTicksPerMatch);
+    const absoluteMaxTicks = config.absoluteMaxTicks ?? config.maxTicksPerMatch ?? 1500;
+    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, absoluteMaxTicks, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1);
+    const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, absoluteMaxTicks);
     played.records.push(...benchmarkPlayed.records);
     played.telemetry.push(...benchmarkPlayed.telemetry);
     matchCount += played.records.length;
@@ -476,7 +480,7 @@ export function continueEvolution(
         opponentCombined,
         config.evaluationSeeds,
         opponentScheduleTrainingSeed,
-        config.maxTicksPerMatch,
+        absoluteMaxTicks,
         config.opponentsPerGenome ?? 1,
         config.matchesPerOpponent ?? 1,
       );

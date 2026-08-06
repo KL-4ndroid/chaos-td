@@ -82,8 +82,8 @@ export interface MatchConfig {
   configVersion: string;
   /** Training mode: resolve only after one or both players are eliminated. */
   endOnEliminationOnly?: boolean;
-  /** In elimination-only matches, begin escalating attrition after this many running ticks. */
-  suddenDeathStartTick?: number;
+  /** Hard running-tick cap for an adjudicated training result. */
+  absoluteMaxTicks?: number;
 }
 
 export interface PlayerSlotState {
@@ -225,6 +225,8 @@ export interface SimulationState {
   runningStartedAtTick: number | null;
   resolvingStartedAtTick: number | null;
   players: Record<PlayerSlot, PlayerBattleState>;
+  /** Damage caused to each opposing player's HP by player-sent monsters. */
+  damageDealt?: Record<PlayerSlot, number>;
   lanes: Record<LaneId, LaneRuntimeState>;
   towers: TowerRuntimeState[];
   nextEntityId: number;
@@ -436,7 +438,7 @@ function processSpawns(state: SimulationState): { state: SimulationState; events
 
 function processMovement(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
   const events: DomainEvent[] = [];
-  const newState: SimulationState = { ...state, players: { ...state.players } };
+  const newState: SimulationState = { ...state, players: { ...state.players }, damageDealt: { p1: state.damageDealt?.p1 ?? 0, p2: state.damageDealt?.p2 ?? 0 } };
 
   for (const [laneId, lane] of Object.entries(state.lanes)) {
     const newLane: LaneRuntimeState = {
@@ -488,6 +490,11 @@ function processMovement(state: SimulationState): { state: SimulationState; even
         // Process leak
         const leakDamage = monster.leakDamage;
         defenderHp -= leakDamage;
+        if (monster.source.type === 'player') {
+          const damageDealt = newState.damageDealt ?? { p1: 0, p2: 0 };
+          damageDealt[monster.source.playerId] += leakDamage;
+          newState.damageDealt = damageDealt;
+        }
 
         const leakEvent: MonsterLeakedEvent = {
           type: 'monster_leaked',
@@ -1464,26 +1471,10 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
       allEvents.push(...combatEvents);
 
       const tickInRunning = currentState.tick - (currentState.runningStartedAtTick ?? 0);
-      if (
-        currentState.config.endOnEliminationOnly
-        && currentState.config.suddenDeathStartTick !== undefined
-        && tickInRunning >= currentState.config.suddenDeathStartTick
-      ) {
-        // This is not a timeout result: the match remains live and the
-        // escalating attrition guarantees an elimination outcome for training.
-        const elapsedSuddenDeathTicks = tickInRunning - currentState.config.suddenDeathStartTick;
-        const damage = 1 + Math.floor(elapsedSuddenDeathTicks / 50);
-        currentState = {
-          ...currentState,
-          players: {
-            p1: { ...currentState.players.p1, hp: Math.max(0, currentState.players.p1.hp - damage) },
-            p2: { ...currentState.players.p2, hp: Math.max(0, currentState.players.p2.hp - damage) },
-          },
-        };
-      }
       const shouldResolve =
         currentState.players.p1.hp <= 0 ||
         currentState.players.p2.hp <= 0 ||
+        (currentState.config.absoluteMaxTicks !== undefined && tickInRunning >= currentState.config.absoluteMaxTicks) ||
         (!currentState.config.endOnEliminationOnly && tickInRunning >= PHASE_TICKS.RUNNING_MAX);
 
       if (shouldResolve) {
@@ -1498,7 +1489,7 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
       currentState = { ...currentState, tick: currentState.tick + 1 };
       const tickInResolving = currentState.tick - (currentState.resolvingStartedAtTick ?? 0);
       const shouldResult = currentState.config.endOnEliminationOnly
-        ? currentState.players.p1.hp <= 0 || currentState.players.p2.hp <= 0
+        ? currentState.players.p1.hp <= 0 || currentState.players.p2.hp <= 0 || currentState.config.absoluteMaxTicks !== undefined
         : tickInResolving >= PHASE_TICKS.RESOLVING_MAX;
 
       if (shouldResult) {
@@ -1514,7 +1505,8 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
         let outcome: 'win' | 'draw' = 'draw';
         let reason = 'timeout';
 
-        if (p1Hp <= 0 && p2Hp <= 0) {
+        const forcedAdjudication = currentState.config.absoluteMaxTicks !== undefined;
+        if (p1Hp <= 0 && p2Hp <= 0 && !forcedAdjudication) {
           reason = 'simultaneous_elimination';
         } else if (p1Hp <= 0) {
           winnerId = 'p2';
@@ -1534,32 +1526,16 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
             outcome = 'win';
             reason = 'hp_advantage';
           }
-        } else {
-          // Tie-breaker: income
-          const p1Income = currentState.players.p1.income;
-          const p2Income = currentState.players.p2.income;
-          if (p1Income !== p2Income) {
-            if (p1Income > p2Income) {
-              winnerId = 'p1';
-              reason = 'income_advantage';
-            } else {
-              winnerId = 'p2';
-              reason = 'income_advantage';
-            }
-          } else {
-            // Final tie-breaker: net worth
-            const p1NetWorth = calculateNetWorth(currentState, 'p1');
-            const p2NetWorth = calculateNetWorth(currentState, 'p2');
-            if (p1NetWorth !== p2NetWorth) {
-              if (p1NetWorth > p2NetWorth) {
-                winnerId = 'p1';
-                reason = 'networth_advantage';
-              } else {
-                winnerId = 'p2';
-                reason = 'networth_advantage';
-              }
-            }
-          }
+        } else if (forcedAdjudication) {
+          const p1Damage = currentState.damageDealt?.p1 ?? 0;
+          const p2Damage = currentState.damageDealt?.p2 ?? 0;
+          const p1Assets = calculateNetWorth(currentState, 'p1');
+          const p2Assets = calculateNetWorth(currentState, 'p2');
+          winnerId = p1Damage !== p2Damage ? (p1Damage > p2Damage ? 'p1' : 'p2')
+            : p1Assets !== p2Assets ? (p1Assets > p2Assets ? 'p1' : 'p2')
+              : 'p1';
+          outcome = 'win';
+          reason = p1Damage !== p2Damage ? 'total_damage_dealt' : p1Assets !== p2Assets ? 'total_assets' : 'deterministic_first_player';
         }
 
         const matchEndEvent: MatchEndedEvent = {

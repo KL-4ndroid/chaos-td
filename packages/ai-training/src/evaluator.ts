@@ -116,7 +116,12 @@ function tallyRecords(records: readonly MatchRecord[], genomeStrategyId: string,
       const opponent = slot === 'p1' ? 'p2' : 'p1';
       const leakDamage = telemetry.leakDamageByDefender;
       if (leakDamage) netLeakDamage += (leakDamage[opponent] ?? 0) - (leakDamage[slot] ?? 0);
-      economicScore += telemetry.incomePaidByPlayer?.[slot] ?? 0;
+      // Investment and recurring income are productive; unspent end-of-match
+      // gold is an opportunity cost. This supplies the missing selection
+      // pressure against strategies that simply hoard a surplus.
+      economicScore += (telemetry.incomePaidByPlayer?.[slot] ?? 0)
+        + (telemetry.finalTowerInvestmentByPlayer?.[slot] ?? 0)
+        - 4 * (telemetry.finalGoldByPlayer?.[slot] ?? 0);
     }
     if (summary.completion === 'tick_guard') tickGuardCount += 1;
     if (summary.outcome === 'draw') draws += 1;

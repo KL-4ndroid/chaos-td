@@ -111,7 +111,9 @@ export function generateLegalActions(
         actions.push({ type: 'upgrade_tower', towerEntityId: entityId });
       }
     }
-    actions.push({ type: 'sell_tower', towerEntityId: entityId });
+    // Selling is deliberately not an ordinary evolutionary action.  The
+    // one-action-per-tick policy otherwise discovers profitable-looking
+    // build/sell loops instead of expanding a durable defence.
   }
   if (obs.self.outboundQueueLength < GLOBAL_CONFIG.sendQueueLimit) {
     const queueCapacity = GLOBAL_CONFIG.sendQueueLimit - obs.self.outboundQueueLength;
@@ -144,7 +146,12 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
   const towerDeficit = Math.max(0, desiredTowerCount - towerCount);
   const cheapestTowerCost = Math.min(...TOWER_DEFINITIONS.map((tower) => tower.levels[0]?.cost ?? Number.MAX_SAFE_INTEGER));
   let score = 0;
-  if (action.type === 'wait') score = 1;
+  if (action.type === 'wait') {
+    // Holding a genome-selected reserve is valid, but surplus must compete
+    // poorly with any productive action.  This prevents passive idling while
+    // retaining `goldRetentionRatio` as the evolved safety control.
+    score = features.gold > reserveGold ? -Math.max(1, features.gold - reserveGold) : 1;
+  }
   if (action.type === 'build_tower') {
     const definition = TOWER_DEFINITIONS.find((candidate) => candidate.id === action.towerTypeId);
     if (!definition) return { action, score: Number.MIN_SAFE_INTEGER };

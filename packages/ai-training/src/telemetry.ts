@@ -51,6 +51,9 @@ export interface LeagueTelemetryRecord {
   readonly p1MirroredFinalTick: number | null;
   readonly p1FinalHp: number;
   readonly p2FinalHp: number;
+  /** Final private economy, emitted only into offline training telemetry. */
+  readonly finalGoldByPlayer?: Readonly<Record<PlayerSlot, number>>;
+  readonly finalTowerInvestmentByPlayer?: Readonly<Record<PlayerSlot, number>>;
   readonly finalStateHash: string;
   readonly domainEventTypes: Readonly<Record<string, number>>;
   readonly correctnessChecks: Readonly<Record<keyof typeof TELEMETRY_CORRECTNESS_FLAGS, boolean>>;
@@ -220,7 +223,7 @@ function playSelfPlayWithTelemetry(
   maxTicks: number,
 ): { summary: SelfPlayMatchSummary; telemetry: LeagueTelemetryRecord; replay: Replay } {
   const seed = match.seed;
-  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, suddenDeathStartTick: maxTicks }, createSelfPlayLanes());
+  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, absoluteMaxTicks: maxTicks }, createSelfPlayLanes());
   simulation.start();
   let replay = createReplayData(seed, CONFIG_VERSION, simulation.state.stateHash);
   const acc = freshAccumulator();
@@ -332,6 +335,8 @@ function playSelfPlayWithTelemetry(
     p1MirroredFinalTick: null,
     p1FinalHp: acc.p1FinalHp,
     p2FinalHp: acc.p2FinalHp,
+    finalGoldByPlayer: { p1: simulation.state.players.p1.gold, p2: simulation.state.players.p2.gold },
+    finalTowerInvestmentByPlayer: { p1: simulation.state.players.p1.totalInvested, p2: simulation.state.players.p2.totalInvested },
     finalStateHash: summary.finalStateHash,
     domainEventTypes: { ...acc.domainEventTypes },
     correctnessChecks,
