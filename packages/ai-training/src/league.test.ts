@@ -9,10 +9,10 @@ describe('deterministic self-play league', () => {
     expect(runSelfPlayMatch('self-play-deterministic', p1, p2, 300)).toEqual(runSelfPlayMatch('self-play-deterministic', p1, p2, 300));
   });
 
-  it('does not create a fixed player-slot winner for identical policies', () => {
+  it('uses the deterministic final adjudicator for identical policies', () => {
     const policy = createDefaultAIStrategyGenome('mirror');
     const result = runSelfPlayMatch('self-play-mirror', policy, policy, 300);
-    expect(result.winnerId).toBeNull();
-    expect(result.outcome).toBe('draw');
+    expect(result.winnerId).toBe('p1');
+    expect(result.outcome).toBe('win');
   });
 });

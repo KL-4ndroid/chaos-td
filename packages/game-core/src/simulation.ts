@@ -21,7 +21,7 @@ import {
   SELL_REFUND_PERMILLE,
 } from './constants';
 import { type SeededRng, createFromString } from './prng';
-import type { Phase, PlayerSlot, CanonicalState, MonsterState } from './canonical';
+import type { Phase, PlayerSlot, CanonicalState, MatchResult, MonsterState } from './canonical';
 import { hashStateToString } from './canonical';
 import type {
   AttackFiredEvent,
@@ -232,6 +232,8 @@ export interface SimulationState {
   nextEntityId: number;
   nextCommandIdSequence: number;
   pendingCommands: GameCommand[];
+  /** Authoritative result used by league evaluation and replay consumers. */
+  result: MatchResult | null;
   stateHash: string;
   waveScheduler: MatchWaveState;
 }
@@ -286,7 +288,7 @@ function computeStateHash(state: SimulationState): string {
       cellY: tower.cellY,
     })),
     monsters,
-    result: null,
+    result: state.result,
     waveCurrentWaveNumber: state.waveScheduler.currentWaveNumber,
   };
   return hashStateToString(canonical);
@@ -339,6 +341,7 @@ function createSimulationState(
     nextEntityId: 1,
     nextCommandIdSequence: 0,
     pendingCommands: [],
+    result: null,
     stateHash: '',
     waveScheduler: createInitialMatchWaveState(),
   };
@@ -1545,6 +1548,19 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
           outcome,
           reason,
         };
+        currentState = {
+          ...currentState,
+          result: {
+            winnerPlayerId: winnerId,
+            outcome,
+            reason,
+            endedAtTick: currentState.tick,
+            // The state hash is recomputed after this transition. Storing the
+            // pre-result state hash avoids a self-referential hash cycle while
+            // preserving a deterministic end-state reference.
+            finalStateHash: currentState.stateHash,
+          },
+        };
         allEvents.push(matchEndEvent);
       }
       break;
@@ -1635,7 +1651,7 @@ class SimulationImpl implements Simulation {
         cellY: tower.cellY,
       })),
       monsters,
-      result: null,
+      result: this._state.result,
       waveCurrentWaveNumber: this._state.waveScheduler.currentWaveNumber,
     };
   }
