@@ -59,6 +59,8 @@ export interface EvaluatedGenome {
   readonly finalTicks: readonly number[];
   readonly benchmark: ReferenceEvaluation;
   readonly champion: ReferenceEvaluation;
+  readonly economicScore: number;
+  readonly earlyVictoryBonus: number;
 }
 
 export interface ReferenceEvaluation {
@@ -79,6 +81,8 @@ interface Tally {
   rejected: number;
   finalTicks: number[];
   netLeakDamage: number;
+  economicScore: number;
+  earlyVictoryBonus: number;
 }
 
 /**
@@ -97,6 +101,8 @@ function tallyRecords(records: readonly MatchRecord[], genomeStrategyId: string,
   let accepted = 0; let rejected = 0;
   const finalTicks: number[] = [];
   let netLeakDamage = 0;
+  let economicScore = 0;
+  let earlyVictoryBonus = 0;
   for (const record of records) {
     if (mirroredOnly && !record.mirrored) continue;
     const slot = record.p1StrategyId === genomeStrategyId ? 'p1' : record.p2StrategyId === genomeStrategyId ? 'p2' : null;
@@ -110,13 +116,17 @@ function tallyRecords(records: readonly MatchRecord[], genomeStrategyId: string,
       const opponent = slot === 'p1' ? 'p2' : 'p1';
       const leakDamage = telemetry.leakDamageByDefender;
       if (leakDamage) netLeakDamage += (leakDamage[opponent] ?? 0) - (leakDamage[slot] ?? 0);
+      economicScore += telemetry.incomePaidByPlayer?.[slot] ?? 0;
     }
     if (summary.completion === 'tick_guard') tickGuardCount += 1;
     if (summary.outcome === 'draw') draws += 1;
-    else if ((summary.winnerId === slot)) wins += 1;
+    else if ((summary.winnerId === slot)) {
+      wins += 1;
+      if (summary.finalTick < 800) earlyVictoryBonus += (800 - summary.finalTick) * 0.1;
+    }
     else losses += 1;
   }
-  return { wins, losses, draws, tickGuardCount, accepted, rejected, finalTicks, netLeakDamage };
+  return { wins, losses, draws, tickGuardCount, accepted, rejected, finalTicks, netLeakDamage, economicScore, earlyVictoryBonus };
 }
 
 function tallyAll(input: GenomeAggregateInput, genomeStrategyId: string): Tally {
@@ -188,6 +198,8 @@ export function evaluateGenome(
     finalTicks: all.finalTicks,
     benchmark,
     champion,
+    economicScore: all.economicScore,
+    earlyVictoryBonus: all.earlyVictoryBonus,
   };
 }
 

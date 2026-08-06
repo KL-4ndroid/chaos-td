@@ -109,7 +109,7 @@ describe('deterministic evolutionary AI trainer', () => {
     if (!gen0 || !gen1) throw new Error('expected two generations');
     const gen1Ids = new Set(gen1.evaluated.map((e) => e.strategyId));
     const survivingElites = gen0.evaluated
-      .sort((a, b) => b.evaluation.elo - a.evaluation.elo)
+      .sort((a, b) => b.evaluation.totalScore - a.evaluation.totalScore)
       .slice(0, 2)
       .filter((elite) => gen1Ids.has(elite.strategyId));
     expect(survivingElites.length).toBeGreaterThan(0);

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import type { AIStrategyGenome } from '@chaos-td/ai-strategy';
+import { assertValidAIStrategyGenome, type AIStrategyGenome } from '@chaos-td/ai-strategy';
 import type { GenerationRecord } from './trainer.js';
 import {
   continueEvolution,
@@ -76,13 +76,23 @@ export function readCheckpoint(files: { readonly reportFile?: string; readonly s
   if (files.snapshotFile && existsSync(files.snapshotFile)) {
     const content = readFileSync(files.snapshotFile, 'utf8');
     const snapshot = JSON.parse(content) as TrainingSnapshot;
-    return snapshot;
+    return normalizeSnapshotGenomes(snapshot);
   }
   if (files.reportFile && existsSync(files.reportFile)) {
     const report = parseTrainingReport(readFileSync(files.reportFile, 'utf8'));
-    return createTrainingSnapshot(report, report.generations, report.currentPopulation, {});
+    return normalizeSnapshotGenomes(createTrainingSnapshot(report, report.generations, report.currentPopulation, {}));
   }
   throw new Error('No checkpoint files found');
+}
+
+/** Adds defaults for newly introduced evolvable genes when loading old checkpoints. */
+function normalizeSnapshotGenomes(snapshot: TrainingSnapshot): TrainingSnapshot {
+  const normalize = (genome: AIStrategyGenome) => assertValidAIStrategyGenome(genome, snapshot.contentVersion);
+  return {
+    ...snapshot,
+    currentPopulation: snapshot.currentPopulation.map(normalize),
+    hallOfFame: snapshot.hallOfFame.map((entry) => ({ ...entry, strategy: normalize(entry.strategy) })),
+  };
 }
 
 /**

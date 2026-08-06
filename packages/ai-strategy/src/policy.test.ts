@@ -108,7 +108,7 @@ describe('feature-driven policy', () => {
     expect(scoreAIAction(features, build, { ...base, buildThreshold: 0 }).score).not.toBe(scoreAIAction(features, build, { ...base, buildThreshold: 1000 }).score);
     expect(scoreAIAction(features, build, { ...base, emergencyDefenseThreshold: 0 }).score).not.toBe(scoreAIAction(features, build, { ...base, emergencyDefenseThreshold: 1000 }).score);
     const normalFeatures = { ...features, leakRisk: 0, activeMonsterPressure: 0 };
-    expect(scoreAIAction(normalFeatures, build, { ...base, reserveGoldRatio: 0 }).score).not.toBe(scoreAIAction(normalFeatures, build, { ...base, reserveGoldRatio: 1000 }).score);
+    expect(scoreAIAction(normalFeatures, build, { ...base, goldRetentionRatio: 0 }).score).not.toBe(scoreAIAction(normalFeatures, build, { ...base, goldRetentionRatio: 900 }).score);
     expect(scoreAIAction(normalFeatures, build, { ...base, incomeInvestmentRatio: 0 }).score).not.toBe(scoreAIAction(normalFeatures, build, { ...base, incomeInvestmentRatio: 1000 }).score);
     expect(scoreAIAction(features, send, { ...base, economyWeight: 0 }).score).not.toBe(scoreAIAction(features, send, { ...base, economyWeight: 1000 }).score);
     expect(scoreAIAction(features, send, { ...base, sendInvestmentRatio: 0 }).score).not.toBe(scoreAIAction(features, send, { ...base, sendInvestmentRatio: 1000 }).score);
@@ -174,7 +174,7 @@ describe('feature-driven policy', () => {
     expect(scoreAIAction(features, build, genome).score).toBeGreaterThan(scoreAIAction({ ...features, gold: 100 }, build, genome).score);
   });
 
-  it('builds a defensive baseline before spending surplus on outgoing monsters', () => {
+  it('lets the evolved defense threshold choose when defense is preferred', () => {
     const simulation = runningSimulation();
     const input = buildObsInput(simulation, 'p1');
     const obs = buildAIObservation('p1', { ...input, selfPlayer: { ...input.selfPlayer, gold: 600, income: 100 }, ownTowers: [] });
@@ -182,9 +182,10 @@ describe('feature-driven policy', () => {
     const features = extractAIFeaturesFromObservation(obs);
     const scored = generateLegalActions(obs, new Map()).map((action) => scoreAIAction(features, action, genome));
     expect(selectAIAction(scored, createFromString('balanced-opening-seed')).type).toBe('build_tower');
+    expect(scoreAIAction(features, { type: 'build_tower', towerTypeId: 'archer', cellX: 3, cellY: 14 }, { ...genome, defenseBaselineThreshold: 900 }).score).toBeGreaterThan(scoreAIAction(features, { type: 'build_tower', towerTypeId: 'archer', cellX: 3, cellY: 14 }, { ...genome, defenseBaselineThreshold: 0 }).score);
   });
 
-  it('never liquidates towers while the defensive baseline is unmet', () => {
+  it('allows selling decisions to evolve rather than imposing a hard defensive baseline', () => {
     const genome = createDefaultAIStrategyGenome('no-liquidation');
     const features = {
       playerId: 'p1' as const, tick: 100, hp: 20, gold: 600, income: 100, towerInvestment: 0,
@@ -192,6 +193,6 @@ describe('feature-driven policy', () => {
       bossDefenseCoverage: 0, activeMonsterPressure: 0, flyingPressure: 0, bossPressure: 0, leakRisk: 0,
       sendQueueCount: 0, opponentHp: 20, opponentGroundCoverage: 0, opponentFlyingCoverage: 0, opponentPressure: 0,
     };
-    expect(scoreAIAction(features, { type: 'sell_tower', towerEntityId: 1 }, genome).score).toBeLessThan(0);
+    expect(scoreAIAction(features, { type: 'sell_tower', towerEntityId: 1 }, { ...genome, sellThreshold: 900 }).score).toBeGreaterThan(scoreAIAction(features, { type: 'sell_tower', towerEntityId: 1 }, { ...genome, sellThreshold: 0 }).score);
   });
 });

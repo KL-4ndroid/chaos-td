@@ -26,6 +26,10 @@ export interface AIStrategyGenome {
   readonly pressureTimingWeight: number;
   readonly counterOpponentWeight: number;
   readonly diversityPreference: number;
+  /** Evolved desired defense level (0..1000), replacing a hard-coded baseline. */
+  readonly defenseBaselineThreshold: number;
+  /** Evolved retained gold ratio in permille (0..900). */
+  readonly goldRetentionRatio: number;
   readonly openingBookId?: string;
 }
 
@@ -66,6 +70,8 @@ const NUMBER_FIELDS: readonly GenomeNumberKey[] = Object.freeze([
   'pressureTimingWeight',
   'counterOpponentWeight',
   'diversityPreference',
+  'defenseBaselineThreshold',
+  'goldRetentionRatio',
 ]);
 
 const CANONICAL_FIELDS: readonly (keyof AIStrategyGenome)[] = Object.freeze([
@@ -112,6 +118,7 @@ export function validateAIStrategyGenome(value: unknown, expectedContentVersion:
 
   for (const field of NUMBER_FIELDS) {
     const fieldValue = value[field];
+    if (fieldValue === undefined && (field === 'defenseBaselineThreshold' || field === 'goldRetentionRatio')) continue;
     if (fieldValue === undefined) {
       errors.push('missing_field');
       continue;
@@ -123,6 +130,7 @@ export function validateAIStrategyGenome(value: unknown, expectedContentVersion:
     if (!Number.isInteger(fieldValue) || fieldValue < AI_STRATEGY_NUMERIC_MIN || fieldValue > AI_STRATEGY_NUMERIC_MAX) {
       errors.push('number_out_of_range');
     }
+    if (field === 'goldRetentionRatio' && Number(fieldValue) > 900) errors.push('number_out_of_range');
   }
 
   if (errors.length > 0) return { ok: false, errors: [...new Set(errors)].sort() };
@@ -150,6 +158,8 @@ export function validateAIStrategyGenome(value: unknown, expectedContentVersion:
       pressureTimingWeight: Number(value['pressureTimingWeight']),
       counterOpponentWeight: Number(value['counterOpponentWeight']),
       diversityPreference: Number(value['diversityPreference']),
+      defenseBaselineThreshold: value['defenseBaselineThreshold'] === undefined ? 500 : Number(value['defenseBaselineThreshold']),
+      goldRetentionRatio: value['goldRetentionRatio'] === undefined ? 450 : Number(value['goldRetentionRatio']),
       ...(value['openingBookId'] === undefined ? {} : { openingBookId: String(value['openingBookId']) }),
     },
   };
@@ -194,5 +204,7 @@ export function createDefaultAIStrategyGenome(strategyId: string, compatibleCont
     pressureTimingWeight: 500,
     counterOpponentWeight: 550,
     diversityPreference: 350,
+    defenseBaselineThreshold: 500,
+    goldRetentionRatio: 450,
   };
 }

@@ -16,7 +16,8 @@ export interface GenerationScheduleConfig {
   readonly generation: number;
   readonly trainingSeed: string;
   readonly evaluationSeeds: readonly string[];
-  readonly matchesPerGenome: number;
+  readonly opponentsPerGenome: number;
+  readonly matchesPerOpponent: number;
 }
 
 function matchKey(match: EvolutionMatch): string {
@@ -26,11 +27,11 @@ function matchKey(match: EvolutionMatch): string {
 export function createGenerationSchedule(config: GenerationScheduleConfig): readonly EvolutionMatch[] {
   if (config.population.length < 2) throw new Error('Generation schedule requires at least two genomes');
   if (config.evaluationSeeds.length === 0) throw new Error('Generation schedule requires evaluation seeds');
-  if (config.matchesPerGenome < 1) throw new Error('matchesPerGenome must be at least one');
+  if (config.opponentsPerGenome < 1 || config.matchesPerOpponent < 1) throw new Error('dynamic pairing values must be at least one');
 
   const ids = [...new Set(config.population.map((genome) => genome.strategyId))].sort((left, right) => left.localeCompare(right));
   if (ids.length !== config.population.length) throw new Error('Generation schedule requires unique strategy IDs');
-  const roundsNeeded = config.matchesPerGenome;
+  const roundsNeeded = config.opponentsPerGenome;
   const rounds: string[][] = [];
   const circle = [...ids];
   if (circle.length % 2 === 1) circle.push('__bye__');
@@ -60,10 +61,12 @@ export function createGenerationSchedule(config: GenerationScheduleConfig): read
       const [left, right] = pair.split('\u0000');
       if (!left || !right) continue;
       const pairId = `g${config.generation}:pair-${String(pairIndex).padStart(4, '0')}`;
-      const seedName = config.evaluationSeeds[pairIndex % config.evaluationSeeds.length] ?? config.trainingSeed;
-      const seed = `${config.trainingSeed}:${seedName}:r${String(pairIndex)}`;
-      matches.push({ generation: config.generation, pairId, seed, participantAId: left, participantBId: right, p1StrategyId: left, p2StrategyId: right, mirrored: false });
-      matches.push({ generation: config.generation, pairId, seed, participantAId: left, participantBId: right, p1StrategyId: right, p2StrategyId: left, mirrored: true });
+      for (let game = 0; game < config.matchesPerOpponent; game += 1) {
+        const seedName = config.evaluationSeeds[(pairIndex + game) % config.evaluationSeeds.length] ?? config.trainingSeed;
+        const seed = `${config.trainingSeed}:${seedName}:r${String(pairIndex)}:m${game}`;
+        const mirrored = game % 2 === 1;
+        matches.push({ generation: config.generation, pairId: `${pairId}:m${game}`, seed, participantAId: left, participantBId: right, p1StrategyId: mirrored ? right : left, p2StrategyId: mirrored ? left : right, mirrored });
+      }
       pairIndex += 1;
     }
   }

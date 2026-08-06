@@ -31,7 +31,12 @@ import { runSelfPlayWithTelemetry, type LeagueTelemetryRecord } from './telemetr
 export interface TrainerConfig {
   readonly populationSize: number;
   readonly generations: number;
-  readonly matchesPerGenome: number;
+  readonly opponentsPerGenome: number;
+  readonly matchesPerOpponent: number;
+  readonly mutationSigmaInitial: number;
+  readonly mutationSigmaDecay: number;
+  readonly tournamentSelectionSize: number;
+  readonly elitePreservationStrategy: 'mu_plus_lambda';
   readonly eliteCount: number;
   readonly hallOfFameOpponentCount: number;
   readonly mutationRatePermille: number;
@@ -131,6 +136,7 @@ function reproduceParents(
   contentVersion: string,
   slotSeed: 'regular' | 'next',
   childCount: number,
+  mutationSigma: number,
 ): AIStrategyGenome[] {
   if (picked.length === 0 || childCount <= 0) return [];
   const rng = createFromString(rngSeed);
@@ -151,7 +157,7 @@ function reproduceParents(
       draft = { ...left, strategyId: childId, strategyVersion: left.strategyVersion + 1 };
       draft = assertValidAIStrategyGenome(draft, contentVersion);
     }
-    children.push(mutateGenome(draft, `${rngSeed}:mut:${index}`, mutationRatePermille));
+    children.push(mutateGenome(draft, `${rngSeed}:mut:${index}`, mutationRatePermille, mutationSigma));
   }
   return children;
 }
@@ -162,7 +168,8 @@ function playMatches(
   evaluationSeeds: readonly string[],
   trainingSeed: string,
   maxTicksPerMatch: number,
-  matchesPerGenome: number,
+  opponentsPerGenome: number,
+  matchesPerOpponent: number,
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   if (population.length < 2) return { records: [], telemetry: [] };
   const schedule = createGenerationSchedule({
@@ -170,7 +177,8 @@ function playMatches(
     generation,
     trainingSeed,
     evaluationSeeds,
-    matchesPerGenome: Math.max(1, matchesPerGenome),
+    opponentsPerGenome: Math.max(1, opponentsPerGenome),
+    matchesPerOpponent: Math.max(1, matchesPerOpponent),
   });
   return executeSchedule(generation, population, schedule, maxTicksPerMatch);
 }
@@ -182,13 +190,13 @@ function playBenchmarkMatches(
   maxTicksPerMatch: number,
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   const benchmark = createDefaultAIStrategyGenome('benchmark-v1', CONFIG_VERSION);
-  const schedule: EvolutionMatch[] = population.flatMap((genome, index) => {
+  // Dynamic league uses 144 population games (32 × 3 opponents × 3 games / 2).
+  // Sample 16 rotating benchmark games, preserving the 160-match generation budget.
+  const schedule: EvolutionMatch[] = population.filter((_, index) => (index + generation) % 2 === 0).map((genome, index) => {
     const seed = `${trainingSeed}:benchmark:${String(index).padStart(4, '0')}`;
     const pairId = `g${generation}:benchmark-${String(index).padStart(4, '0')}`;
-    return [
-      { generation, pairId, seed, participantAId: genome.strategyId, participantBId: benchmark.strategyId, p1StrategyId: genome.strategyId, p2StrategyId: benchmark.strategyId, mirrored: false },
-      { generation, pairId, seed, participantAId: genome.strategyId, participantBId: benchmark.strategyId, p1StrategyId: benchmark.strategyId, p2StrategyId: genome.strategyId, mirrored: true },
-    ];
+    const mirrored = generation % 2 === 1;
+    return { generation, pairId, seed, participantAId: genome.strategyId, participantBId: benchmark.strategyId, p1StrategyId: mirrored ? benchmark.strategyId : genome.strategyId, p2StrategyId: mirrored ? genome.strategyId : benchmark.strategyId, mirrored };
   });
   return executeSchedule(generation, [...population, benchmark], schedule, maxTicksPerMatch);
 }
@@ -236,7 +244,7 @@ function evaluatePopulation(
   const behaviorDiversity = populationBehaviorDiversity(population);
   const initialElo = 1000;
   const ratings = computeHeadToHeadRatings(population, records, initialElo);
-  return population.map((genome) => {
+  const raw = population.map((genome) => {
     const elo = ratings.get(genome.strategyId) ?? initialElo;
     return evaluateGenome(
       genome,
@@ -253,6 +261,25 @@ function evaluatePopulation(
       `${trainingSeed}:eval`,
     );
   });
+  const rank = (entries: readonly EvaluatedGenome[], value: (entry: EvaluatedGenome) => number): ReadonlyMap<string, number> => {
+    const ordered = [...entries].sort((a, b) => value(a) - value(b) || a.strategyId.localeCompare(b.strategyId));
+    return new Map(ordered.map((entry, index) => [entry.strategyId, index + 1]));
+  };
+  const winRanks = rank(raw, (entry) => entry.matches === 0 ? 0 : entry.wins / entry.matches);
+  const pressureRanks = rank(raw, (entry) => entry.evaluation.pressureScore);
+  const economicRanks = rank(raw, (entry) => entry.economicScore);
+  return raw.map((entry) => ({
+    ...entry,
+    evaluation: {
+      ...entry.evaluation,
+      totalScore: Math.round(
+        (winRanks.get(entry.strategyId) ?? 1) * 1200
+        + (pressureRanks.get(entry.strategyId) ?? 1) * 150
+        + (economicRanks.get(entry.strategyId) ?? 1) * 100
+        + entry.earlyVictoryBonus,
+      ),
+    },
+  }));
 }
 
 function candidateFromEvaluated(
@@ -426,7 +453,7 @@ export function continueEvolution(
  
   for (let generation = state.nextGeneration; generation < config.generations; generation += 1) {
     const scheduleTrainingSeed = `${config.trainingSeed}:gen-${generation}`;
-    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, config.maxTicksPerMatch, config.matchesPerGenome);
+    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, config.maxTicksPerMatch, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1);
     const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, config.maxTicksPerMatch);
     played.records.push(...benchmarkPlayed.records);
     played.telemetry.push(...benchmarkPlayed.telemetry);
@@ -450,7 +477,8 @@ export function continueEvolution(
         config.evaluationSeeds,
         opponentScheduleTrainingSeed,
         config.maxTicksPerMatch,
-        config.matchesPerGenome,
+        config.opponentsPerGenome ?? 1,
+        config.matchesPerOpponent ?? 1,
       );
       opponentRecords = opponentPlayed.records;
       opponentTelemetry = opponentPlayed.telemetry;
@@ -491,6 +519,7 @@ export function continueEvolution(
       primaryEval,
       `${config.trainingSeed}:select:${generation}`,
       eliteCount,
+      config.tournamentSelectionSize ?? 3,
     );
     const eliteGenomes = elites
       .map((picked) => population.find((g) => g.strategyId === picked.strategyId))
@@ -505,6 +534,7 @@ export function continueEvolution(
       config.contentVersion,
       'regular',
       config.populationSize - eliteGenomes.length,
+      (config.mutationSigmaInitial ?? 50) * ((config.mutationSigmaDecay ?? 0.98) ** generation),
     );
 
     population = [

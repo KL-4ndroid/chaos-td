@@ -19,21 +19,30 @@ export const MUTABLE_FIELDS = Object.freeze([
   'pressureTimingWeight',
   'counterOpponentWeight',
   'diversityPreference',
+  'defenseBaselineThreshold',
+  'goldRetentionRatio',
 ] as const);
 
 type MutableField = typeof MUTABLE_FIELDS[number];
 
-function clamp(value: number): number {
+function clamp(value: number, field?: MutableField): number {
+  if (field === 'goldRetentionRatio') return Math.max(0, Math.min(900, value));
   return Math.max(0, Math.min(1000, value));
 }
 
-export function mutateGenome(genome: AIStrategyGenome, seed: string, mutationRatePermille: number): AIStrategyGenome {
+function gaussian(rng: ReturnType<typeof createFromString>): number {
+  const u1 = Math.max(1e-6, nextInt(rng, 1, 999999).value / 1_000_000);
+  const u2 = nextInt(rng, 0, 999999).value / 1_000_000;
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+export function mutateGenome(genome: AIStrategyGenome, seed: string, mutationRatePermille: number, sigma = 50): AIStrategyGenome {
   const rng = createFromString(seed);
   const mutated: Record<MutableField, number> = {} as Record<MutableField, number>;
   for (const field of MUTABLE_FIELDS) {
     const shouldMutate = nextInt(rng, 0, 999).value < mutationRatePermille;
-    const delta = shouldMutate ? nextInt(rng, -100, 100).value : 0;
-    mutated[field] = clamp(genome[field] + delta);
+    const delta = shouldMutate ? Math.round(gaussian(rng) * sigma) : 0;
+    mutated[field] = clamp(genome[field] + delta, field);
   }
   return assertValidAIStrategyGenome({ ...genome, ...mutated, strategyVersion: genome.strategyVersion + 1 }, genome.compatibleContentVersion);
 }
