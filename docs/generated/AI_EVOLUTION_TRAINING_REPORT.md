@@ -1,19 +1,16 @@
-# AI Training Run evolution-v1:tier-baseline-seed-20260805
+# AI Training Run evolution-v1:economic-balance-smoke-seed
 
 - Content version: `mvp-0.1.0`
-- Final canonical hash: `e7ee64bc0962e946`
-- Generations completed: 5
-- Total matches played: 160
+- Final canonical hash: `861499e01b16b435`
+- Generations completed: 2
+- Total matches played: 96
 - Hall of fame entries: 0
-- Average final tick: 800
+- Average final tick: 300
 - Best Elo: 1000 (evo-001 @ gen 0)
 
 ## Per-generation
 
 | Gen | Matches | Avg final tick | Best Elo | Strategy |
 |----:|--------:|---------------:|---------:|----------|
-| 0 | 32 | 800.00 | 1000 | evo-001 |
-| 1 | 32 | 800.00 | 1000 | evo-022 |
-| 2 | 32 | 800.00 | 1000 | g1-p-0008 |
-| 3 | 32 | 800.00 | 1000 | g1-p-0015 |
-| 4 | 32 | 800.00 | 1000 | g3-p-0021 |
+| 0 | 48 | 300.00 | 1000 | evo-001 |
+| 1 | 48 | 300.00 | 1000 | evo-014 |

@@ -1,0 +1,196 @@
+#< CLIXML
+(node:13912) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13912) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13912) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:13912) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:13912) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:17844) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:17844) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:17844) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:17844) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:17844) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:15952) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15952) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15952) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:15952) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:15952) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:19876) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19876) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19876) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:19876) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:19876) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:9840) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9840) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9840) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:9840) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:9840) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:19000) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19000) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19000) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:19000) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:19000) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:19048) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19048) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19048) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:19048) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:19048) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:21188) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21188) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21188) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:21188) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:21188) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:15484) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15484) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15484) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:15484) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:15484) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:13732) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13732) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13732) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:13732) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:13732) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:10688) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10688) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10688) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:10688) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:10688) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:14632) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14632) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-training/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-training\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14632) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-data/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-data\package.json.
+(node:14632) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/game-core/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\game-core\package.json.
+(node:14632) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/user/chaos-td/packages/ai-strategy/dist/index.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\user\chaos-td\packages\ai-strategy\package.json.
+(node:3484) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("./scripts/ai-training-loader.mjs", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
