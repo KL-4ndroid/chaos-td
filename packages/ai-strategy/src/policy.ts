@@ -144,7 +144,6 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
   // evolutionary genomes tune proportions, not basic economic safety.
   const desiredTowerCount = Math.floor(genome.defenseBaselineThreshold / 100);
   const towerDeficit = Math.max(0, desiredTowerCount - towerCount);
-  const cheapestTowerCost = Math.min(...TOWER_DEFINITIONS.map((tower) => tower.levels[0]?.cost ?? Number.MAX_SAFE_INTEGER));
   let score = 0;
   if (action.type === 'wait') {
     // Holding a genome-selected reserve is valid, but surplus must compete
@@ -184,8 +183,10 @@ export function scoreAIAction(features: AIFeatures, action: LegalAIAction, genom
   if (action.type === 'queue_monster') {
     const definition = MONSTER_DEFINITIONS.find((candidate) => candidate.id === action.monsterTypeId);
     if (!definition) return { action, score: Number.MIN_SAFE_INTEGER };
-    const defenseBudget = towerDeficit > 0 ? cheapestTowerCost : 0;
-    const availableGold = Math.max(0, features.gold - reserveGold - defenseBudget);
+    // Attack allocation is controlled exclusively by evolvable genes. In
+    // particular, a genome may choose a zero-tower all-in via a low reserve
+    // and high send investment ratio; no hidden defence budget is imposed.
+    const availableGold = Math.max(0, features.gold - reserveGold);
     const attackBudget = Math.floor((availableGold * genome.sendInvestmentRatio) / 1000);
     const incomeValue = Math.floor((definition.incomeGain * action.quantity * genome.economyWeight) / 10);
     score = genome.aggressionWeight + Math.floor((features.opponentPressure * genome.counterOpponentWeight) / 1000) + incomeValue;
