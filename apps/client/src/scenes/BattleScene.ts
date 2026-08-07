@@ -6,6 +6,7 @@ import {
   addEvent,
   addReplayCommand,
   calculateMonsterPosition,
+  createFromString,
   createPathSegments,
   createReplayData,
   createSimulation,
@@ -18,6 +19,17 @@ import {
   type Simulation,
   type SimulationState,
 } from '@chaos-td/game-core';
+import {
+  buildAIObservation,
+  createDefaultAIStrategyGenome,
+  extractAIFeaturesFromObservation,
+  generateLegalActions,
+  scoreAIAction,
+  selectAIAction,
+  toGameCommand,
+  type AIStrategyGenome,
+  type BuildAIObservationInput,
+} from '@chaos-td/ai-strategy';
 import {
   CONFIG_VERSION,
   MONSTER_BY_ID,
@@ -96,6 +108,7 @@ export class BattleScene extends Phaser.Scene {
   private trainingReplay?: Replay;
   private humanGuidedTraining = false;
   private humanGuidanceSubmitted = false;
+  private guidedOpponentGenome: AIStrategyGenome = createDefaultAIStrategyGenome('guided-ai-v1', CONFIG_VERSION);
   private liveTrainingState?: SimulationState;
   private replaySpeed = 1;
   private readonly monsterVisuals = new Map<number, MonsterVisual>();
@@ -107,6 +120,7 @@ export class BattleScene extends Phaser.Scene {
   private waveText?: Phaser.GameObjects.Text;
   private feedbackText?: Phaser.GameObjects.Text;
   private pausedText?: Phaser.GameObjects.Text;
+  private resultText?: Phaser.GameObjects.Text;
   private actionMenu?: Phaser.GameObjects.Container;
   private actionMenuBounds?: ScreenRect;
   private selectedCell?: { cellX: number; cellY: number };
@@ -122,6 +136,7 @@ export class BattleScene extends Phaser.Scene {
     const trainingReplay = this.registry.get('trainingReplay') as Replay | undefined;
     this.humanGuidedTraining = this.registry.get('humanGuidedTraining') === true;
     this.humanGuidanceSubmitted = false;
+    this.guidedOpponentGenome = createDefaultAIStrategyGenome('guided-ai-v1', CONFIG_VERSION);
     this.simulation = createDemoSimulation();
     this.replay = createReplayData('portrait-maze-demo', CONFIG_VERSION, this.simulation.state.stateHash);
     delete this.trainingReplay;
@@ -174,7 +189,9 @@ export class BattleScene extends Phaser.Scene {
     if (this.trainingReplay) {
       for (const item of this.trainingReplay.commands.filter((entry) => entry.tick === state.tick)) this.simulation.submitCommand(item.command);
     }
-    if (!this.trainingReplay && state.phase === 'running' && !this.opponentDefenseSubmitted) {
+    if (this.humanGuidedTraining && !this.trainingReplay && state.phase === 'running') {
+      this.submitGuidedOpponentCommand(state);
+    } else if (!this.trainingReplay && state.phase === 'running' && !this.opponentDefenseSubmitted) {
       const cells = [{ cellX: 4, cellY: 6 }, { cellX: 3, cellY: 4 }, { cellX: 4, cellY: 2 }];
       cells.forEach((cell, index) => {
         this.simulation.submitCommand({
@@ -187,7 +204,7 @@ export class BattleScene extends Phaser.Scene {
       });
       this.opponentDefenseSubmitted = true;
     }
-    if (!this.trainingReplay && isDemoWaveTick(state.phase, state.tick + 1, state.runningStartedAtTick)) {
+    if (!this.humanGuidedTraining && !this.trainingReplay && isDemoWaveTick(state.phase, state.tick + 1, state.runningStartedAtTick)) {
       this.simulation.submitCommand({
         type: 'queue_monster',
         commandId: this.simulation.getNextCommandId('p2'),
@@ -201,6 +218,9 @@ export class BattleScene extends Phaser.Scene {
     this.replay = addCheckpoint(this.replay, result.state.tick, result.state.stateHash);
     if (result.state.phase === 'result') {
       this.replay = finalizeReplay(this.replay, result.state.stateHash, result.state.tick);
+      const winner = result.state.result?.winnerPlayerId;
+      this.resultText?.setText(winner === 'p1' ? 'VICTORY' : 'DEFEAT').setVisible(true);
+      this.loop.pause();
       if (this.humanGuidedTraining && !this.humanGuidanceSubmitted) void this.submitHumanGuidance(result.state);
     }
     this.captureMonsterPositions(result.state);
@@ -437,6 +457,9 @@ export class BattleScene extends Phaser.Scene {
     this.pausedText = this.add.text(VIEW_WIDTH / 2, 430, 'PAUSED', {
       color: '#f0cf83', fontFamily: 'Arial, sans-serif', fontSize: '36px', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(100).setVisible(false);
+    this.resultText = this.add.text(VIEW_WIDTH / 2, 405, '', {
+      color: '#f0cf83', fontFamily: 'Arial, sans-serif', fontSize: '38px', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(101).setVisible(false);
   }
 
   private createSendControls(): void {
@@ -705,6 +728,20 @@ export class BattleScene extends Phaser.Scene {
   private setLiveTrainingState(state: SimulationState): void { this.liveTrainingState = state; }
   private stopLiveTrainingState(): void { delete this.liveTrainingState; }
 
+  private submitGuidedOpponentCommand(state: SimulationState): void {
+    const input = buildOpponentObservationInput(state);
+    const observation = buildAIObservation('p2', input);
+    const features = extractAIFeaturesFromObservation(observation);
+    const scored = generateLegalActions(observation, buildOpponentTowerMap(state))
+      .map((action) => scoreAIAction(features, action, this.guidedOpponentGenome));
+    const action = selectAIAction(scored, createFromString(`guided-ai:${state.tick}`));
+    const command = toGameCommand(action, 'p2', state.tick, 0);
+    if (!command) return;
+    const submitted = { ...command, commandId: this.simulation.getNextCommandId('p2') } as GameCommand;
+    this.replay = addReplayCommand(this.replay, state.tick, submitted);
+    this.simulation.submitCommand(submitted);
+  }
+
   private submitHumanCommand(command: GameCommand): void {
     this.replay = addReplayCommand(this.replay, this.simulation.state.tick, command);
     this.simulation.submitCommand(command);
@@ -749,4 +786,24 @@ export class BattleScene extends Phaser.Scene {
       this.feedbackText?.setText('Could not reach the local training service').setColor('#f1a38f');
     }
   }
+}
+
+function buildOpponentObservationInput(state: SimulationState): BuildAIObservationInput {
+  const ownTowers = state.towers.filter((tower) => tower.ownerId === 'p2').map((tower) => ({ towerTypeId: tower.towerTypeId, level: tower.level, cellX: tower.cellX, cellY: tower.cellY }));
+  const opponentTowers = state.towers.filter((tower) => tower.ownerId === 'p1').map((tower) => ({ towerTypeId: tower.towerTypeId, level: tower.level, cellX: tower.cellX, cellY: tower.cellY }));
+  return {
+    selfPlayer: state.players.p2,
+    publicOpponent: { hp: state.players.p1.hp },
+    ownBattlefield: { monsters: state.lanes.lane_p2.monsters, outboundQueue: state.lanes.lane_p1.spawnQueue },
+    opponentBattlefield: { monsters: state.lanes.lane_p1.monsters },
+    ownTowers,
+    opponentTowers,
+    tick: state.tick,
+    phase: state.phase as 'countdown' | 'running' | 'result',
+    waveNumber: state.waveScheduler.currentWaveNumber,
+  };
+}
+
+function buildOpponentTowerMap(state: SimulationState): ReadonlyMap<string, number> {
+  return new Map(state.towers.filter((tower) => tower.ownerId === 'p2').map((tower) => [`${tower.towerTypeId}:${tower.cellX}:${tower.cellY}`, tower.entityId]));
 }

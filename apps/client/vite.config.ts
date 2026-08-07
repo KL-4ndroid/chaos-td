@@ -7,6 +7,7 @@ export default defineConfig({
   root: '.',
   resolve: {
     alias: {
+      '@chaos-td/ai-strategy': fileURLToPath(new URL('../../packages/ai-strategy/src/index.ts', import.meta.url)),
       '@chaos-td/game-core': fileURLToPath(new URL('../../packages/game-core/src/index.ts', import.meta.url)),
       '@chaos-td/game-data': fileURLToPath(new URL('../../packages/game-data/src/index.ts', import.meta.url)),
     },
