@@ -179,6 +179,29 @@ export const SNIPER_TOWER: TowerDefinition = Object.freeze({
 });
 
 // ============================================================================
+// Wooden Crate - a cheap, non-attacking pathing obstacle.
+// It occupies a buildable cell and therefore makes ground monsters recalculate
+// their route. The simulation still rejects any placement that seals the lane.
+// ============================================================================
+
+export const CRATE_TOWER: TowerDefinition = Object.freeze({
+  id: 'crate',
+  displayName: 'Wooden Crate',
+  role: 'blocker',
+  targeting: 'first',
+  attackTargets: [] as const,
+  damageType: 'physical',
+  levels: Object.freeze([
+    Object.freeze({
+      cost: 50,
+      damage: 0,
+      cooldownTicks: 1,
+      rangeMilliTiles: 1,
+    }),
+  ]),
+});
+
+// ============================================================================
 // Tower Registry
 // ============================================================================
 
@@ -187,6 +210,7 @@ export const TOWER_DEFINITIONS: readonly TowerDefinition[] = Object.freeze([
   MAGE_TOWER,
   FROST_TOWER,
   SNIPER_TOWER,
+  CRATE_TOWER,
 ]);
 
 /**

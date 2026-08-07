@@ -93,6 +93,9 @@ export function generateLegalActions(
   const actions: LegalAIAction[] = [{ type: 'wait' }];
 
   for (const definition of TOWER_DEFINITIONS) {
+    // Pathing obstacles are a player-facing tactical tool, not an ordinary
+    // evolutionary combat action. They remain observable to the AI.
+    if (definition.attackTargets.length === 0) continue;
     const level = definition.levels[0];
     if (!level || obs.self.gold < level.cost) continue;
     for (const cell of laneDefinition.buildableCells) {

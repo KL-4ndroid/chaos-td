@@ -178,7 +178,7 @@ export function validateTowerDefinition(tower: unknown): ValidationResult {
     errors.push(createError('TOWER_DISPLAY_NAME_MISSING', 'Tower displayName must be a non-empty string', `towers.${towerId}`));
   }
 
-  const validRoles = ['single_target', 'splash', 'slow', 'heavy_hit'];
+  const validRoles = ['single_target', 'splash', 'slow', 'heavy_hit', 'blocker'];
   if (!validRoles.includes(t['role'] as string)) {
     errors.push(createError('TOWER_ROLE_INVALID', `Invalid tower role: ${t['role']}`, `towers.${towerId}.role`));
   }
@@ -206,10 +206,10 @@ export function validateTowerDefinition(tower: unknown): ValidationResult {
   }
 
   const levels = t['levels'];
-  if (!Array.isArray(levels) || levels.length !== 3) {
-    errors.push(createError('TOWER_LEVELS_COUNT', `Tower must have exactly 3 levels, got ${Array.isArray(levels) ? levels.length : 0}`, `towers.${towerId}.levels`));
+  if (!Array.isArray(levels) || levels.length < 1 || levels.length > 3) {
+    errors.push(createError('TOWER_LEVELS_COUNT', `Tower must have 1 to 3 levels, got ${Array.isArray(levels) ? levels.length : 0}`, `towers.${towerId}.levels`));
   } else {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < levels.length; i++) {
       const level = levels[i];
       if (level !== undefined) {
         errors.push(...validateTowerLevel(level, towerId, i));

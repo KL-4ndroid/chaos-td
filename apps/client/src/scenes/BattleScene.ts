@@ -308,7 +308,9 @@ export class BattleScene extends Phaser.Scene {
         const y = pixel.y;
         const textureKey = phaserAssetKey(`tower.${tower.towerTypeId}`);
         const children: Phaser.GameObjects.GameObject[] = [];
-        if (this.textures.exists(textureKey)) {
+        if (tower.towerTypeId === 'crate') {
+          children.push(this.add.rectangle(0, 0, 25, 22, 0x8b5a2b, 1).setStrokeStyle(2, 0xe0b16d, 1));
+        } else if (this.textures.exists(textureKey)) {
           children.push(this.add.image(0, 0, textureKey).setDisplaySize(29, 29).setOrigin(0.5, 0.82));
         } else {
           children.push(
@@ -554,6 +556,7 @@ export class BattleScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-TWO', () => this.submitBuild('mage'));
     this.input.keyboard?.on('keydown-THREE', () => this.submitBuild('frost'));
     this.input.keyboard?.on('keydown-FOUR', () => this.submitBuild('sniper'));
+    this.input.keyboard?.on('keydown-FIVE', () => this.submitBuild('crate'));
     this.input.keyboard?.on('keydown-S', () => this.submitMonster('sheep'));
     this.input.keyboard?.on('keydown-U', () => this.submitUpgrade());
     this.input.keyboard?.on('keydown-X', () => this.submitSell());
@@ -562,9 +565,9 @@ export class BattleScene extends Phaser.Scene {
   private openBuildMenu(cellX: number, cellY: number, pointerX: number, pointerY: number): void {
     this.closeActionMenu();
     this.selectedCell = { cellX, cellY };
-    const towerIds: readonly TowerId[] = ['archer', 'mage', 'frost', 'sniper'];
+    const towerIds: readonly TowerId[] = ['archer', 'mage', 'frost', 'sniper', 'crate'];
     const panelWidth = 228;
-    const panelHeight = 132;
+    const panelHeight = 176;
     const panelX = Phaser.Math.Clamp(pointerX - panelWidth / 2, 8, VIEW_WIDTH - panelWidth - 8);
     const preferredY = pointerY > BOTTOM_BOARD_Y + BOARD_HEIGHT / 2 ? pointerY - panelHeight - 10 : pointerY + 10;
     const panelY = Phaser.Math.Clamp(preferredY, 318, 772 - panelHeight);

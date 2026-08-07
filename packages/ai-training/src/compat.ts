@@ -24,7 +24,7 @@ export interface PoolCompatibilityReport {
   readonly overallResult: CompatibilityResult;
 }
 
-const KNOWN_TOWER_ROLES = new Set(['single_target', 'splash', 'slow', 'heavy_hit']);
+const KNOWN_TOWER_ROLES = new Set(['single_target', 'splash', 'slow', 'heavy_hit', 'blocker']);
 const KNOWN_DAMAGE_TYPES = new Set(['physical', 'magic', 'pure']);
 const KNOWN_MOVEMENT_TYPES = new Set(['ground', 'flying']);
 const KNOWN_MONSTER_TAGS = new Set(['boss', 'siege', 'swift', 'magic_resist', 'physical_resist']);

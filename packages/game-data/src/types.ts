@@ -19,7 +19,7 @@ export type LaneId = 'lane_p1' | 'lane_p2';
  * 'lane_p2' = battlefield belonging to player p2
  */
 export type BattlefieldId = LaneId;
-export type TowerId = 'archer' | 'mage' | 'frost' | 'sniper';
+export type TowerId = 'archer' | 'mage' | 'frost' | 'sniper' | 'crate';
 export type MonsterId =
   | 'sheep' | 'wolf' | 'treant' | 'ghost'
   | 'basic' | 'swift' | 'flying' | 'siege' | 'boss';
@@ -111,7 +111,7 @@ export interface TowerLevelDefinition {
 // Tower Definition
 // ============================================================================
 
-export type TowerRole = 'single_target' | 'splash' | 'slow' | 'heavy_hit';
+export type TowerRole = 'single_target' | 'splash' | 'slow' | 'heavy_hit' | 'blocker';
 export type TowerTargeting = 'first' | 'strong' | 'boss';
 
 /**

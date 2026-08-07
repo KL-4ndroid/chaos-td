@@ -69,6 +69,7 @@ export {
   MAGE_TOWER,
   FROST_TOWER,
   SNIPER_TOWER,
+  CRATE_TOWER,
   TOWER_DEFINITIONS,
   TOWER_BY_ID,
 } from './towers.js';

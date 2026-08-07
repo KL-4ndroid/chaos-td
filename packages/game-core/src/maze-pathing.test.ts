@@ -39,12 +39,12 @@ function createRunningSimulation(): Simulation {
   return simulation;
 }
 
-function build(simulation: Simulation, cellX: number, cellY: number) {
+function build(simulation: Simulation, cellX: number, cellY: number, towerTypeId: 'archer' | 'crate' = 'archer') {
   simulation.submitCommand({
     type: 'build_tower',
     commandId: simulation.getNextCommandId('p1'),
     playerId: 'p1',
-    towerTypeId: 'archer',
+    towerTypeId,
     cellX,
     cellY,
   });
@@ -52,6 +52,17 @@ function build(simulation: Simulation, cellX: number, cellY: number) {
 }
 
 describe('tower maze pathing', () => {
+  it('allows a wooden crate to reroute monsters without creating an attacking tower', () => {
+    const simulation = createRunningSimulation();
+    const originalLength = simulation.state.lanes.lane_p1.totalPathLength;
+
+    const result = build(simulation, 3, 15, 'crate');
+
+    expect(result.events.some((event) => event.type === 'tower_built')).toBe(true);
+    expect(result.state.lanes.lane_p1.totalPathLength).toBeGreaterThan(originalLength);
+    expect(result.state.towers[0]).toMatchObject({ towerTypeId: 'crate', totalInvested: 50 });
+  });
+
   it('reroutes the lane when a tower occupies a navigation cell', () => {
     const simulation = createRunningSimulation();
     const originalLength = simulation.state.lanes.lane_p1.totalPathLength;

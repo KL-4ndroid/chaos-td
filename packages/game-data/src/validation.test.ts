@@ -113,15 +113,15 @@ describe('Tower Definition Validation', () => {
     expect(result.errors.some(e => e.code === 'LEVEL_SPLASH_FACTOR_OOB')).toBe(true);
   });
 
-  it('should reject tower without 3 levels', () => {
+  it('should reject tower without a level', () => {
     const badTower = {
       id: 'bad',
       displayName: 'Bad',
       role: 'single_target',
       targeting: 'first',
-      levels: [
-        { cost: 100, damage: 10, cooldownTicks: 10, rangeMilliTiles: 1000 },
-      ],
+      attackTargets: [],
+      damageType: 'physical',
+      levels: [],
     };
     const result = validateTowerDefinition(badTower);
     expect(result.valid).toBe(false);

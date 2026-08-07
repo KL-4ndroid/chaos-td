@@ -102,7 +102,7 @@ export interface AIObservation {
 }
 
 function towerRoleCoverage(towers: readonly { towerTypeId: string }[]): Record<TowerRole, number> {
-  const coverage: Record<TowerRole, number> = { single_target: 0, splash: 0, slow: 0, heavy_hit: 0 };
+  const coverage: Record<TowerRole, number> = { single_target: 0, splash: 0, slow: 0, heavy_hit: 0, blocker: 0 };
   for (const tower of towers) {
     const def = TOWER_DEFINITIONS.find((d) => d.id === tower.towerTypeId);
     if (def) coverage[def.role] += 1;
