@@ -39,6 +39,10 @@ const config = {
 };
 const root = resolve(process.cwd(), 'reports', 'ai', 'runs', runId);
 const checkpointRoot = resolve(process.cwd(), 'data', 'ai', 'training', 'checkpoints', runId);
+const resumeFromRunId = process.env.AI_TRAINING_RESUME_FROM_RUN_ID;
+const resumeCheckpointRoot = resumeFromRunId
+  ? resolve(process.cwd(), 'data', 'ai', 'training', 'checkpoints', resumeFromRunId)
+  : checkpointRoot;
 const liveRoot = resolve(root, 'live');
 const globalLiveRoot = resolve(process.cwd(), 'reports', 'ai');
 const reportFile = resolve(checkpointRoot, 'training-report.json');
@@ -97,8 +101,17 @@ if (operation === 'evaluate') {
   console.log(JSON.stringify({ runId, operation, valid: issues.length === 0, issues }, null, 2));
   process.exit(issues.length === 0 ? 0 : 1);
 }
+const resumeSnapshotFile = resolve(resumeCheckpointRoot, 'checkpoint.json');
+const resumeReportFile = resolve(resumeCheckpointRoot, 'training-report.json');
+const injectLatestChampion = (snapshot) => {
+  if (process.env.AI_TRAINING_INJECT_LATEST_CHAMPION !== '1' || !existsSync(resolve(process.cwd(), 'data', 'ai', 'training', 'latest-champion.json'))) return snapshot;
+  const champion = JSON.parse(readFileSync(resolve(process.cwd(), 'data', 'ai', 'training', 'latest-champion.json'), 'utf8')).genome;
+  if (!champion || snapshot.currentPopulation.length === 0) return snapshot;
+  const remaining = snapshot.currentPopulation.filter((genome) => genome.strategyId !== champion.strategyId);
+  return { ...snapshot, currentPopulation: [champion, ...remaining].slice(0, snapshot.currentPopulation.length) };
+};
 const report = operation === 'resume'
-  ? resumeTraining(config, readCheckpoint({ reportFile, snapshotFile }), liveObserver)
+  ? resumeTraining(config, injectLatestChampion(readCheckpoint({ reportFile: resumeReportFile, snapshotFile: resumeSnapshotFile })), liveObserver)
   : runEvolutionTraining(config, liveObserver);
 const issues = validateTrainingRunReport(report);
 if (issues.length > 0) throw new Error(`Training validation failed: ${JSON.stringify(issues)}`);
