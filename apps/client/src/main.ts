@@ -30,10 +30,11 @@ document.querySelector<HTMLButtonElement>('#replay-pause')?.addEventListener('cl
 document.querySelector<HTMLSelectElement>('#replay-speed')?.addEventListener('change', (event) => game.events.emit('replay-speed', Number((event.target as HTMLSelectElement).value)));
 async function startHumanGuidedMatch(): Promise<void> {
   const response = await fetch('/api/training/champion', { cache: 'no-store' });
-  const champion = response.ok ? await response.json() as { genome?: unknown } : {};
+  const champion = response.ok ? await response.json() as { genome?: unknown; trainedAt?: string; humanSamples?: number; source?: string } : {};
   game.registry.remove('trainingReplay');
   game.registry.set('humanGuidedTraining', true);
   game.registry.set('guidedOpponentGenome', champion.genome ?? null);
+  game.registry.set('guidedOpponentInfo', { strategyId: (champion.genome as { strategyId?: string } | null)?.strategyId ?? 'default-ai', trainedAt: champion.trainedAt ?? null, humanSamples: champion.humanSamples ?? 0, source: champion.source ?? 'checkpoint' });
   game.scene.stop('BattleScene');
   game.scene.start('BattleScene');
 }
@@ -85,10 +86,10 @@ async function pollHumanGuidanceTraining(): Promise<void> {
   try {
     const response = await fetch('/api/training/human-guidance/status', { cache: 'no-store' });
     if (!response.ok) return;
-    const status = await response.json() as { status: string; message: string; detail?: { completed?: number; total?: number } | null };
+    const status = await response.json() as { status: string; message: string; queued?: boolean; detail?: { completed?: number; total?: number } | null };
     const active = status.status === 'running' || status.status === 'completed' || status.status === 'failed';
     if (guidancePanel) guidancePanel.hidden = !active;
-    if (guidanceText) guidanceText.textContent = status.message;
+    if (guidanceText) guidanceText.textContent = status.queued ? `${status.message} Another human sample is queued.` : status.message;
     if (guidanceBar) {
       guidanceBar.max = status.detail?.total ?? 8;
       guidanceBar.value = status.detail?.completed ?? 0;

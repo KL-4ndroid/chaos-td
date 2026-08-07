@@ -120,6 +120,7 @@ export class BattleScene extends Phaser.Scene {
   private phaseText?: Phaser.GameObjects.Text;
   private waveText?: Phaser.GameObjects.Text;
   private feedbackText?: Phaser.GameObjects.Text;
+  private opponentText?: Phaser.GameObjects.Text;
   private pausedText?: Phaser.GameObjects.Text;
   private resultText?: Phaser.GameObjects.Text;
   private actionMenu?: Phaser.GameObjects.Container;
@@ -156,7 +157,11 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#101418');
     this.drawArena();
     this.createOverlay();
-    if (this.humanGuidedTraining) this.feedbackText?.setText('HUMAN-GUIDED EVOLUTION: your replay will train the next batch').setColor('#f0cf83');
+    if (this.humanGuidedTraining) {
+      const info = this.registry.get('guidedOpponentInfo') as { strategyId?: string; humanSamples?: number } | undefined;
+      this.feedbackText?.setText('HUMAN-GUIDED EVOLUTION: your replay will train the next batch').setColor('#f0cf83');
+      this.opponentText?.setText(`AI ${info?.strategyId ?? 'default-ai'}  •  human samples ${info?.humanSamples ?? 0}`);
+    }
     this.createSendControls();
     this.createInputBindings();
     this.syncTowerVisuals(this.simulation.state);
@@ -445,6 +450,9 @@ export class BattleScene extends Phaser.Scene {
     this.phaseText = this.add.text(462, 15, '', {
       color: '#9eb1aa', fontFamily: 'Arial, sans-serif', fontSize: '12px', align: 'right',
     }).setOrigin(1, 0).setDepth(51);
+    this.opponentText = this.add.text(18, 31, '', {
+      color: '#9eb1aa', fontFamily: 'Arial, sans-serif', fontSize: '11px',
+    }).setDepth(51);
     this.hpText = this.add.text(18, 49, '', {
       color: '#e8eeeb', fontFamily: 'Arial, sans-serif', fontSize: '14px',
     }).setDepth(51);

@@ -37,8 +37,8 @@ const human = createHumanBenchmarkGenome('human-v1', CONFIG_VERSION, profile?.ge
 const candidates = [champion, ...Array.from({ length: 7 }, (_, index) => mutateGenome(
   { ...champion, strategyId: `guided-candidate-${String(index + 1).padStart(2, '0')}`, strategyVersion: champion.strategyVersion + 1 },
   `human-guided:${profile?.recordedAt ?? 'default'}:${index}`,
-  80,
-  35,
+  220,
+  90,
 ))];
 
 writeStatus({ status: 'running', completed: 0, total: candidates.length, humanSamples: profile?.samples ?? 0 });

@@ -26,15 +26,22 @@ export default defineConfig({
     name: 'training-live-state',
     configureServer(server) {
       let fastTraining: { status: 'idle' | 'running' | 'completed' | 'failed'; message: string } = { status: 'idle', message: '' };
+      let queuedFastTraining = false;
       const trainingRoot = resolve(fileURLToPath(new URL('../../data/ai/training', import.meta.url)));
       const fastStatusPath = resolve(trainingRoot, 'human-guidance', 'fast-training-status.json');
       const startFastTraining = (): void => {
-        if (fastTraining.status === 'running') return;
+        if (fastTraining.status === 'running') { queuedFastTraining = true; return; }
         fastTraining = { status: 'running', message: 'Training against the saved human style…' };
         const workspaceRoot = fileURLToPath(new URL('../../', import.meta.url));
         const child = spawn(process.execPath, ['--loader', './scripts/ai-training-loader.mjs', 'scripts/run-human-guided-fast-train.mjs'], { cwd: workspaceRoot, windowsHide: true });
         child.on('error', (error) => { fastTraining = { status: 'failed', message: error.message }; });
-        child.on('exit', (code) => { fastTraining = code === 0 ? { status: 'completed', message: 'New champion is ready for your next guided match.' } : { status: 'failed', message: `Fast training ended with code ${code ?? 'unknown'}.` }; });
+        child.on('exit', (code) => {
+          fastTraining = code === 0 ? { status: 'completed', message: 'New champion is ready for your next guided match.' } : { status: 'failed', message: `Fast training ended with code ${code ?? 'unknown'}.` };
+          if (queuedFastTraining) {
+            queuedFastTraining = false;
+            startFastTraining();
+          }
+        });
       };
       server.middlewares.use('/api/training/human-guidance', (request, response, next) => {
         if (request.url !== '/' && request.url !== '') { next(); return; }
@@ -63,7 +70,8 @@ export default defineConfig({
               return [key, Math.round((before * previousSamples + next * incomingSamples) / totalSamples)];
             }));
             writeFileSync(profilePath, JSON.stringify({ ...incoming, samples: totalSamples, genomeOverrides }, null, 2));
-            startFastTraining();
+            if (fastTraining.status === 'running') queuedFastTraining = true;
+            else startFastTraining();
             response.statusCode = 201;
             response.setHeader('Content-Type', 'application/json; charset=utf-8');
             response.end(JSON.stringify({ accepted: true }));
@@ -78,7 +86,7 @@ export default defineConfig({
         response.statusCode = 200;
         response.setHeader('Content-Type', 'application/json; charset=utf-8');
         response.setHeader('Cache-Control', 'no-store');
-        response.end(JSON.stringify({ ...fastTraining, detail }));
+        response.end(JSON.stringify({ ...fastTraining, queued: queuedFastTraining, detail }));
       });
       server.middlewares.use('/api/training/champion', (_request, response) => {
         const championPath = resolve(trainingRoot, 'latest-champion.json');
