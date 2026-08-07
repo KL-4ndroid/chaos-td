@@ -456,7 +456,8 @@ export function continueEvolution(
  
   for (let generation = state.nextGeneration; generation < config.generations; generation += 1) {
     const scheduleTrainingSeed = `${config.trainingSeed}:gen-${generation}`;
-    const absoluteMaxTicks = config.absoluteMaxTicks ?? config.maxTicksPerMatch;
+    const configuredCap = config.absoluteMaxTicks ?? config.maxTicksPerMatch;
+    const absoluteMaxTicks = configuredCap !== undefined && configuredCap > 0 ? configuredCap : undefined;
     const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, absoluteMaxTicks, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1);
     const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, absoluteMaxTicks);
     played.records.push(...benchmarkPlayed.records);

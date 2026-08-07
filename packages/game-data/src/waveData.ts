@@ -36,7 +36,12 @@ function makeGroup(
  * Scales by +5% every 5 waves, starting from 1.0.
  */
 function waveMultiplier(waveNumber: number): number {
-  return 1 + Math.floor(waveNumber / 5) * 0.05;
+  // Waves 1-35 rise steadily into the normal-player endgame. Afterwards the
+  // curve accelerates so wave 100 remains a genuine expert challenge.
+  const base = 1 + (waveNumber - 1) * 0.035;
+  const eliteBonus = Math.floor(waveNumber / 10) * 0.15;
+  if (waveNumber > 35) return base + eliteBonus + (waveNumber - 35) * 0.065;
+  return base + eliteBonus;
 }
 
 /**
@@ -64,7 +69,7 @@ export function generateWaveDefinitions(maxWave: number): readonly WaveDefinitio
 
     // Basic sheep: always present, count increases with wave
     // W1-3: 3 monsters; W4+: 3+1=4, W7+: 3+2=5, W10+: 3+3=6 ...
-    const basicCount = Math.min(3 + Math.floor((wave - 1) / 3), 8);
+    const basicCount = Math.min(4 + Math.floor((wave - 1) / 2), 10);
     groups.push(makeGroup('basic', basicCount, mult));
 
     // Swift (wolf) every 5th wave

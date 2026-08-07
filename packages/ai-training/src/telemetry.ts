@@ -223,7 +223,7 @@ function playSelfPlayWithTelemetry(
   absoluteMaxTicks: number | undefined,
 ): { summary: SelfPlayMatchSummary; telemetry: LeagueTelemetryRecord; replay: Replay } {
   const seed = match.seed;
-  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, ...(absoluteMaxTicks === undefined ? {} : { absoluteMaxTicks }) }, createSelfPlayLanes());
+  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, ...(absoluteMaxTicks !== undefined && absoluteMaxTicks > 0 ? { absoluteMaxTicks } : {}) }, createSelfPlayLanes());
   simulation.start();
   let replay = createReplayData(seed, CONFIG_VERSION, simulation.state.stateHash);
   const acc = freshAccumulator();

@@ -18,9 +18,9 @@ import { CONFIG_VERSION } from '@chaos-td/game-data';
 const operation = process.argv[2] ?? 'train';
 const mode = process.argv[3] ?? 'smoke';
 const configs = {
-  smoke: { populationSize: 16, generations: 2, evaluationSeeds: ['smoke-001', 'smoke-002', 'smoke-003'], opponentsPerGenome: 3, matchesPerOpponent: 3, endCondition: 'elimination_only', eliteCount: 2, hallOfFameOpponentCount: 2, mutationRatePermille: 60, crossoverRatePermille: 600, mutationSigmaInitial: 50, mutationSigmaDecay: 0.98, tournamentSelectionSize: 7, elitePreservationStrategy: 'mu_plus_lambda' },
-  local: { populationSize: 32, generations: 5, evaluationSeeds: Array.from({ length: 5 }, (_, i) => `local-${String(i + 1).padStart(3, '0')}`), opponentsPerGenome: 3, matchesPerOpponent: 3, endCondition: 'elimination_only', eliteCount: 4, hallOfFameOpponentCount: 4, mutationRatePermille: 60, crossoverRatePermille: 600, mutationSigmaInitial: 50, mutationSigmaDecay: 0.98, tournamentSelectionSize: 7, elitePreservationStrategy: 'mu_plus_lambda' },
-  full: { populationSize: 128, generations: 50, evaluationSeeds: Array.from({ length: 5 }, (_, i) => `full-${String(i + 1).padStart(3, '0')}`), opponentsPerGenome: 3, matchesPerOpponent: 3, endCondition: 'elimination_only', eliteCount: 8, hallOfFameOpponentCount: 8, mutationRatePermille: 60, crossoverRatePermille: 600, mutationSigmaInitial: 50, mutationSigmaDecay: 0.98, tournamentSelectionSize: 7, elitePreservationStrategy: 'mu_plus_lambda' },
+  smoke: { populationSize: 16, generations: 2, evaluationSeeds: ['smoke-001', 'smoke-002', 'smoke-003'], opponentsPerGenome: 3, matchesPerOpponent: 3, absoluteMaxTicks: 0, endCondition: 'elimination_only', eliteCount: 2, hallOfFameOpponentCount: 2, mutationRatePermille: 60, crossoverRatePermille: 600, mutationSigmaInitial: 50, mutationSigmaDecay: 0.98, tournamentSelectionSize: 7, elitePreservationStrategy: 'mu_plus_lambda' },
+  local: { populationSize: 32, generations: 5, evaluationSeeds: Array.from({ length: 5 }, (_, i) => `local-${String(i + 1).padStart(3, '0')}`), opponentsPerGenome: 3, matchesPerOpponent: 3, absoluteMaxTicks: 0, endCondition: 'elimination_only', eliteCount: 4, hallOfFameOpponentCount: 4, mutationRatePermille: 60, crossoverRatePermille: 600, mutationSigmaInitial: 50, mutationSigmaDecay: 0.98, tournamentSelectionSize: 7, elitePreservationStrategy: 'mu_plus_lambda' },
+  full: { populationSize: 128, generations: 50, evaluationSeeds: Array.from({ length: 5 }, (_, i) => `full-${String(i + 1).padStart(3, '0')}`), opponentsPerGenome: 3, matchesPerOpponent: 3, absoluteMaxTicks: 0, endCondition: 'elimination_only', eliteCount: 8, hallOfFameOpponentCount: 8, mutationRatePermille: 60, crossoverRatePermille: 600, mutationSigmaInitial: 50, mutationSigmaDecay: 0.98, tournamentSelectionSize: 7, elitePreservationStrategy: 'mu_plus_lambda' },
 };
 const base = configs[mode] ?? configs.smoke;
 const generationsOverride = Number.parseInt(process.env.AI_TRAINING_GENERATIONS ?? '', 10);
@@ -65,6 +65,7 @@ const checkpointReport = {
   })),
 };
 console.log('[Evolution Optimized] 新參數已套用');
+console.log('[Balance Patch] 怪物強度已重構，35關倍率約2.64，100關約10.19');
 writeFileSync(resolve(root, 'training-config.json'), JSON.stringify(config, null, 2));
 writeFileSync(resolve(root, 'generation-summary.jsonl'), report.generations.map((g) => JSON.stringify({ generation: g.generation, matches: g.matchRecords.length, evaluations: g.evaluated })).join('\n') + '\n');
 writeFileSync(resolve(root, 'match-summary.jsonl'), report.generations.flatMap((g) => g.matchRecords).map((m) => JSON.stringify(m.summary)).join('\n') + '\n');
