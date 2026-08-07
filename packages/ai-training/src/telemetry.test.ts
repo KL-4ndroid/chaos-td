@@ -52,6 +52,20 @@ describe('league telemetry from domain events', () => {
     expect(telemetry.commandAcceptedPerPlayer.p1 + telemetry.commandAcceptedPerPlayer.p2).toBe(summary.acceptedCommands);
   });
 
+  it('streams sampled showcase states without changing the match result', () => {
+    const p1 = createDefaultAIStrategyGenome('alpha', CONFIG_VERSION);
+    const p2 = createDefaultAIStrategyGenome('beta', CONFIG_VERSION);
+    const streamedTicks: number[] = [];
+    const streamed = runSelfPlayWithTelemetry(match('seed-live', p1.strategyId, p2.strategyId), p1, p2, 200, {
+      sampleEveryTicks: 50,
+      onTick: ({ state }) => streamedTicks.push(state.tick),
+    });
+    const baseline = runSelfPlayWithTelemetry(match('seed-live', p1.strategyId, p2.strategyId), p1, p2, 200);
+    expect(streamed.summary).toEqual(baseline.summary);
+    expect(streamedTicks).toContain(streamed.summary.finalTick);
+    expect(streamedTicks.every((tick) => tick % 50 === 0 || tick === streamed.summary.finalTick)).toBe(true);
+  });
+
   it('serializes telemetry to a canonical stable JSON string', () => {
     const p1 = createDefaultAIStrategyGenome('alpha');
     const p2 = createDefaultAIStrategyGenome('beta');

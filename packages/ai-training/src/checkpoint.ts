@@ -5,6 +5,7 @@ import {
   continueEvolution,
   type TrainerConfig,
   type TrainingRunReport,
+  type TrainingProgressObserver,
   type EvolutionTrainerState,
 } from './trainer.js';
 import {
@@ -103,6 +104,7 @@ function normalizeSnapshotGenomes(snapshot: TrainingSnapshot): TrainingSnapshot 
 export function resumeTraining(
   config: TrainerConfig,
   snapshot: TrainingSnapshot,
+  observer?: TrainingProgressObserver,
 ): TrainingRunReport {
   const completedCount = snapshot.completedGenerations.length;
   // `generations` is the number of evaluated generations. A snapshot records
@@ -127,7 +129,7 @@ export function resumeTraining(
   // continueEvolution retains completed generations in `state`; it must use
   // the original full configuration so generation-specific seeds and the
   // reproduction sequence remain identical to an uninterrupted run.
-  return continueEvolution(config, state);
+  return continueEvolution(config, state, observer);
 }
 
 function snapshotToReport(snapshot: TrainingSnapshot, config: TrainerConfig): TrainingRunReport {

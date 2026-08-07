@@ -34,8 +34,55 @@ const config = {
 };
 const root = resolve(process.cwd(), 'reports', 'ai', 'runs', runId);
 const checkpointRoot = resolve(process.cwd(), 'data', 'ai', 'training', 'checkpoints', runId);
+const liveRoot = resolve(root, 'live');
+const globalLiveRoot = resolve(process.cwd(), 'reports', 'ai');
 const reportFile = resolve(checkpointRoot, 'training-report.json');
 const snapshotFile = resolve(checkpointRoot, 'checkpoint.json');
+mkdirSync(liveRoot, { recursive: true });
+
+function writeLive(name, value) {
+  const serialized = JSON.stringify(value);
+  writeFileSync(resolve(liveRoot, name), serialized);
+  writeFileSync(resolve(globalLiveRoot, `live-training-${name}`), serialized);
+}
+
+let liveProgress = {
+  schemaVersion: 1,
+  runId,
+  mode,
+  status: 'starting',
+  generation: null,
+  completedMatches: 0,
+  currentMatch: null,
+  updatedAt: new Date().toISOString(),
+};
+const flushProgress = () => {
+  liveProgress = { ...liveProgress, updatedAt: new Date().toISOString() };
+  writeLive('progress.json', liveProgress);
+};
+const liveObserver = {
+  onGenerationStarted(update) {
+    liveProgress = { ...liveProgress, status: 'running', generation: update.generation, completedMatches: update.completedMatches, currentMatch: null };
+    flushProgress();
+  },
+  onMatchStarted(update) {
+    liveProgress = { ...liveProgress, generation: update.generation, completedMatches: update.completedMatches, currentMatch: { stage: update.stage, matchIndex: update.matchIndex, scheduledMatches: update.scheduledMatches, p1StrategyId: update.p1StrategyId, p2StrategyId: update.p2StrategyId } };
+    flushProgress();
+  },
+  onShowcaseTick(update) {
+    writeLive('state.json', { schemaVersion: 1, runId, generation: update.generation, stage: update.stage, matchIndex: update.matchIndex, scheduledMatches: update.scheduledMatches, completedMatches: update.completedMatches, updatedAt: new Date().toISOString(), state: update.state });
+  },
+  onMatchCompleted(update) {
+    liveProgress = { ...liveProgress, completedMatches: update.completedMatches, lastMatch: { finalTick: update.summary.finalTick, winnerId: update.summary.winnerId, terminationReason: update.summary.terminationReason ?? null, rejectedCommands: update.telemetry.rejectedCommands } };
+    flushProgress();
+    if (update.replay) writeLive('showcase-replay.json', update.replay);
+  },
+  onGenerationCompleted(update) {
+    liveProgress = { ...liveProgress, generation: update.generation, completedMatches: update.completedMatches, currentMatch: null, champion: { strategyId: update.championStrategyId, elo: update.championElo }, hallOfFameCount: update.hallOfFameCount };
+    flushProgress();
+  },
+};
+flushProgress();
 if (operation === 'evaluate') {
   if (!existsSync(reportFile)) throw new Error(`Missing training report: ${reportFile}`);
   const report = JSON.parse(readFileSync(reportFile, 'utf8'));
@@ -46,8 +93,8 @@ if (operation === 'evaluate') {
   process.exit(issues.length === 0 ? 0 : 1);
 }
 const report = operation === 'resume'
-  ? resumeTraining(config, readCheckpoint({ reportFile, snapshotFile }))
-  : runEvolutionTraining(config);
+  ? resumeTraining(config, readCheckpoint({ reportFile, snapshotFile }), liveObserver)
+  : runEvolutionTraining(config, liveObserver);
 const issues = validateTrainingRunReport(report);
 if (issues.length > 0) throw new Error(`Training validation failed: ${JSON.stringify(issues)}`);
 mkdirSync(root, { recursive: true });
@@ -82,3 +129,5 @@ writeCheckpoint({ reportFile: resolve(checkpointRoot, 'training-report.json'), s
 writeFileSync(resolve(process.cwd(), 'docs', 'generated', 'AI_EVOLUTION_TRAINING_REPORT.md'), renderTrainingSummaryMarkdown(summary));
 writeFileSync(resolve(root, 'training-report.json'), serializeTrainingReport(checkpointReport));
 console.log(JSON.stringify({ runId, mode, generations: report.generations.length, matches: report.matchCount, hash: report.finalCanonicalHash, hallOfFame: report.hallOfFame.length }, null, 2));
+liveProgress = { ...liveProgress, status: 'completed', completedMatches: report.matchCount, currentMatch: null };
+flushProgress();

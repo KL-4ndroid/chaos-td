@@ -54,6 +54,7 @@ export {
   runSelfPlayWithTelemetry,
   serializeTelemetryRecord,
   type LeagueTelemetryRecord,
+  type SelfPlayTelemetryObserver,
   TELEMETRY_CORRECTNESS_FLAGS,
 } from './telemetry.js';
 export {
@@ -66,9 +67,11 @@ export {
 } from './evaluator.js';
 export {
   runEvolutionTraining,
+  continueEvolution,
   type TrainerConfig,
   type GenerationRecord,
   type TrainingRunReport,
+  type TrainingProgressObserver,
 } from './trainer.js';
 export {
   validateTrainingRunReport,

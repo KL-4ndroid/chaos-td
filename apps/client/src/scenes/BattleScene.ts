@@ -92,6 +92,7 @@ export class BattleScene extends Phaser.Scene {
   private readonly loop = new FixedStepLoop(TICK_DURATION_MS);
   private simulation = createDemoSimulation();
   private trainingReplay?: Replay;
+  private liveTrainingState?: SimulationState;
   private replaySpeed = 1;
   private readonly monsterVisuals = new Map<number, MonsterVisual>();
   private readonly towerVisuals = new Map<number, Phaser.GameObjects.Container>();
@@ -129,6 +130,8 @@ export class BattleScene extends Phaser.Scene {
 
     this.game.events.on('replay-toggle', this.toggleReplayPause, this);
     this.game.events.on('replay-speed', this.setReplaySpeed, this);
+    this.game.events.on('training-live-state', this.setLiveTrainingState, this);
+    this.game.events.on('training-live-stop', this.stopLiveTrainingState, this);
 
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.handleHidden, this);
     this.game.events.on(Phaser.Core.Events.VISIBLE, this.handleVisible, this);
@@ -137,17 +140,27 @@ export class BattleScene extends Phaser.Scene {
       this.game.events.off(Phaser.Core.Events.VISIBLE, this.handleVisible, this);
       this.game.events.off('replay-toggle', this.toggleReplayPause, this);
       this.game.events.off('replay-speed', this.setReplaySpeed, this);
+      this.game.events.off('training-live-state', this.setLiveTrainingState, this);
+      this.game.events.off('training-live-stop', this.stopLiveTrainingState, this);
     });
   }
 
   update(_time: number, delta: number): void {
+    if (this.liveTrainingState) {
+      this.syncTowerVisuals(this.liveTrainingState);
+      this.captureMonsterPositions(this.liveTrainingState);
+      this.renderMonsters(this.liveTrainingState, 1);
+      this.removeInactiveMonsterVisuals(this.liveTrainingState);
+      this.updateOverlay();
+      return;
+    }
     this.loop.advance(delta * this.replaySpeed, () => this.stepSimulation());
     this.renderMonsters(this.simulation.state, this.loop.interpolationAlpha);
     this.updateOverlay();
   }
 
   private stepSimulation(): void {
-    const state = this.simulation.state;
+    const state = this.liveTrainingState ?? this.simulation.state;
     if (this.trainingReplay) {
       for (const item of this.trainingReplay.commands.filter((entry) => entry.tick === state.tick)) this.simulation.submitCommand(item.command);
     }
@@ -678,4 +691,6 @@ export class BattleScene extends Phaser.Scene {
 
   private toggleReplayPause(): void { if (this.loop.isPaused) this.handleVisible(); else this.handleHidden(); }
   private setReplaySpeed(speed: number): void { this.replaySpeed = [1, 2, 4].includes(speed) ? speed : 1; }
+  private setLiveTrainingState(state: SimulationState): void { this.liveTrainingState = state; }
+  private stopLiveTrainingState(): void { delete this.liveTrainingState; }
 }

@@ -19,6 +19,16 @@ import {
 } from './league.js';
 import { participantPolicySeed, type EvolutionMatch } from './schedule.js';
 
+/** Read-only sampled state for a live training showcase. */
+export interface SelfPlayTelemetryObserver {
+  readonly sampleEveryTicks?: number;
+  onTick?(update: {
+    readonly match: EvolutionMatch;
+    readonly state: SimulationState;
+    readonly events: readonly DomainEvent[];
+  }): void;
+}
+
 /**
  * League-level telemetry derived from authoritative domain events and the
  * match result. The trainer reads `SimulationState` and the full event stream
@@ -222,6 +232,7 @@ function playSelfPlayWithTelemetry(
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
   absoluteMaxTicks: number | undefined,
+  observer?: SelfPlayTelemetryObserver,
 ): { summary: SelfPlayMatchSummary; telemetry: LeagueTelemetryRecord; replay: Replay } {
   const seed = match.seed;
   const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, ...(absoluteMaxTicks !== undefined && absoluteMaxTicks > 0 ? { absoluteMaxTicks } : {}) }, createSelfPlayLanes());
@@ -269,8 +280,12 @@ function playSelfPlayWithTelemetry(
     replay = addCheckpoint(replay, simulation.state.tick, simulation.state.stateHash);
     ingestEvents(simulation.state, events, acc);
 
-
     const phase: Phase = simulation.state.phase as Phase;
+    const sampleEveryTicks = Math.max(1, observer?.sampleEveryTicks ?? 50);
+    if (observer?.onTick && (simulation.state.tick % sampleEveryTicks === 0 || phase === 'result')) {
+      observer.onTick({ match, state: simulation.state, events });
+    }
+
     if (phase === 'result') {
       // Step once more after the result phase to detect any post-result
       // commands emitted by future logic; the integrated runtime does not
@@ -357,8 +372,9 @@ export function runSelfPlayWithTelemetry(
   p1: AIStrategyGenome,
   p2: AIStrategyGenome,
   absoluteMaxTicks: number | undefined,
+  observer?: SelfPlayTelemetryObserver,
 ): { readonly summary: SelfPlayMatchSummary; readonly telemetry: LeagueTelemetryRecord; readonly replay: Replay } {
-  return playSelfPlayWithTelemetry(match, p1, p2, absoluteMaxTicks);
+  return playSelfPlayWithTelemetry(match, p1, p2, absoluteMaxTicks, observer);
 }
 
 /**

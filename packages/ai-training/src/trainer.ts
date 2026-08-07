@@ -26,7 +26,16 @@ import {
 } from './evaluator.js';
 // SelfPlayMatchSummary is referenced via MatchRecord -> EvaluatedGenome from
 // './evaluator.js'; no direct import needed here.
-import { runSelfPlayWithTelemetry, type LeagueTelemetryRecord } from './telemetry.js';
+import { runSelfPlayWithTelemetry, type LeagueTelemetryRecord, type SelfPlayTelemetryObserver } from './telemetry.js';
+
+/** Optional I/O boundary for live dashboards. It never participates in scoring. */
+export interface TrainingProgressObserver {
+  onGenerationStarted?(update: { readonly generation: number; readonly completedMatches: number }): void;
+  onMatchStarted?(update: { readonly generation: number; readonly stage: 'population' | 'benchmark' | 'hall_of_fame'; readonly matchIndex: number; readonly scheduledMatches: number; readonly completedMatches: number; readonly p1StrategyId: string; readonly p2StrategyId: string }): void;
+  onShowcaseTick?(update: { readonly generation: number; readonly stage: 'population' | 'benchmark' | 'hall_of_fame'; readonly matchIndex: number; readonly scheduledMatches: number; readonly completedMatches: number; readonly state: Parameters<NonNullable<SelfPlayTelemetryObserver['onTick']>>[0]['state'] }): void;
+  onMatchCompleted?(update: { readonly generation: number; readonly stage: 'population' | 'benchmark' | 'hall_of_fame'; readonly matchIndex: number; readonly scheduledMatches: number; readonly completedMatches: number; readonly summary: MatchRecord['summary']; readonly telemetry: LeagueTelemetryRecord; readonly replay?: MatchRecord['replay'] }): void;
+  onGenerationCompleted?(update: { readonly generation: number; readonly completedMatches: number; readonly championStrategyId: string | null; readonly championElo: number | null; readonly hallOfFameCount: number }): void;
+}
 
 export interface TrainerConfig {
   readonly populationSize: number;
@@ -173,6 +182,9 @@ function playMatches(
   maxTicksPerMatch: number | undefined,
   opponentsPerGenome: number,
   matchesPerOpponent: number,
+  observer: TrainingProgressObserver | undefined,
+  completedMatches: number,
+  stage: 'population' | 'hall_of_fame',
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   if (population.length < 2) return { records: [], telemetry: [] };
   const schedule = createGenerationSchedule({
@@ -183,7 +195,7 @@ function playMatches(
     opponentsPerGenome: Math.max(1, opponentsPerGenome),
     matchesPerOpponent: Math.max(1, matchesPerOpponent),
   });
-  return executeSchedule(generation, population, schedule, maxTicksPerMatch);
+  return executeSchedule(generation, population, schedule, maxTicksPerMatch, observer, completedMatches, stage);
 }
 
 function playBenchmarkMatches(
@@ -191,6 +203,8 @@ function playBenchmarkMatches(
   population: readonly AIStrategyGenome[],
   trainingSeed: string,
   maxTicksPerMatch: number | undefined,
+  observer: TrainingProgressObserver | undefined,
+  completedMatches: number,
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   const benchmark = createDefaultAIStrategyGenome('benchmark-v1', CONFIG_VERSION);
   // Dynamic league uses 144 population games (32 × 3 opponents × 3 games / 2).
@@ -201,7 +215,7 @@ function playBenchmarkMatches(
     const mirrored = generation % 2 === 1;
     return { generation, pairId, seed, participantAId: genome.strategyId, participantBId: benchmark.strategyId, p1StrategyId: mirrored ? benchmark.strategyId : genome.strategyId, p2StrategyId: mirrored ? genome.strategyId : benchmark.strategyId, mirrored };
   });
-  return executeSchedule(generation, [...population, benchmark], schedule, maxTicksPerMatch);
+  return executeSchedule(generation, [...population, benchmark], schedule, maxTicksPerMatch, observer, completedMatches, 'benchmark');
 }
 
 function executeSchedule(
@@ -209,15 +223,23 @@ function executeSchedule(
   population: readonly AIStrategyGenome[],
   schedule: readonly EvolutionMatch[],
   maxTicksPerMatch: number | undefined,
+  observer: TrainingProgressObserver | undefined,
+  completedMatches: number,
+  stage: 'population' | 'benchmark' | 'hall_of_fame',
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   const records: MatchRecord[] = [];
   const telemetry: LeagueTelemetryRecord[] = [];
   const lookup = new Map(population.map((genome) => [genome.strategyId, genome]));
-  for (const match of schedule) {
+  for (const [matchIndex, match] of schedule.entries()) {
     const p1 = lookup.get(match.p1StrategyId);
     const p2 = lookup.get(match.p2StrategyId);
     if (!p1 || !p2) continue;
-    const { summary, telemetry: fullTelemetry, replay } = runSelfPlayWithTelemetry(match, p1, p2, maxTicksPerMatch);
+    observer?.onMatchStarted?.({ generation, stage, matchIndex: matchIndex + 1, scheduledMatches: schedule.length, completedMatches, p1StrategyId: p1.strategyId, p2StrategyId: p2.strategyId });
+    const showcaseObserver: SelfPlayTelemetryObserver | undefined = matchIndex === 0 ? {
+      sampleEveryTicks: 50,
+      onTick: ({ state }) => observer?.onShowcaseTick?.({ generation, stage, matchIndex: matchIndex + 1, scheduledMatches: schedule.length, completedMatches, state }),
+    } : undefined;
+    const { summary, telemetry: fullTelemetry, replay } = runSelfPlayWithTelemetry(match, p1, p2, maxTicksPerMatch, showcaseObserver);
     records.push({
       generation,
       pairId: match.pairId,
@@ -233,6 +255,8 @@ function executeSchedule(
       replay,
     });
     telemetry.push(fullTelemetry);
+    completedMatches += 1;
+    observer?.onMatchCompleted?.({ generation, stage, matchIndex: matchIndex + 1, scheduledMatches: schedule.length, completedMatches, summary, telemetry: fullTelemetry, ...(matchIndex === 0 ? { replay } : {}) });
   }
   return { records, telemetry };
 }
@@ -407,7 +431,7 @@ function canonicalize(value: unknown): string {
  * 4. Tournament-select elites and produce offspring via mutation/crossover.
  * 5. Hand the next population to the following generation.
  */
-export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
+export function runEvolutionTraining(config: TrainerConfig, observer?: TrainingProgressObserver): TrainingRunReport {
   if (config.populationSize < 2) throw new Error('populationSize must be at least 2');
   if (config.generations < 0) throw new Error('generations must be >= 0');
   if (config.evaluationSeeds.length === 0) throw new Error('evaluationSeeds required');
@@ -428,7 +452,7 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
     trainingHash: '',
     trainerVersion: 1,
   };
-  return continueEvolution(config, initialState);
+  return continueEvolution(config, initialState, observer);
 }
  
 /**
@@ -439,6 +463,7 @@ export function runEvolutionTraining(config: TrainerConfig): TrainingRunReport {
 export function continueEvolution(
   config: TrainerConfig,
   state: EvolutionTrainerState,
+  observer?: TrainingProgressObserver,
 ): TrainingRunReport {
   const initial = createInitialPopulation({
     size: Math.max(5, config.populationSize),
@@ -455,11 +480,12 @@ export function continueEvolution(
   let matchCount = generations.reduce((sum, gen) => sum + gen.matchRecords.length, 0);
  
   for (let generation = state.nextGeneration; generation < config.generations; generation += 1) {
+    observer?.onGenerationStarted?.({ generation, completedMatches: matchCount });
     const scheduleTrainingSeed = `${config.trainingSeed}:gen-${generation}`;
     const configuredCap = config.absoluteMaxTicks ?? config.maxTicksPerMatch;
     const absoluteMaxTicks = configuredCap !== undefined && configuredCap > 0 ? configuredCap : undefined;
-    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, absoluteMaxTicks, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1);
-    const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, absoluteMaxTicks);
+    const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, absoluteMaxTicks, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1, observer, matchCount, 'population');
+    const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, absoluteMaxTicks, observer, matchCount + played.records.length);
     played.records.push(...benchmarkPlayed.records);
     played.telemetry.push(...benchmarkPlayed.telemetry);
     matchCount += played.records.length;
@@ -484,6 +510,9 @@ export function continueEvolution(
         absoluteMaxTicks,
         config.opponentsPerGenome ?? 1,
         config.matchesPerOpponent ?? 1,
+        observer,
+        matchCount,
+        'hall_of_fame',
       );
       opponentRecords = opponentPlayed.records;
       opponentTelemetry = opponentPlayed.telemetry;
@@ -516,6 +545,8 @@ export function continueEvolution(
       newHallOfFameEntries: newHofEntries,
       populationFingerprints,
     });
+    const champion = [...primaryEval].sort((left, right) => right.evaluation.elo - left.evaluation.elo || left.strategyId.localeCompare(right.strategyId))[0];
+    observer?.onGenerationCompleted?.({ generation, completedMatches: matchCount, championStrategyId: champion?.strategyId ?? null, championElo: champion?.evaluation.elo ?? null, hallOfFameCount: hallOfFame.length });
 
     if (generation === config.generations) break;
 
