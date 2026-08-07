@@ -7,6 +7,7 @@ import {
 } from '@chaos-td/ai-strategy';
 import {
   createHumanBenchmarkGenome,
+  genomeDistance,
   mutateGenome,
   runSelfPlayWithTelemetry,
 } from '@chaos-td/ai-training';
@@ -34,11 +35,22 @@ const fallbackReport = (() => {
 const storedChampion = existsSync(championPath) ? JSON.parse(readFileSync(championPath, 'utf8')).genome : fallbackReport;
 const champion = assertValidAIStrategyGenome(storedChampion ?? createDefaultAIStrategyGenome('guided-champion-v1', CONFIG_VERSION), CONFIG_VERSION);
 const human = createHumanBenchmarkGenome('human-v1', CONFIG_VERSION, profile?.genomeOverrides ?? {});
-const candidates = [champion, ...Array.from({ length: 7 }, (_, index) => mutateGenome(
+const counterHuman = assertValidAIStrategyGenome({
+  ...champion,
+  strategyId: `guided-counter-human-${champion.strategyVersion + 1}`,
+  strategyVersion: champion.strategyVersion + 1,
+  aggressionWeight: Math.max(champion.aggressionWeight, 820),
+  sendInvestmentRatio: Math.max(champion.sendInvestmentRatio, 780),
+  pressureTimingWeight: Math.max(champion.pressureTimingWeight, 760),
+  counterOpponentWeight: Math.max(champion.counterOpponentWeight, 820),
+  goldRetentionRatio: Math.min(champion.goldRetentionRatio, 220),
+  defenseBaselineThreshold: Math.min(champion.defenseBaselineThreshold, 380),
+}, CONFIG_VERSION);
+const candidates = [champion, counterHuman, ...Array.from({ length: 6 }, (_, index) => mutateGenome(
   { ...champion, strategyId: `guided-candidate-${String(index + 1).padStart(2, '0')}`, strategyVersion: champion.strategyVersion + 1 },
   `human-guided:${profile?.recordedAt ?? 'default'}:${index}`,
-  220,
-  90,
+  260,
+  110,
 ))];
 
 writeStatus({ status: 'running', completed: 0, total: candidates.length, humanSamples: profile?.samples ?? 0 });
@@ -58,10 +70,11 @@ for (const [index, candidate] of candidates.entries()) {
   const win = summary.winnerId === 'p1' ? 1 : 0;
   const hpMargin = telemetry.p1FinalHp - telemetry.p2FinalHp;
   const pressure = telemetry.leakDamageByDefender.p2 - telemetry.leakDamageByDefender.p1;
-  scored.push({ candidate, summary, score: win * 1_000_000 + hpMargin * 100 + pressure });
-  writeStatus({ status: 'running', completed: index + 1, total: candidates.length, humanSamples: profile?.samples ?? 0 });
+  const speed = Math.max(0, 30_000 - summary.finalTick);
+  scored.push({ candidate, summary, score: win * 1_000_000 + hpMargin * 100 + pressure * 10 + speed, distance: genomeDistance(candidate, champion) });
+  writeStatus({ status: 'running', completed: index + 1, total: candidates.length, humanSamples: profile?.samples ?? 0, candidates: scored.map((entry) => ({ strategyId: entry.candidate.strategyId, winnerId: entry.summary.winnerId, finalTick: entry.summary.finalTick, score: entry.score, distance: entry.distance })) });
 }
-const best = [...scored].sort((left, right) => right.score - left.score || left.candidate.strategyId.localeCompare(right.candidate.strategyId))[0];
+const best = [...scored].sort((left, right) => right.score - left.score || right.distance - left.distance || left.candidate.strategyId.localeCompare(right.candidate.strategyId))[0];
 if (!best) throw new Error('Fast training produced no candidate');
 // Never replace a champion with a candidate that did not formally defeat the human profile.
 const selected = best.summary.winnerId === 'p1' ? best.candidate : champion;
@@ -72,6 +85,7 @@ writeFileSync(championPath, JSON.stringify({
   humanSamples: profile?.samples ?? 0,
   genome: selected,
   selectedScore: best.score,
+  selectionReason: `formal win, score ${best.score}, genome distance ${best.distance}`,
 }, null, 2));
-writeStatus({ status: 'completed', completed: candidates.length, total: candidates.length, championStrategyId: selected.strategyId, humanSamples: profile?.samples ?? 0 });
+writeStatus({ status: 'completed', completed: candidates.length, total: candidates.length, championStrategyId: selected.strategyId, humanSamples: profile?.samples ?? 0, candidates: scored.map((entry) => ({ strategyId: entry.candidate.strategyId, winnerId: entry.summary.winnerId, finalTick: entry.summary.finalTick, score: entry.score, distance: entry.distance })) });
 console.log(JSON.stringify({ status: 'completed', championStrategyId: selected.strategyId }));
