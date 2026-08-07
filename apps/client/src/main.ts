@@ -28,6 +28,12 @@ fileInput?.addEventListener('change', async () => {
 });
 document.querySelector<HTMLButtonElement>('#replay-pause')?.addEventListener('click', () => game.events.emit('replay-toggle'));
 document.querySelector<HTMLSelectElement>('#replay-speed')?.addEventListener('change', (event) => game.events.emit('replay-speed', Number((event.target as HTMLSelectElement).value)));
+document.querySelector<HTMLButtonElement>('#human-guided')?.addEventListener('click', () => {
+  game.registry.remove('trainingReplay');
+  game.registry.set('humanGuidedTraining', true);
+  game.scene.stop('BattleScene');
+  game.scene.start('BattleScene');
+});
 
 const monitor = document.querySelector<HTMLElement>('#training-status');
 let liveEnabled = false;

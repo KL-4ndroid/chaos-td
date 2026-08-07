@@ -23,6 +23,10 @@ const configs = {
   full: { populationSize: 128, generations: 50, evaluationSeeds: Array.from({ length: 5 }, (_, i) => `full-${String(i + 1).padStart(3, '0')}`), opponentsPerGenome: 3, matchesPerOpponent: 3, absoluteMaxTicks: 30000, endCondition: 'elimination_only', eliteCount: 8, hallOfFameOpponentCount: 8, mutationRatePermille: 60, crossoverRatePermille: 600, mutationSigmaInitial: 50, mutationSigmaDecay: 0.98, tournamentSelectionSize: 7, elitePreservationStrategy: 'mu_plus_lambda' },
 };
 const base = configs[mode] ?? configs.smoke;
+const humanGuidanceProfileFile = resolve(process.cwd(), 'data', 'ai', 'training', 'human-guidance', 'latest-profile.json');
+const humanGuidanceProfile = existsSync(humanGuidanceProfileFile)
+  ? JSON.parse(readFileSync(humanGuidanceProfileFile, 'utf8'))
+  : undefined;
 const generationsOverride = Number.parseInt(process.env.AI_TRAINING_GENERATIONS ?? '', 10);
 const runId = process.env.AI_TRAINING_RUN_ID ?? `p1-6-011-${mode}`;
 const config = {
@@ -31,6 +35,7 @@ const config = {
   trainingSeed: process.env.AI_TRAINING_SEED ?? `ai-training-${mode}`,
   contentVersion: CONFIG_VERSION,
   canonicalTag: 'evolution-v1',
+  ...(humanGuidanceProfile ? { humanGuidanceProfile } : {}),
 };
 const root = resolve(process.cwd(), 'reports', 'ai', 'runs', runId);
 const checkpointRoot = resolve(process.cwd(), 'data', 'ai', 'training', 'checkpoints', runId);
@@ -112,6 +117,7 @@ const checkpointReport = {
   })),
 };
 console.log('[Evolution Optimized] 新參數已套用');
+if (humanGuidanceProfile) console.log(`[Human Guided Evolution] loaded ${humanGuidanceProfile.samples} human match sample(s)`);
 console.log('[Balance Patch] 怪物強度已重構，35關倍率約2.64，100關約10.19');
 writeFileSync(resolve(root, 'training-config.json'), JSON.stringify(config, null, 2));
 writeFileSync(resolve(root, 'generation-summary.jsonl'), report.generations.map((g) => JSON.stringify({ generation: g.generation, matches: g.matchRecords.length, evaluations: g.evaluated })).join('\n') + '\n');

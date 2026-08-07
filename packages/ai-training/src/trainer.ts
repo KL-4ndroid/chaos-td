@@ -27,7 +27,7 @@ import {
 // SelfPlayMatchSummary is referenced via MatchRecord -> EvaluatedGenome from
 // './evaluator.js'; no direct import needed here.
 import { runSelfPlayWithTelemetry, type LeagueTelemetryRecord, type SelfPlayTelemetryObserver } from './telemetry.js';
-import { createHumanBenchmarkGenome } from './human-benchmark.js';
+import { createHumanBenchmarkGenome, type HumanGuidanceProfile } from './human-benchmark.js';
 
 /** Optional I/O boundary for live dashboards. It never participates in scoring. */
 export interface TrainingProgressObserver {
@@ -59,6 +59,8 @@ export interface TrainerConfig {
   readonly maxTicksPerMatch?: number;
   readonly contentVersion: string;
   readonly canonicalTag: string;
+  /** Latest macro profile extracted from guided human matches. */
+  readonly humanGuidanceProfile?: HumanGuidanceProfile;
 }
 
 export interface GenerationRecord {
@@ -482,7 +484,7 @@ export function continueEvolution(
   const fallback = initial[0];
   if (!fallback) throw new Error('createInitialPopulation returned no genomes');
   const defaultGenome: AIStrategyGenome = fallback;
-  const humanBenchmark = createHumanBenchmarkGenome('human-v1', CONFIG_VERSION);
+  const humanBenchmark = createHumanBenchmarkGenome('human-v1', CONFIG_VERSION, config.humanGuidanceProfile?.genomeOverrides);
  
   let population = state.currentPopulation;
   let hallOfFame = state.hallOfFame;

@@ -4,12 +4,14 @@ import {
   TICK_DURATION_MS,
   addCheckpoint,
   addEvent,
+  addReplayCommand,
   calculateMonsterPosition,
   createPathSegments,
   createReplayData,
   createSimulation,
   finalizeReplay,
   type DomainEvent,
+  type GameCommand,
   type LaneRuntimeState,
   type MonsterRuntimeState,
   type Replay,
@@ -92,6 +94,8 @@ export class BattleScene extends Phaser.Scene {
   private readonly loop = new FixedStepLoop(TICK_DURATION_MS);
   private simulation = createDemoSimulation();
   private trainingReplay?: Replay;
+  private humanGuidedTraining = false;
+  private humanGuidanceSubmitted = false;
   private liveTrainingState?: SimulationState;
   private replaySpeed = 1;
   private readonly monsterVisuals = new Map<number, MonsterVisual>();
@@ -116,6 +120,11 @@ export class BattleScene extends Phaser.Scene {
 
   create(): void {
     const trainingReplay = this.registry.get('trainingReplay') as Replay | undefined;
+    this.humanGuidedTraining = this.registry.get('humanGuidedTraining') === true;
+    this.humanGuidanceSubmitted = false;
+    this.simulation = createDemoSimulation();
+    this.replay = createReplayData('portrait-maze-demo', CONFIG_VERSION, this.simulation.state.stateHash);
+    delete this.trainingReplay;
     if (trainingReplay) {
       this.trainingReplay = trainingReplay;
       this.simulation = createDemoSimulation(trainingReplay.seed, trainingReplay.configVersion as typeof CONFIG_VERSION);
@@ -123,6 +132,7 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#101418');
     this.drawArena();
     this.createOverlay();
+    if (this.humanGuidedTraining) this.feedbackText?.setText('HUMAN-GUIDED EVOLUTION: your replay will train the next batch').setColor('#f0cf83');
     this.createSendControls();
     this.createInputBindings();
     this.syncTowerVisuals(this.simulation.state);
@@ -191,6 +201,7 @@ export class BattleScene extends Phaser.Scene {
     this.replay = addCheckpoint(this.replay, result.state.tick, result.state.stateHash);
     if (result.state.phase === 'result') {
       this.replay = finalizeReplay(this.replay, result.state.stateHash, result.state.tick);
+      if (this.humanGuidedTraining && !this.humanGuidanceSubmitted) void this.submitHumanGuidance(result.state);
     }
     this.captureMonsterPositions(result.state);
     this.renderEvents(result.events);
@@ -622,7 +633,7 @@ export class BattleScene extends Phaser.Scene {
   private submitBuild(towerTypeId: TowerId): void {
     if (!this.selectedCell) return;
     const { cellX, cellY } = this.selectedCell;
-    this.simulation.submitCommand({
+    this.submitHumanCommand({
       type: 'build_tower',
       commandId: this.simulation.getNextCommandId('p1'),
       playerId: 'p1',
@@ -633,7 +644,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private submitMonster(monsterTypeId: string): void {
-    this.simulation.submitCommand({
+    this.submitHumanCommand({
       type: 'queue_monster',
       commandId: this.simulation.getNextCommandId('p1'),
       playerId: 'p1',
@@ -647,7 +658,7 @@ export class BattleScene extends Phaser.Scene {
       this.feedbackText?.setText('Select a tower first').setColor('#f1a38f');
       return;
     }
-    this.simulation.submitCommand({
+    this.submitHumanCommand({
       type: 'upgrade_tower',
       commandId: this.simulation.getNextCommandId('p1'),
       playerId: 'p1',
@@ -660,7 +671,7 @@ export class BattleScene extends Phaser.Scene {
       this.feedbackText?.setText('Select a tower first').setColor('#f1a38f');
       return;
     }
-    this.simulation.submitCommand({
+    this.submitHumanCommand({
       type: 'sell_tower',
       commandId: this.simulation.getNextCommandId('p1'),
       playerId: 'p1',
@@ -673,7 +684,7 @@ export class BattleScene extends Phaser.Scene {
     const state = this.liveTrainingState ?? this.simulation.state;
     this.hpText?.setText(`YOU ${Math.max(0, state.players.p1.hp)} HP   RIVAL ${Math.max(0, state.players.p2.hp)} HP`);
     this.economyText?.setText(`${state.players.p1.gold}G   +${state.players.p1.income}`);
-    this.phaseText?.setText(`${state.phase.toUpperCase()}  ${Math.floor(state.tick / 20)}s`);
+    this.phaseText?.setText(`${this.humanGuidedTraining ? 'GUIDED ' : ''}${state.phase.toUpperCase()}  ${Math.floor(state.tick / 20)}s`);
     const ticksUntilWave = getTicksUntilNextWave(state.phase, state.tick, state.runningStartedAtTick);
     const secondsUntilWave = Math.ceil(ticksUntilWave / 20);
     this.waveText?.setText(state.phase === 'running' ? `NEXT WAVE  ${secondsUntilWave}s` : 'NEXT WAVE  --');
@@ -693,4 +704,49 @@ export class BattleScene extends Phaser.Scene {
   private setReplaySpeed(speed: number): void { this.replaySpeed = [1, 2, 4].includes(speed) ? speed : 1; }
   private setLiveTrainingState(state: SimulationState): void { this.liveTrainingState = state; }
   private stopLiveTrainingState(): void { delete this.liveTrainingState; }
+
+  private submitHumanCommand(command: GameCommand): void {
+    this.replay = addReplayCommand(this.replay, this.simulation.state.tick, command);
+    this.simulation.submitCommand(command);
+  }
+
+  private async submitHumanGuidance(state: SimulationState): Promise<void> {
+    this.humanGuidanceSubmitted = true;
+    const humanCommands = this.replay.commands.filter((entry) => entry.command.playerId === 'p1');
+    const built = this.replay.events.filter((event): event is Extract<DomainEvent, { type: 'tower_built' }> => event.type === 'tower_built' && event.playerId === 'p1');
+    const queued = this.replay.events.filter((event): event is Extract<DomainEvent, { type: 'monster_queued' }> => event.type === 'monster_queued' && event.playerId === 'p1');
+    const towerTypes = new Set(built.map((event) => event.towerType));
+    const queuedCount = queued.reduce((total, event) => total + event.quantity, 0);
+    const assets = state.players.p1.gold + state.players.p1.totalInvested;
+    const clamp = (value: number, max = 1000) => Math.max(0, Math.min(max, Math.round(value)));
+    const profile = {
+      schemaVersion: 1 as const,
+      source: 'human_guided_match' as const,
+      recordedAt: new Date().toISOString(),
+      samples: 1,
+      genomeOverrides: {
+        defenseBaselineThreshold: clamp(250 + built.length * 45),
+        goldRetentionRatio: clamp(assets === 0 ? 450 : (state.players.p1.gold / assets) * 900, 900),
+        incomeInvestmentRatio: clamp(300 + state.players.p1.income * 4),
+        sendInvestmentRatio: clamp(200 + queuedCount * 18),
+        diversityPreference: clamp(100 + towerTypes.size * 180),
+      },
+      matchSummary: {
+        finalTick: state.tick,
+        finalWave: state.waveScheduler.currentWaveNumber,
+        humanWon: state.result?.winnerPlayerId === 'p1',
+        humanCommands: humanCommands.length,
+      },
+    };
+    try {
+      const response = await fetch('/api/training/human-guidance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replay: this.replay, profile }),
+      });
+      this.feedbackText?.setText(response.ok ? 'Human style saved for the next training batch' : 'Could not save human style').setColor(response.ok ? '#9ed8b5' : '#f1a38f');
+    } catch {
+      this.feedbackText?.setText('Could not reach the local training service').setColor('#f1a38f');
+    }
+  }
 }
