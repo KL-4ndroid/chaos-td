@@ -220,10 +220,10 @@ function playSelfPlayWithTelemetry(
   match: EvolutionMatch,
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
-  maxTicks: number,
+  absoluteMaxTicks: number | undefined,
 ): { summary: SelfPlayMatchSummary; telemetry: LeagueTelemetryRecord; replay: Replay } {
   const seed = match.seed;
-  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, absoluteMaxTicks: maxTicks }, createSelfPlayLanes());
+  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, ...(absoluteMaxTicks === undefined ? {} : { absoluteMaxTicks }) }, createSelfPlayLanes());
   simulation.start();
   let replay = createReplayData(seed, CONFIG_VERSION, simulation.state.stateHash);
   const acc = freshAccumulator();
@@ -353,9 +353,9 @@ export function runSelfPlayWithTelemetry(
   match: EvolutionMatch,
   p1: AIStrategyGenome,
   p2: AIStrategyGenome,
-  maxTicks = 10000,
+  absoluteMaxTicks: number | undefined,
 ): { readonly summary: SelfPlayMatchSummary; readonly telemetry: LeagueTelemetryRecord; readonly replay: Replay } {
-  return playSelfPlayWithTelemetry(match, p1, p2, maxTicks);
+  return playSelfPlayWithTelemetry(match, p1, p2, absoluteMaxTicks);
 }
 
 /**
@@ -369,11 +369,11 @@ export function collectLeagueTelemetry(
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
   mirroredOpponent: AIStrategyGenome,
-  maxTicks: number,
+  absoluteMaxTicks: number | undefined,
   _baseline: SelfPlayMatchSummary,
 ): LeagueTelemetryRecord {
   void mirroredOpponent;
-  return playSelfPlayWithTelemetry(match, p1Strategy, p2Strategy, maxTicks).telemetry;
+  return playSelfPlayWithTelemetry(match, p1Strategy, p2Strategy, absoluteMaxTicks).telemetry;
 }
 
 function ingestEvents(state: SimulationState, events: readonly DomainEvent[], acc: MutableTelemetryAccumulator): void {

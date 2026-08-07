@@ -190,9 +190,9 @@ export function runSelfPlayMatch(
   seed: string,
   p1Strategy: AIStrategyGenome,
   p2Strategy: AIStrategyGenome,
-  maxTicks = 10000,
+  absoluteMaxTicks?: number,
 ): SelfPlayMatchSummary {
-  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, absoluteMaxTicks: maxTicks }, createSelfPlayLanes());
+  const simulation = createSimulation({ seed, configVersion: CONFIG_VERSION, endOnEliminationOnly: true, ...(absoluteMaxTicks === undefined ? {} : { absoluteMaxTicks }) }, createSelfPlayLanes());
   let acceptedCommands = 0;
   let rejectedCommands = 0;
   simulation.start();

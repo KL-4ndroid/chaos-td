@@ -1509,8 +1509,18 @@ function stepSimulation(state: SimulationState): { state: SimulationState; event
         let reason = 'timeout';
 
         const forcedAdjudication = currentState.config.absoluteMaxTicks !== undefined;
-        if (p1Hp <= 0 && p2Hp <= 0 && !forcedAdjudication) {
-          reason = 'simultaneous_elimination';
+        if (p1Hp <= 0 && p2Hp <= 0) {
+          const p1Damage = currentState.damageDealt?.p1 ?? 0;
+          const p2Damage = currentState.damageDealt?.p2 ?? 0;
+          const p1Assets = calculateNetWorth(currentState, 'p1');
+          const p2Assets = calculateNetWorth(currentState, 'p2');
+          winnerId = p1Damage !== p2Damage ? (p1Damage > p2Damage ? 'p1' : 'p2')
+            : p1Assets !== p2Assets ? (p1Assets > p2Assets ? 'p1' : 'p2')
+              : 'p1';
+          outcome = 'win';
+          reason = p1Damage !== p2Damage ? 'simultaneous_elimination_total_damage'
+            : p1Assets !== p2Assets ? 'simultaneous_elimination_total_assets'
+              : 'simultaneous_elimination_deterministic_first_player';
         } else if (p1Hp <= 0) {
           winnerId = 'p2';
           outcome = 'win';

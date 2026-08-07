@@ -170,7 +170,7 @@ function playMatches(
   population: readonly AIStrategyGenome[],
   evaluationSeeds: readonly string[],
   trainingSeed: string,
-  maxTicksPerMatch: number,
+  maxTicksPerMatch: number | undefined,
   opponentsPerGenome: number,
   matchesPerOpponent: number,
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
@@ -190,7 +190,7 @@ function playBenchmarkMatches(
   generation: number,
   population: readonly AIStrategyGenome[],
   trainingSeed: string,
-  maxTicksPerMatch: number,
+  maxTicksPerMatch: number | undefined,
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   const benchmark = createDefaultAIStrategyGenome('benchmark-v1', CONFIG_VERSION);
   // Dynamic league uses 144 population games (32 × 3 opponents × 3 games / 2).
@@ -208,7 +208,7 @@ function executeSchedule(
   generation: number,
   population: readonly AIStrategyGenome[],
   schedule: readonly EvolutionMatch[],
-  maxTicksPerMatch: number,
+  maxTicksPerMatch: number | undefined,
 ): { records: MatchRecord[]; telemetry: LeagueTelemetryRecord[] } {
   const records: MatchRecord[] = [];
   const telemetry: LeagueTelemetryRecord[] = [];
@@ -456,7 +456,7 @@ export function continueEvolution(
  
   for (let generation = state.nextGeneration; generation < config.generations; generation += 1) {
     const scheduleTrainingSeed = `${config.trainingSeed}:gen-${generation}`;
-    const absoluteMaxTicks = config.absoluteMaxTicks ?? config.maxTicksPerMatch ?? 1500;
+    const absoluteMaxTicks = config.absoluteMaxTicks ?? config.maxTicksPerMatch;
     const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, absoluteMaxTicks, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1);
     const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, absoluteMaxTicks);
     played.records.push(...benchmarkPlayed.records);
