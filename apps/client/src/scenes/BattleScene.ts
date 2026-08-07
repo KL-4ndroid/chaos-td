@@ -160,7 +160,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private stepSimulation(): void {
-    const state = this.liveTrainingState ?? this.simulation.state;
+    const state = this.simulation.state;
     if (this.trainingReplay) {
       for (const item of this.trainingReplay.commands.filter((entry) => entry.tick === state.tick)) this.simulation.submitCommand(item.command);
     }
@@ -670,7 +670,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private updateOverlay(): void {
-    const state = this.simulation.state;
+    const state = this.liveTrainingState ?? this.simulation.state;
     this.hpText?.setText(`YOU ${Math.max(0, state.players.p1.hp)} HP   RIVAL ${Math.max(0, state.players.p2.hp)} HP`);
     this.economyText?.setText(`${state.players.p1.gold}G   +${state.players.p1.income}`);
     this.phaseText?.setText(`${state.phase.toUpperCase()}  ${Math.floor(state.tick / 20)}s`);
