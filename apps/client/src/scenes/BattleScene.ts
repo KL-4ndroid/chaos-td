@@ -21,6 +21,7 @@ import {
 } from '@chaos-td/game-core';
 import {
   buildAIObservation,
+  assertValidAIStrategyGenome,
   createDefaultAIStrategyGenome,
   extractAIFeaturesFromObservation,
   generateLegalActions,
@@ -137,6 +138,14 @@ export class BattleScene extends Phaser.Scene {
     this.humanGuidedTraining = this.registry.get('humanGuidedTraining') === true;
     this.humanGuidanceSubmitted = false;
     this.guidedOpponentGenome = createDefaultAIStrategyGenome('guided-ai-v1', CONFIG_VERSION);
+    if (this.humanGuidedTraining) {
+      const savedChampion = this.registry.get('guidedOpponentGenome');
+      try {
+        if (savedChampion) this.guidedOpponentGenome = assertValidAIStrategyGenome(savedChampion, CONFIG_VERSION);
+      } catch {
+        // A missing or incompatible stored champion safely falls back to default AI.
+      }
+    }
     this.simulation = createDemoSimulation();
     this.replay = createReplayData('portrait-maze-demo', CONFIG_VERSION, this.simulation.state.stateHash);
     delete this.trainingReplay;

@@ -128,6 +128,16 @@ for (const generation of report.generations) {
 }
 writeFileSync(resolve(root, 'final-rankings.csv'), 'strategyId,generation,fitnessScore,pressureScore,benchmarkScore,benchmarkWins,benchmarkLosses,benchmarkDraws,benchmarkNetLeakDamage,humanWins,humanLosses,humanDraws,humanNetLeakDamage,championWins,championLosses,elo,winRate,slotAdjustedScore,invalidCommandRate\n' + report.generations.at(-1).evaluated.slice().sort((a, b) => b.evaluation.totalScore - a.evaluation.totalScore || b.evaluation.benchmarkScore - a.evaluation.benchmarkScore || a.strategyId.localeCompare(b.strategyId)).map((e) => `${e.strategyId},${e.generation},${e.evaluation.totalScore},${e.evaluation.pressureScore},${e.evaluation.benchmarkScore},${e.benchmark.wins},${e.benchmark.losses},${e.benchmark.draws},${e.benchmark.netLeakDamage},${e.human.wins},${e.human.losses},${e.human.draws},${e.human.netLeakDamage},${e.champion.wins},${e.champion.losses},${e.evaluation.elo},${e.evaluation.winRate},${e.evaluation.slotAdjustedScore},${e.evaluation.invalidCommandRate}`).join('\n') + '\n');
 writeFileSync(resolve(root, 'hall-of-fame.json'), renderHallOfFameJson(summarizeHallOfFame(report)));
+const championEntry = [...report.hallOfFame].sort((left, right) => right.eloAtAdmission - left.eloAtAdmission || right.generation - left.generation)[0];
+const championGenome = championEntry?.strategy ?? report.currentPopulation[0];
+if (championGenome) {
+  writeFileSync(resolve(process.cwd(), 'data', 'ai', 'training', 'latest-champion.json'), JSON.stringify({
+    schemaVersion: 1,
+    source: 'evolution_training',
+    trainedAt: new Date().toISOString(),
+    genome: championGenome,
+  }, null, 2));
+}
 writeFileSync(resolve(root, 'diversity-report.csv'), 'generation,behaviorDiversity\n' + report.generations.map((g) => `${g.generation},${g.evaluated[0]?.evaluation.diversityScore ?? 0}`).join('\n') + '\n');
 writeFileSync(resolve(root, 'validation-summary.json'), JSON.stringify({ valid: issues.length === 0, issues }, null, 2));
 writeFileSync(resolve(root, 'training-summary.json'), JSON.stringify({ ...summary, telemetry }, null, 2));

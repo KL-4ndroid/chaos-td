@@ -51,6 +51,20 @@
     }
     #training-monitor strong { color: #f0cf83; }
     #training-monitor .training-row { display: flex; justify-content: space-between; gap: 12px; }
+    #human-guidance-progress {
+      position: fixed;
+      top: 220px;
+      left: 12px;
+      z-index: 10;
+      width: 285px;
+      padding: 10px;
+      color: #eef3f0;
+      background: rgba(11, 15, 18, 0.92);
+      border: 1px solid #52635d;
+      font: 12px/1.45 Arial, sans-serif;
+    }
+    #human-guidance-progress strong { color: #f0cf83; }
+    #human-guidance-bar { width: 100%; }
   </style>
 </head>
 <body>
@@ -65,6 +79,11 @@
   <aside id="training-monitor" aria-live="polite">
     <strong>TRAINING MONITOR</strong>
     <div id="training-status">Waiting for a training run…</div>
+  </aside>
+  <aside id="human-guidance-progress" hidden aria-live="polite">
+    <strong>HUMAN-GUIDED TRAINING</strong>
+    <progress id="human-guidance-bar" max="8" value="0"></progress>
+    <div id="human-guidance-status">Training is preparing…</div>
   </aside>
   <script type="module" src="./src/main.ts"></script>
 </body>

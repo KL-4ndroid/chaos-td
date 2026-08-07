@@ -28,12 +28,16 @@ fileInput?.addEventListener('change', async () => {
 });
 document.querySelector<HTMLButtonElement>('#replay-pause')?.addEventListener('click', () => game.events.emit('replay-toggle'));
 document.querySelector<HTMLSelectElement>('#replay-speed')?.addEventListener('change', (event) => game.events.emit('replay-speed', Number((event.target as HTMLSelectElement).value)));
-document.querySelector<HTMLButtonElement>('#human-guided')?.addEventListener('click', () => {
+async function startHumanGuidedMatch(): Promise<void> {
+  const response = await fetch('/api/training/champion', { cache: 'no-store' });
+  const champion = response.ok ? await response.json() as { genome?: unknown } : {};
   game.registry.remove('trainingReplay');
   game.registry.set('humanGuidedTraining', true);
+  game.registry.set('guidedOpponentGenome', champion.genome ?? null);
   game.scene.stop('BattleScene');
   game.scene.start('BattleScene');
-});
+}
+document.querySelector<HTMLButtonElement>('#human-guided')?.addEventListener('click', () => { void startHumanGuidedMatch(); });
 
 const monitor = document.querySelector<HTMLElement>('#training-status');
 let liveEnabled = false;
@@ -73,5 +77,27 @@ document.querySelector<HTMLButtonElement>('#training-live')?.addEventListener('c
 });
 void pollTrainingLive();
 window.setInterval(() => void pollTrainingLive(), 1000);
+
+const guidancePanel = document.querySelector<HTMLElement>('#human-guidance-progress');
+const guidanceBar = document.querySelector<HTMLProgressElement>('#human-guidance-bar');
+const guidanceText = document.querySelector<HTMLElement>('#human-guidance-status');
+async function pollHumanGuidanceTraining(): Promise<void> {
+  try {
+    const response = await fetch('/api/training/human-guidance/status', { cache: 'no-store' });
+    if (!response.ok) return;
+    const status = await response.json() as { status: string; message: string; detail?: { completed?: number; total?: number } | null };
+    const active = status.status === 'running' || status.status === 'completed' || status.status === 'failed';
+    if (guidancePanel) guidancePanel.hidden = !active;
+    if (guidanceText) guidanceText.textContent = status.message;
+    if (guidanceBar) {
+      guidanceBar.max = status.detail?.total ?? 8;
+      guidanceBar.value = status.detail?.completed ?? 0;
+    }
+  } catch {
+    // Guided play remains available when the local Vite service is unavailable.
+  }
+}
+void pollHumanGuidanceTraining();
+window.setInterval(() => void pollHumanGuidanceTraining(), 1000);
 
 export { game };
