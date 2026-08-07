@@ -32,8 +32,16 @@ while (-not (Test-Path -LiteralPath $stopPath)) {
   try {
     $env:AI_TRAINING_RUN_ID = $RunId
     $env:AI_TRAINING_GENERATIONS = "$target"
+    # Windows PowerShell 5.1 promotes Node's loader warning on stderr to a
+    # native error record when ErrorActionPreference is Stop. Keep normal
+    # PowerShell failures strict, but let Node's actual exit code decide this
+    # child process outcome.
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     & node --loader ./scripts/ai-training-loader.mjs scripts/run-ai-evolution.mjs $operation $Mode *>> $logPath
-    if ($LASTEXITCODE -ne 0) { throw "Evolution batch exited with code $LASTEXITCODE" }
+    $nodeExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    if ($nodeExitCode -ne 0) { throw "Evolution batch exited with code $nodeExitCode" }
   }
   finally {
     Remove-Item Env:AI_TRAINING_RUN_ID -ErrorAction SilentlyContinue
