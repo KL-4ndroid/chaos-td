@@ -3,7 +3,9 @@ param(
   [ValidateSet('smoke', 'local', 'full')]
   [string]$Mode = 'local',
   [ValidateRange(1, 50)]
-  [int]$GenerationsPerBatch = 5
+  [int]$GenerationsPerBatch = 5,
+  [ValidateRange(0, 168)]
+  [int]$DurationHours = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,9 +17,11 @@ $checkpointRoot = Join-Path $workspace "data\ai\training\checkpoints\$RunId"
 $snapshotPath = Join-Path $checkpointRoot 'checkpoint.json'
 $stopPath = Join-Path $workspace "data\ai\training\stop\$RunId.stop"
 $logPath = Join-Path $workspace "reports\ai\$RunId.continuous.log"
+$deadline = if ($DurationHours -gt 0) { (Get-Date).AddHours($DurationHours) } else { $null }
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stopPath), (Split-Path -Parent $logPath) | Out-Null
 
 while (-not (Test-Path -LiteralPath $stopPath)) {
+  if ($deadline -and (Get-Date) -ge $deadline) { break }
   $completed = 0
   $operation = 'train'
   if (Test-Path -LiteralPath $snapshotPath) {
@@ -27,7 +31,7 @@ while (-not (Test-Path -LiteralPath $stopPath)) {
   }
   $target = $completed + $GenerationsPerBatch
   $stamp = Get-Date -Format 'o'
-  Add-Content -LiteralPath $logPath -Value "[$stamp] START operation=$operation completed=$completed target=$target"
+  Add-Content -LiteralPath $logPath -Value "[$stamp] START operation=$operation completed=$completed target=$target deadline=$deadline"
   Push-Location $workspace
   try {
     $env:AI_TRAINING_RUN_ID = $RunId
@@ -51,4 +55,4 @@ while (-not (Test-Path -LiteralPath $stopPath)) {
   Add-Content -LiteralPath $logPath -Value "[$(Get-Date -Format 'o')] COMPLETE target=$target"
 }
 
-Add-Content -LiteralPath $logPath -Value "[$(Get-Date -Format 'o')] STOP requested"
+Add-Content -LiteralPath $logPath -Value "[$(Get-Date -Format 'o')] STOP requested_or_deadline_reached"

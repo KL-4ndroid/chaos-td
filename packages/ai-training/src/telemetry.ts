@@ -35,6 +35,7 @@ export interface LeagueTelemetryRecord {
   readonly finalTick: number;
   readonly winnerId: PlayerSlot | null;
   readonly outcome: 'win' | 'draw';
+  readonly terminationReason?: string;
   readonly completion: 'result' | 'tick_guard';
   readonly acceptedCommands: number;
   readonly rejectedCommands: number;
@@ -298,6 +299,7 @@ function playSelfPlayWithTelemetry(
     finalTick: simulation.state.tick,
     winnerId: result?.winnerPlayerId ?? null,
     outcome: result?.outcome ?? 'draw',
+    ...(result?.reason ? { terminationReason: result.reason } : {}),
     completion: 'result',
     acceptedCommands: acc.acceptedCommands,
     rejectedCommands: acc.rejectedCommands,
@@ -319,6 +321,7 @@ function playSelfPlayWithTelemetry(
     finalTick: summary.finalTick,
     winnerId: summary.winnerId,
     outcome: summary.outcome,
+    ...(summary.terminationReason ? { terminationReason: summary.terminationReason } : {}),
     completion: summary.completion,
     acceptedCommands: acc.acceptedCommands,
     rejectedCommands: acc.rejectedCommands,
@@ -441,6 +444,7 @@ export function serializeTelemetryRecord(record: LeagueTelemetryRecord): string 
     finalTick: record.finalTick,
     winnerId: record.winnerId,
     outcome: record.outcome,
+    ...(record.terminationReason ? { terminationReason: record.terminationReason } : {}),
     completion: record.completion,
     acceptedCommands: record.acceptedCommands,
     rejectedCommands: record.rejectedCommands,
@@ -457,6 +461,8 @@ export function serializeTelemetryRecord(record: LeagueTelemetryRecord): string 
     p1MirroredFinalTick: record.p1MirroredFinalTick,
     p1FinalHp: record.p1FinalHp,
     p2FinalHp: record.p2FinalHp,
+    ...(record.finalGoldByPlayer ? { finalGoldByPlayer: record.finalGoldByPlayer } : {}),
+    ...(record.finalTowerInvestmentByPlayer ? { finalTowerInvestmentByPlayer: record.finalTowerInvestmentByPlayer } : {}),
     finalStateHash: record.finalStateHash,
     domainEventTypes: Object.fromEntries(
       Object.entries(record.domainEventTypes).sort(([a], [b]) => a.localeCompare(b)),

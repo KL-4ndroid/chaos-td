@@ -38,6 +38,8 @@ export interface SelfPlayMatchSummary {
   readonly finalTick: number;
   readonly winnerId: PlayerSlot | null;
   readonly outcome: 'win' | 'draw';
+  /** Authoritative game-end reason, e.g. elimination or time_limit_judgment. */
+  readonly terminationReason?: string;
   readonly completion: 'result' | 'tick_guard';
   readonly acceptedCommands: number;
   readonly rejectedCommands: number;
@@ -243,6 +245,7 @@ export function runSelfPlayMatch(
     finalTick: simulation.state.tick,
     winnerId: result?.winnerPlayerId ?? null,
     outcome: result?.outcome ?? 'draw',
+    ...(result?.reason ? { terminationReason: result.reason } : {}),
     completion: result ? 'result' : 'tick_guard',
     acceptedCommands,
     rejectedCommands,
