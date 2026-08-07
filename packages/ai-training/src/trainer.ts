@@ -27,6 +27,7 @@ import {
 // SelfPlayMatchSummary is referenced via MatchRecord -> EvaluatedGenome from
 // './evaluator.js'; no direct import needed here.
 import { runSelfPlayWithTelemetry, type LeagueTelemetryRecord, type SelfPlayTelemetryObserver } from './telemetry.js';
+import { createHumanBenchmarkGenome } from './human-benchmark.js';
 
 /** Optional I/O boundary for live dashboards. It never participates in scoring. */
 export interface TrainingProgressObserver {
@@ -201,6 +202,7 @@ function playMatches(
 function playBenchmarkMatches(
   generation: number,
   population: readonly AIStrategyGenome[],
+  humanBenchmark: AIStrategyGenome,
   trainingSeed: string,
   maxTicksPerMatch: number | undefined,
   observer: TrainingProgressObserver | undefined,
@@ -210,12 +212,16 @@ function playBenchmarkMatches(
   // Dynamic league uses 144 population games (32 × 3 opponents × 3 games / 2).
   // Sample 16 rotating benchmark games, preserving the 160-match generation budget.
   const schedule: EvolutionMatch[] = population.filter((_, index) => (index + generation) % 2 === 0).map((genome, index) => {
-    const seed = `${trainingSeed}:benchmark:${String(index).padStart(4, '0')}`;
-    const pairId = `g${generation}:benchmark-${String(index).padStart(4, '0')}`;
+    // Keep the 16-match benchmark budget unchanged: half face the stable AI
+    // baseline and half face the human macro profile.
+    const opponent = index % 2 === 0 ? benchmark : humanBenchmark;
+    const label = opponent.strategyId === humanBenchmark.strategyId ? 'human' : 'benchmark';
+    const seed = `${trainingSeed}:${label}:${String(index).padStart(4, '0')}`;
+    const pairId = `g${generation}:${label}-${String(index).padStart(4, '0')}`;
     const mirrored = generation % 2 === 1;
-    return { generation, pairId, seed, participantAId: genome.strategyId, participantBId: benchmark.strategyId, p1StrategyId: mirrored ? benchmark.strategyId : genome.strategyId, p2StrategyId: mirrored ? genome.strategyId : benchmark.strategyId, mirrored };
+    return { generation, pairId, seed, participantAId: genome.strategyId, participantBId: opponent.strategyId, p1StrategyId: mirrored ? opponent.strategyId : genome.strategyId, p2StrategyId: mirrored ? genome.strategyId : opponent.strategyId, mirrored };
   });
-  return executeSchedule(generation, [...population, benchmark], schedule, maxTicksPerMatch, observer, completedMatches, 'benchmark');
+  return executeSchedule(generation, [...population, benchmark, humanBenchmark], schedule, maxTicksPerMatch, observer, completedMatches, 'benchmark');
 }
 
 function executeSchedule(
@@ -267,6 +273,7 @@ function evaluatePopulation(
   records: readonly MatchRecord[],
   trainingSeed: string,
   championStrategyIds: readonly string[] = [],
+  humanBenchmarkStrategyIds: readonly string[] = ['human-v1'],
 ): EvaluatedGenome[] {
   const behaviorDiversity = populationBehaviorDiversity(population);
   const initialElo = 1000;
@@ -283,6 +290,7 @@ function evaluatePopulation(
         elo,
         initialElo,
         benchmarkStrategyIds: ['benchmark-v1'],
+        humanBenchmarkStrategyIds,
         championStrategyIds,
       },
       `${trainingSeed}:eval`,
@@ -337,6 +345,7 @@ function admitToHallOfFame(
     behaviorFingerprint: behaviorFingerprint(candidateFromEvaluated(entry, primaryLookup, secondaryLookup, defaultGenome)),
     tickGuardRate: entry.matches === 0 ? 0 : entry.tickGuardCount / entry.matches,
     benchmark: entry.benchmark,
+    human: entry.human,
     champion: entry.champion,
   }));
   return [...admitHallOfFameCandidates(existing, candidates)];
@@ -473,6 +482,7 @@ export function continueEvolution(
   const fallback = initial[0];
   if (!fallback) throw new Error('createInitialPopulation returned no genomes');
   const defaultGenome: AIStrategyGenome = fallback;
+  const humanBenchmark = createHumanBenchmarkGenome('human-v1', CONFIG_VERSION);
  
   let population = state.currentPopulation;
   let hallOfFame = state.hallOfFame;
@@ -485,12 +495,12 @@ export function continueEvolution(
     const configuredCap = config.absoluteMaxTicks ?? config.maxTicksPerMatch;
     const absoluteMaxTicks = configuredCap !== undefined && configuredCap > 0 ? configuredCap : undefined;
     const played = playMatches(generation, population, config.evaluationSeeds, scheduleTrainingSeed, absoluteMaxTicks, config.opponentsPerGenome ?? 1, config.matchesPerOpponent ?? 1, observer, matchCount, 'population');
-    const benchmarkPlayed = playBenchmarkMatches(generation, population, scheduleTrainingSeed, absoluteMaxTicks, observer, matchCount + played.records.length);
+    const benchmarkPlayed = playBenchmarkMatches(generation, population, humanBenchmark, scheduleTrainingSeed, absoluteMaxTicks, observer, matchCount + played.records.length);
     played.records.push(...benchmarkPlayed.records);
     played.telemetry.push(...benchmarkPlayed.telemetry);
     matchCount += played.records.length;
     const championStrategyIds = hallOfFame.map((entry) => entry.strategy.strategyId);
-    const primaryEval = evaluatePopulation(population, generation, played.records, scheduleTrainingSeed, championStrategyIds);
+    const primaryEval = evaluatePopulation(population, generation, played.records, scheduleTrainingSeed, championStrategyIds, [humanBenchmark.strategyId]);
 
     // Hall of fame also plays matches against the population for context.
     const hofGenomes = hallOfFame.map((entry) => entry.strategy);
@@ -517,7 +527,7 @@ export function continueEvolution(
       opponentRecords = opponentPlayed.records;
       opponentTelemetry = opponentPlayed.telemetry;
       matchCount += opponentPlayed.records.length;
-      opponentEvaluation = evaluatePopulation(opponentCombined, generation, opponentPlayed.records, opponentScheduleTrainingSeed, championStrategyIds);
+      opponentEvaluation = evaluatePopulation(opponentCombined, generation, opponentPlayed.records, opponentScheduleTrainingSeed, championStrategyIds, [humanBenchmark.strategyId]);
     }
 
     // Admit primary and opponent evals into HOF (this is the only stage that

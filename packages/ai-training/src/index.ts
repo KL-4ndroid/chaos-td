@@ -73,6 +73,7 @@ export {
   type TrainingRunReport,
   type TrainingProgressObserver,
 } from './trainer.js';
+export { createHumanBenchmarkGenome } from './human-benchmark.js';
 export {
   validateTrainingRunReport,
   validateTrainingSnapshot,

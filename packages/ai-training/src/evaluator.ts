@@ -38,6 +38,8 @@ export interface GenomeAggregateInput {
   readonly initialElo: number;
   /** Fixed opponents with separately reported W/D/L and score. */
   readonly benchmarkStrategyIds?: readonly string[];
+  /** Human-style curriculum opponents, reported separately from AI baseline. */
+  readonly humanBenchmarkStrategyIds?: readonly string[];
   readonly championStrategyIds?: readonly string[];
 }
 
@@ -58,6 +60,7 @@ export interface EvaluatedGenome {
   readonly matches: number;
   readonly finalTicks: readonly number[];
   readonly benchmark: ReferenceEvaluation;
+  readonly human: ReferenceEvaluation;
   readonly champion: ReferenceEvaluation;
   readonly economicScore: number;
   readonly earlyVictoryBonus: number;
@@ -168,6 +171,7 @@ export function evaluateGenome(
   const all = tallyAll(input, genome.strategyId);
   const mirror = tallyMirrored(input, genome.strategyId);
   const benchmark = referenceEvaluation(input.records, genome.strategyId, input.benchmarkStrategyIds ?? ['benchmark-v1']);
+  const human = referenceEvaluation(input.records, genome.strategyId, input.humanBenchmarkStrategyIds ?? ['human-v1']);
   const champion = referenceEvaluation(input.records, genome.strategyId, input.championStrategyIds ?? []);
   const elo = input.elo;
   const evaluation = calculateEvaluation({
@@ -202,6 +206,7 @@ export function evaluateGenome(
     matches: all.finalTicks.length,
     finalTicks: all.finalTicks,
     benchmark,
+    human,
     champion,
     economicScore: all.economicScore,
     earlyVictoryBonus: all.earlyVictoryBonus,

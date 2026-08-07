@@ -19,13 +19,14 @@ export interface HallOfFameCandidate {
   readonly behaviorFingerprint: string;
   readonly tickGuardRate: number;
   readonly benchmark: { readonly wins: number; readonly losses: number; readonly score: number };
+  readonly human?: { readonly wins: number; readonly losses: number; readonly score: number };
   readonly champion: { readonly wins: number; readonly losses: number; readonly score: number };
 }
 
 export function admitHallOfFameCandidates(existing: readonly HallOfFameEntry[], candidates: readonly HallOfFameCandidate[]): readonly HallOfFameEntry[] {
   const fingerprints = new Set(existing.map((entry) => entry.behaviorFingerprint));
   const admitted = candidates
-    .filter((candidate) => candidate.evaluation.invalidCommandRate === 0 && candidate.evaluation.slotAdjustedScore >= 0 && candidate.evaluation.reliabilityScore >= 800 && (candidate.benchmark.wins > candidate.benchmark.losses || candidate.champion.wins > candidate.champion.losses) && !fingerprints.has(candidate.behaviorFingerprint))
+    .filter((candidate) => candidate.evaluation.invalidCommandRate === 0 && candidate.evaluation.slotAdjustedScore >= 0 && candidate.evaluation.reliabilityScore >= 800 && (candidate.benchmark.wins > candidate.benchmark.losses || (candidate.human?.wins ?? 0) > (candidate.human?.losses ?? 0) || candidate.champion.wins > candidate.champion.losses) && !fingerprints.has(candidate.behaviorFingerprint))
     .map((candidate) => ({ strategy: candidate.strategy, generation: candidate.generation, eloAtAdmission: candidate.evaluation.elo, evaluationSeedSetVersion: candidate.evaluationSeedSetVersion, contentVersion: candidate.strategy.compatibleContentVersion, behaviorFingerprint: candidate.behaviorFingerprint }));
   return [...existing, ...admitted].sort((left, right) => left.generation - right.generation || right.eloAtAdmission - left.eloAtAdmission || left.strategy.strategyId.localeCompare(right.strategy.strategyId));
 }
