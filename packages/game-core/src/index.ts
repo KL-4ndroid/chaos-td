@@ -88,6 +88,8 @@ export {
   type MonsterRuntimeState,
   type MatchWaveState,
   type BattlefieldWaveRuntimeState,
+  INITIAL_BUILD_GRACE_TICKS,
+  WAVE_INTERVAL_TICKS,
   createSimulation,
   createWithRng,
   calculateMonsterPosition,

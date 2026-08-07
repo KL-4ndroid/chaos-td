@@ -1237,7 +1237,9 @@ function processIncome(state: SimulationState): { state: SimulationState; events
   return { state: newState, events };
 }
 
-const WAVE_INTERVAL_TICKS = 200 as const;
+/** Ten seconds at the fixed simulation rate for players to establish a defence. */
+export const INITIAL_BUILD_GRACE_TICKS = 200 as const;
+export const WAVE_INTERVAL_TICKS = 200 as const;
 
 /**
  * Advance the wave scheduler and spawn wave monsters on each battlefield.
@@ -1266,7 +1268,12 @@ function processWaveScheduler(state: SimulationState): { state: SimulationState;
   newState.waveScheduler.ticksSinceRunningStart = runningTicks;
 
   const previousWaveNumber = state.waveScheduler.currentWaveNumber;
-  const scheduledWaveNumber = Math.floor((runningTicks - 1) / WAVE_INTERVAL_TICKS) + 1;
+  // The match enters RUNNING before wave one.  Keep that opening window free
+  // of system-wave monsters so both players can place their initial towers.
+  // Wave one therefore starts on running tick 201 (after a full 200 ticks).
+  const scheduledWaveNumber = runningTicks <= INITIAL_BUILD_GRACE_TICKS
+    ? 0
+    : Math.floor((runningTicks - INITIAL_BUILD_GRACE_TICKS - 1) / WAVE_INTERVAL_TICKS) + 1;
   const bothBattlefieldsCompleted =
     state.waveScheduler.battlefields.p1.spawningCompleted &&
     state.waveScheduler.battlefields.p2.spawningCompleted;
