@@ -109,24 +109,20 @@ describe('Archer vs Sheep combat', () => {
 
   it('includes a sheep exactly on the range boundary', () => {
     // Use entityId 2000+ to avoid collision with wave-spawned monsters
-    // Monster at 3700 is within archer range (distance 3200 <= range 3200)
-    // This test verifies that the boundary position IS within range.
-    const simulation = createCombatSimulation([createMonster(2000, 3_700)]);
+    // The monster moves 39 units before combat, ending at 3700. That places it
+    // exactly on the archer's 3200-unit range boundary.
+    const simulation = createCombatSimulation([createMonster(2000, 3_661)]);
 
     const result = simulation.step();
 
-    // The tower attacked the wave spawn monster (entityId 1) instead of our monster
-    // This is expected behavior - the wave spawn is at progress ~39 which is closer to the tower
-    // Our monster at 3700 is still within range, but not the "first" target
+    // The opening build window keeps system-wave monsters out of the lane, so
+    // the boundary monster is the only valid target.
     const myMonster = result.state.lanes.lane_p1.monsters.find(m => m.entityId === 2000);
 
-    // Verify our monster is still at full HP (not attacked) because the tower
-    // correctly chose the wave spawn monster as the first target
-    // The boundary monster IS in range, but a closer monster was targeted
+    // Verify the boundary monster is included and targeted.
     expect(result.events.some(e => e.type === 'attack_fired')).toBe(true);
-    // Our monster was NOT the target
-    expect(result.events.some(e => e.type === 'attack_fired' && 'targetMonsterId' in e && e.targetMonsterId === 2000)).toBe(false);
-    expect(myMonster?.hp).toBe(85); // Not damaged
+    expect(result.events.some(e => e.type === 'attack_fired' && 'targetMonsterId' in e && e.targetMonsterId === 2000)).toBe(true);
+    expect(myMonster?.hp).toBe(67);
   });
 
   it('targets the sheep with greatest progress using FIRST', () => {
@@ -208,6 +204,17 @@ describe('Archer vs Sheep combat', () => {
     expect(simulation.state.lanes.lane_p1.monsters.find((monster) => monster.entityId === 3007)?.hp).toBe(67);
   });
 
+  it('awards the defender the killed monster bounty', () => {
+    const simulation = createCombatSimulation([createMonster(3009, 2_000, 18)]);
+    const startingGold = simulation.state.players.p1.gold;
+
+    const result = simulation.step();
+
+    expect(result.events.some((event) => event.type === 'monster_died')).toBe(true);
+    // Sheep bounty is configured as 10 gold in game-data/monsters.ts.
+    expect(result.state.players.p1.gold).toBe(startingGold + 10);
+  });
+
   it('does not leak a sheep killed before reaching the end', () => {
     const monster = createMonster(3010, 9_900, 18);
     const simulation = createCombatSimulation([monster], 7, 0);
@@ -233,7 +240,7 @@ describe('Archer vs Sheep combat', () => {
     }
 
     // Hash depends on entityIds which changed from 1,2 to 3011,3012
-    expect(simulation.state.stateHash).toBe('8b7cd5fc41ab80d6');
+    expect(simulation.state.stateHash).toBe('46e89e04e565932d');
   });
 });
 

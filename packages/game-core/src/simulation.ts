@@ -538,6 +538,40 @@ function canTowerAttackMonster(
   return attackTargets.includes(monsterMovementType as AttackTarget);
 }
 
+/**
+ * Gold gained by the defending player when this monster is killed.
+ * Player-sent monsters use their configured bounty. System-wave monsters
+ * scale their bounty with the same difficulty multiplier as their HP/shield,
+ * so surviving later waves funds the stronger defence they require.
+ */
+function calculateKillBounty(monster: MonsterRuntimeState): number {
+  if (monster.source.type !== 'wave') {
+    return MONSTER_BY_ID.get(monster.monsterTypeId)?.bounty ?? 0;
+  }
+
+  const wave = WAVE_DEFINITIONS[monster.source.waveNumber - 1];
+  const group = wave?.groups.find(
+    (candidate) => getWaveMonsterDefinition(candidate.monsterType).id === monster.monsterTypeId,
+  );
+  if (!group) return 0;
+
+  const baseBounty = getWaveMonsterDefinition(group.monsterType).bounty;
+  return Math.max(1, Math.round(baseBounty * group.difficultyMultiplier));
+}
+
+function awardKillBounty(
+  state: SimulationState,
+  playerId: 'p1' | 'p2',
+  monster: MonsterRuntimeState,
+): void {
+  const bounty = calculateKillBounty(monster);
+  if (bounty === 0) return;
+  state.players[playerId] = {
+    ...state.players[playerId],
+    gold: state.players[playerId].gold + bounty,
+  };
+}
+
 function processCombat(state: SimulationState): { state: SimulationState; events: DomainEvent[] } {
   if (state.towers.length === 0) {
     return { state, events: [] };
@@ -546,6 +580,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
   const events: DomainEvent[] = [];
   const newState: SimulationState = {
     ...state,
+    players: { ...state.players },
     lanes: { ...state.lanes },
     towers: state.towers.map((tower) => ({ ...tower })),
   };
@@ -654,6 +689,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
     events.push(attackEvent, damageEvent, resolvedEvent);
 
     if (target.hp === 0) {
+      awardKillBounty(newState, tower.ownerId, target);
       const deathEvent: MonsterDiedEvent = {
         type: 'monster_died',
         tick: state.tick,
@@ -714,6 +750,7 @@ function processCombat(state: SimulationState): { state: SimulationState; events
             isSplash: true,
           });
           if (other.hp === 0) {
+            awardKillBounty(newState, tower.ownerId, other);
             events.push({
               type: 'monster_died',
               tick: state.tick,
