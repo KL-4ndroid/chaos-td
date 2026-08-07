@@ -7,6 +7,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Node writes loader warnings to stderr. They are diagnostics, not a failed
+# evolution batch, so do not let PowerShell promote them to terminating errors.
+$PSNativeCommandUseErrorActionPreference = $false
 $workspace = Split-Path -Parent $PSScriptRoot
 $checkpointRoot = Join-Path $workspace "data\ai\training\checkpoints\$RunId"
 $snapshotPath = Join-Path $checkpointRoot 'checkpoint.json'
